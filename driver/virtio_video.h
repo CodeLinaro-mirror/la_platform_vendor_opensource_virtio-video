@@ -23,7 +23,7 @@
 #include <linux/virtio.h>
 #include <linux/virtio_ids.h>
 #include <linux/virtio_config.h>
-#include <linux/virtio_video.h>
+#include <vidc/linux/virtio_video.h>
 #include <linux/list.h>
 #include <linux/completion.h>
 #include <media/v4l2-device.h>
