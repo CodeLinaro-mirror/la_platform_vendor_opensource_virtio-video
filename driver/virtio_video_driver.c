@@ -26,12 +26,18 @@
 
 #include "virtio_video.h"
 
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-label"
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 static unsigned int debug;
 module_param(debug, uint, 0644);
 
 static unsigned int use_dma_mem;
 module_param(use_dma_mem, uint, 0644);
 MODULE_PARM_DESC(use_dma_mem, "Try to allocate buffers from the DMA zone");
+
+static atomic_t v4l2_instance = ATOMIC_INIT(0);
 
 static int vid_nr_dec = -1;
 module_param(vid_nr_dec, int, 0644);
@@ -50,7 +56,11 @@ module_param(mplane_cam, bool, 0644);
 MODULE_PARM_DESC(mplane_cam,
 	"1 (default) - multiplanar camera, 0 - single planar camera");
 
-static int virtio_video_probe(struct virtio_device *vdev)
+#ifndef CONFIG_MSM_VIRTIO_HAB
+static int virtio_video_probe(struct virtio_device* vdev)
+#else
+int virtio_video_probe(struct virtio_device* vdev)
+#endif
 {
 	int ret;
 	struct virtio_video_device *vvd;
@@ -58,17 +68,21 @@ static int virtio_video_probe(struct virtio_device *vdev)
 	struct device *dev = &vdev->dev;
 	struct device *pdev = dev->parent;
 
+#ifndef CONFIG_MSM_VIRTIO_HAB
 	static const char * const names[] = { "commandq", "eventq" };
 	static vq_callback_t *callbacks[] = {
 		virtio_video_cmd_cb,
 		virtio_video_event_cb
 	};
 
+#endif
+
+#ifndef MSM_HAB_NO_SUPPORT
 	if (!virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES)) {
 		dev_err(dev, "device must support guest allocated buffers\n");
 		return -ENODEV;
 	}
-
+#endif
 	vvd = devm_kzalloc(dev, sizeof(*vvd), GFP_KERNEL);
 	if (!vvd)
 		return -ENOMEM;
@@ -105,8 +119,9 @@ static int virtio_video_probe(struct virtio_device *vdev)
 	idr_init(&vvd->stream_idr);
 
 	init_waitqueue_head(&vvd->wq);
-
+#ifndef MSM_HAB_NO_SUPPORT
 	if (virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_NON_CONTIG))
+#endif
 		vvd->supp_non_contig = true;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,9,0)
@@ -127,6 +142,7 @@ static int virtio_video_probe(struct virtio_device *vdev)
 
 	dma_set_mask(dev, *pdev->dma_mask);
 
+	v4l2_device_set_name(&vvd->v4l2_dev, DRIVER_NAME, &v4l2_instance);
 	dev_set_name(dev, "%s.%i", DRIVER_NAME, vdev->index);
 	ret = v4l2_device_register(dev, &vvd->v4l2_dev);
 	if (ret)
@@ -139,6 +155,7 @@ static int virtio_video_probe(struct virtio_device *vdev)
 
 	INIT_LIST_HEAD(&vvd->pending_vbuf_list);
 
+#ifndef CONFIG_MSM_VIRTIO_HAB
 	ret = virtio_find_vqs(vdev, 2, vqs, callbacks, names, NULL);
 	if (ret) {
 		v4l2_err(&vvd->v4l2_dev, "failed to find virt queues\n");
@@ -147,13 +164,14 @@ static int virtio_video_probe(struct virtio_device *vdev)
 
 	vvd->commandq.vq = vqs[0];
 	vvd->eventq.vq = vqs[1];
-
+#endif
 	ret = virtio_video_alloc_vbufs(vvd);
 	if (ret) {
 		v4l2_err(&vvd->v4l2_dev, "failed to alloc vbufs\n");
 		goto err_vbufs;
 	}
 
+#ifndef CONFIG_MSM_VIRTIO_HAB
 	virtio_cread(vdev, struct virtio_video_config, max_caps_length,
 		     &vvd->max_caps_len);
 	if (!vvd->max_caps_len) {
@@ -169,12 +187,18 @@ static int virtio_video_probe(struct virtio_device *vdev)
 		ret = -EINVAL;
 		goto err_config;
 	}
-
+#else
+	/* Set non-zero value only for addressing compilation error */
+	vvd->max_caps_len = 10;
+	vvd->max_resp_len = 10;
+#endif
+#ifndef CONFIG_MSM_VIRTIO_HAB
 	ret = virtio_video_alloc_events(vvd);
 	if (ret)
 		goto err_events;
 
 	virtio_device_ready(vdev);
+#endif
 	vvd->commandq.ready = true;
 	vvd->eventq.ready = true;
 
@@ -184,7 +208,6 @@ static int virtio_video_probe(struct virtio_device *vdev)
 			 "failed to init virtio video\n");
 		goto err_init;
 	}
-
 	return 0;
 
 err_init:
@@ -201,7 +224,11 @@ err_v4l2_reg:
 	return ret;
 }
 
+#ifndef CONFIG_MSM_VIRTIO_HAB
 static void virtio_video_remove(struct virtio_device *vdev)
+#else
+void virtio_video_remove(struct virtio_device* vdev)
+#endif
 {
 	struct virtio_video_device *vvd = vdev->priv;
 
@@ -224,6 +251,7 @@ static unsigned int features[] = {
 	VIRTIO_VIDEO_F_RESOURCE_NON_CONTIG,
 };
 
+#ifndef CONFIG_MSM_VIRTIO_HAB
 static struct virtio_driver virtio_video_driver = {
 	.feature_table = features,
 	.feature_table_size = ARRAY_SIZE(features),
@@ -244,3 +272,4 @@ MODULE_AUTHOR("Nikolay Martyanov <nikolay.martyanov@opensynergy.com>");
 MODULE_AUTHOR("Samiullah Khawaja <samiullah.khawaja@opensynergy.com>");
 MODULE_VERSION(DRIVER_VERSION);
 MODULE_LICENSE("GPL");
+#endif

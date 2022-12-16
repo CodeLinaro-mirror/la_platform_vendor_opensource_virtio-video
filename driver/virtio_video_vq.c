@@ -239,8 +239,7 @@ static void *virtio_video_alloc_req(struct virtio_video_device *vvd,
 	return vbuf->buf;
 }
 
-static void *
-virtio_video_alloc_req_resp(struct virtio_video_device *vvd,
+static void *virtio_video_alloc_req_resp(struct virtio_video_device *vvd,
 			    virtio_video_resp_cb cb,
 			    struct virtio_video_vbuffer **vbuffer_p,
 			    int req_size, int resp_size,
@@ -258,8 +257,7 @@ virtio_video_alloc_req_resp(struct virtio_video_device *vvd,
 	return vbuf->buf;
 }
 
-static int
-virtio_video_queue_cmd_buffer(struct virtio_video_device *vvd,
+static int virtio_video_queue_cmd_buffer(struct virtio_video_device *vvd,
 			      struct virtio_video_vbuffer *vbuf)
 {
 	unsigned long flags;
@@ -307,9 +305,7 @@ retry:
 
 	return ret;
 }
-
-static int
-virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
+static int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 				   struct virtio_video_vbuffer *vbuf)
 {
 	int ret;

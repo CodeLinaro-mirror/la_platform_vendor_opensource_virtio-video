@@ -32,6 +32,10 @@
 #include <media/videobuf2-dma-sg.h>
 #include <media/videobuf2-dma-contig.h>
 
+#ifndef CONFIG_MSM_VIRTIO_HAB
+#define CONFIG_MSM_VIRTIO_HAB
+#endif
+#define MSM_HAB_NO_SUPPORT
 #define DRIVER_NAME "virtio-video"
 
 #define MIN_BUFS_MIN 0

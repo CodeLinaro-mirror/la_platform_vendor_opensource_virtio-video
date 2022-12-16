@@ -24,6 +24,10 @@
 
 #include "virtio_video.h"
 
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-label"
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 enum video_stream_state virtio_video_state(struct virtio_video_stream *stream)
 {
 	return atomic_read(&stream->state);
@@ -1147,21 +1151,23 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 	output_resp_buf = kzalloc(vvd->max_caps_len, GFP_KERNEL);
 	if (!output_resp_buf)
 		return -ENOMEM;
-
+#ifndef MSM_HAB_NO_SUPPORT
 	ret = virtio_video_query_capability(vvd, output_resp_buf,
 					    VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
 	if (ret) {
 		v4l2_err(&vvd->v4l2_dev, "failed to get output caps\n");
 		goto err_output_cap;
 	}
+#endif
 
 	if (vvd->is_m2m_dev) {
-		input_resp_buf = kzalloc(vvd->max_caps_len, GFP_KERNEL);
+	    input_resp_buf = kzalloc(vvd->max_caps_len, GFP_KERNEL);
 		if (!input_resp_buf) {
-			ret = -ENOMEM;
+		    ret = -ENOMEM;
 			goto err_input_buf;
 		}
 
+#ifndef MSM_HAB_NO_SUPPORT
 		ret = virtio_video_query_capability(vvd, input_resp_buf,
 						VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
 		if (ret) {
@@ -1169,6 +1175,7 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 			goto err_input_cap;
 		}
 
+#endif
 		m2m_dev = v4l2_m2m_init(&virtio_video_device_m2m_ops);
 		if (IS_ERR(m2m_dev)) {
 			v4l2_err(&vvd->v4l2_dev, "failed to init m2m device\n");
@@ -1227,7 +1234,7 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 		virtio_video_dec_init(vvd);
 		break;
 	}
-
+#ifndef MSM_HAB_NO_SUPPORT
 	ret = virtio_video_parse_virtio_capabilities(vvd, input_resp_buf,
 						     output_resp_buf);
 	if (ret) {
@@ -1240,7 +1247,7 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 		v4l2_err(&vvd->v4l2_dev, "failed to query controls\n");
 		goto parse_ctrl_err;
 	}
-
+#endif
 	ret = virtio_video_device_register(vvd);
 	if (ret) {
 		v4l2_err(&vvd->v4l2_dev,
