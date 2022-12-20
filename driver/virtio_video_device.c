@@ -23,6 +23,9 @@
 #include <media/videobuf2-dma-sg.h>
 
 #include "virtio_video.h"
+#ifdef CONFIG_MSM_VIRTIO_HAB
+#include "virtio_video_msm_hab.h"
+#endif
 
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-label"
@@ -938,7 +941,7 @@ static int virtio_video_device_open(struct file *file)
 		v4l2_err(&vvd->v4l2_dev, "device already in use.\n");
 		return ret;
 	}
-
+#ifndef VIRTIO_VIDEO_MSM
 	default_fmt = list_first_entry_or_null(vvd->ops->get_fmt_list(vvd),
 					       struct video_format,
 					       formats_list_entry);
@@ -948,6 +951,7 @@ static int virtio_video_device_open(struct file *file)
 		goto err;
 	}
 
+#endif
 	stream = kzalloc(sizeof(*stream), GFP_KERNEL);
 	if (!stream) {
 		ret = -ENOMEM;
@@ -955,7 +959,11 @@ static int virtio_video_device_open(struct file *file)
 	}
 
 	get_task_comm(name, current);
+#ifndef VIRTIO_VIDEO_MSM
 	format = virtio_video_v4l2_format_to_virtio(default_fmt->desc.format);
+#else
+	format = VIRTIO_VIDEO_FORMAT_H264;
+#endif
 	virtio_video_stream_id_get(vvd, stream, &stream_id);
 	ret = virtio_video_cmd_stream_create(vvd, stream_id, format, name);
 	if (ret) {
@@ -967,7 +975,7 @@ static int virtio_video_device_open(struct file *file)
 	stream->stream_id = stream_id;
 
 	virtio_video_state_reset(stream);
-
+#ifndef VIRTIO_VIDEO_MSM
 	ret = virtio_video_stream_get_params(vvd, stream);
 	if (ret)
 		goto err_stream_create;
@@ -978,6 +986,7 @@ static int virtio_video_device_open(struct file *file)
 		if (ret)
 			goto err_stream_create;
 	}
+#endif
 
 	mutex_init(&stream->vq_mutex);
 	v4l2_fh_init(&stream->fh, video_dev);
@@ -1159,6 +1168,14 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 		goto err_output_cap;
 	}
 #endif
+#ifdef VIRTIO_VIDEO_MSM
+	ret = virtio_video_msm_hab_open(vvd);
+	if (ret) {
+		v4l2_err(&vvd->v4l2_dev, "close hab due to open errors");
+		virtio_video_msm_hab_close(vvd);
+		goto err_output_cap;
+	}
+#endif
 
 	if (vvd->is_m2m_dev) {
 	    input_resp_buf = kzalloc(vvd->max_caps_len, GFP_KERNEL);
@@ -1280,7 +1297,9 @@ void virtio_video_device_deinit(struct virtio_video_device *vvd)
 {
 	vvd->commandq.ready = false;
 	vvd->eventq.ready = false;
-
+#ifdef VIRTIO_VIDEO_MSM
+	virtio_video_msm_hab_close(vvd);
+#endif
 	virtio_video_device_unregister(vvd);
 	if (vvd->is_m2m_dev)
 		v4l2_m2m_release(vvd->m2m_dev);

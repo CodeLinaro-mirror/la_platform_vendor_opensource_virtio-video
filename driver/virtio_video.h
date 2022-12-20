@@ -32,16 +32,46 @@
 #include <media/videobuf2-dma-sg.h>
 #include <media/videobuf2-dma-contig.h>
 
+#ifdef VIRTIO_VIDEO_MSM
+#include <linux/kthread.h>
+#endif
+
 #ifndef CONFIG_MSM_VIRTIO_HAB
 #define CONFIG_MSM_VIRTIO_HAB
 #endif
-#define MSM_HAB_NO_SUPPORT
+
 #define DRIVER_NAME "virtio-video"
 
 #define MIN_BUFS_MIN 0
 #define MIN_BUFS_MAX VIDEO_MAX_FRAME
 #define MIN_BUFS_STEP 1
 #define MIN_BUFS_DEF 1
+
+#ifdef VIRTIO_VIDEO_MSM
+struct msm_hab_virtqueue {
+	void (*callback)(struct msm_hab_virtqueue* vq);
+	const char* name;
+	struct virtio_device* vdev;
+	unsigned int index;
+	unsigned int num_free;
+	void* priv;
+	spinlock_t qlock;
+	uint32_t habmm_handle;
+	struct list_head vbuf_list;
+	struct list_head resp_list;
+};
+
+#define virtqueue msm_hab_virtqueue
+#define virtqueue_get_buf msm_hab_virtqueue_get_buf
+#define virtqueue_detach_unused_buf msm_hab_virtqueue_detach_unused_buf
+#define virtqueue_add_sgs msm_hab_virtqueue_add_sgs
+#define virtqueue_kick(x) ((void)0)
+#define virtqueue_add_inbuf msm_hab_virtqueue_add_inbuf
+#define virtqueue_disable_cb(x) {}
+#define virtqueue_is_broken(x) (false)
+#define virtqueue_enable_cb(x) (true)
+
+#endif
 
 struct video_format_frame {
 	struct virtio_video_format_frame frame;

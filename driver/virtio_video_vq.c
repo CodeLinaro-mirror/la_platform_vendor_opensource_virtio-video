@@ -21,6 +21,9 @@
  */
 
 #include "virtio_video.h"
+#ifdef CONFIG_MSM_VIRTIO_HAB
+#include "virtio_video_msm_hab.h"
+#endif
 
 #define MAX_INLINE_CMD_SIZE   298
 #define MAX_INLINE_RESP_SIZE  298

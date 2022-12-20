@@ -155,7 +155,16 @@ int virtio_video_probe(struct virtio_device* vdev)
 
 	INIT_LIST_HEAD(&vvd->pending_vbuf_list);
 
-#ifndef CONFIG_MSM_VIRTIO_HAB
+#ifdef CONFIG_MSM_VIRTIO_HAB
+	vvd->commandq.vq = kmalloc(sizeof(struct virtqueue), GFP_KERNEL);
+	vvd->commandq.vq->habmm_handle = 0;
+	vvd->commandq.vq->vdev = vdev;
+	INIT_LIST_HEAD(&vvd->commandq.vq->resp_list);
+	vvd->eventq.vq = kmalloc(sizeof(struct virtqueue), GFP_KERNEL);
+	vvd->eventq.vq->habmm_handle = 0;
+	vvd->eventq.vq->vdev = vdev;
+	INIT_LIST_HEAD(&vvd->eventq.vq->resp_list);
+#else
 	ret = virtio_find_vqs(vdev, 2, vqs, callbacks, names, NULL);
 	if (ret) {
 		v4l2_err(&vvd->v4l2_dev, "failed to find virt queues\n");
