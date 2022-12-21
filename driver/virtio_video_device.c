@@ -2,6 +2,7 @@
 /* Driver for virtio video device.
  *
  * Copyright 2020 OpenSynergy GmbH.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

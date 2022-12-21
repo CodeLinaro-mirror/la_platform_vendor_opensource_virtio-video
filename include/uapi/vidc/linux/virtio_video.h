@@ -38,6 +38,8 @@
 #include <linux/types.h>
 #include <linux/virtio_config.h>
 
+#define MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE (2048)
+
 enum virtio_video_device_type {
 	VIRTIO_VIDEO_DEVICE_ENCODER = 0x0100,
 	VIRTIO_VIDEO_DEVICE_DECODER,
@@ -177,6 +179,9 @@ enum virtio_video_cmd_type {
 	VIRTIO_VIDEO_CMD_QUERY_CONTROL,
 	VIRTIO_VIDEO_CMD_GET_CONTROL,
 	VIRTIO_VIDEO_CMD_SET_CONTROL,
+	VIRTIO_VIDEO_CMD_STREAMON,
+	VIRTIO_VIDEO_CMD_STREAMOFF,
+	VIRTIO_VIDEO_CMD_STREAM_START,
 
 	/* Response */
 	VIRTIO_VIDEO_RESP_OK_NODATA = 0x0200,
@@ -194,6 +199,28 @@ enum virtio_video_cmd_type {
 	VIRTIO_VIDEO_RESP_ERR_UNSUPPORTED_CONTROL,
 };
 
+enum virtio_video_sub_cmd_type
+{
+	ENUM_FMT = 1,
+	ENUM_FRAMESIZES,
+	ENUM_FRAMEINTERVALS,
+	S_FMT,
+	G_FMT,
+	QUERYCAP,
+	SUBSCRIBE_EVENT,
+	UNSUBSCRIBE_EVENT,
+	QBUF,
+	REQBUFS,
+	QUERYCTRL,
+	QUERYMENU,
+	G_CTRL,
+	S_CTRL,
+	G_PARAM,
+	S_PARAM,
+	G_SELECTION,
+	S_SELECTION,
+};
+
 struct virtio_video_cmd_hdr {
 	__le32 type; /* One of enum virtio_video_cmd_type */
 	__le32 stream_id;
@@ -203,6 +230,8 @@ struct virtio_video_cmd_hdr {
 enum virtio_video_queue_type {
 	VIRTIO_VIDEO_QUEUE_TYPE_INPUT = 0x100,
 	VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT,
+	VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META,
+	VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT_META,
 };
 
 struct virtio_video_query_capability {
@@ -252,12 +281,33 @@ enum virtio_video_mem_type {
 	VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES,
 };
 
+struct virtio_video_stream_ioctl_hdr {
+	__le32	cmd_type;
+	__le32	stream_id;
+	__le32	sub_cmd_type;
+};
+
+struct virtio_video_stream_ioctl_cmd {
+	struct virtio_video_stream_ioctl_hdr hdr;
+	__u8   payload[];
+};
+
+struct virtio_video_msg {
+	struct virtio_video_cmd_hdr hdr;
+	__u8   payload[MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE - sizeof(struct virtio_video_cmd_hdr)];
+};
+
+struct virtio_video_resp
+{
+	__le32 result; /* VIRTIO_VIDEO_RESULT_* */
+};
+
 struct virtio_video_stream_create {
 	struct virtio_video_cmd_hdr hdr;
 	__le32 in_mem_type; /* One of VIRTIO_VIDEO_MEM_TYPE_* types */
 	__le32 out_mem_type; /* One of VIRTIO_VIDEO_MEM_TYPE_* types */
 	__le32 coded_format; /* One of VIRTIO_VIDEO_FORMAT_* types */
-	__u8 padding[4];
+	__le32 device_type;  /* virtio_video_device_type types */
 	__u8 tag[64];
 };
 

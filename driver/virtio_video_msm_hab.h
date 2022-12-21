@@ -8,6 +8,9 @@
 
 #include "virtio_video.h"
 
+int virtio_video_msm_queue_cmd_buffer(struct virtio_video_device* vvd,
+	struct virtio_video_vbuffer* vbuf);
+
 int virtio_video_msm_hab_open(struct virtio_video_device* vvd);
 void virtio_video_msm_hab_close(struct virtio_video_device* vvd);
 

@@ -2,6 +2,7 @@
 /* Common header for virtio video driver.
  *
  * Copyright 2020 OpenSynergy GmbH.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,6 +49,12 @@
 #define MIN_BUFS_DEF 1
 
 #ifdef VIRTIO_VIDEO_MSM
+#define INPUT_MPLANE V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE
+#define OUTPUT_MPLANE V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE
+#define INPUT_META_PLANE V4L2_BUF_TYPE_META_OUTPUT
+#define OUTPUT_META_PLANE V4L2_BUF_TYPE_META_CAPTURE
+
+
 struct msm_hab_virtqueue {
 	void (*callback)(struct msm_hab_virtqueue* vq);
 	const char* name;
@@ -70,6 +77,15 @@ struct msm_hab_virtqueue {
 #define virtqueue_disable_cb(x) {}
 #define virtqueue_is_broken(x) (false)
 #define virtqueue_enable_cb(x) (true)
+
+enum msm_vidc_port_type {
+	INPUT_PORT = 0,
+	OUTPUT_PORT,
+	INPUT_META_PORT,
+	OUTPUT_META_PORT,
+	PORT_NONE,
+	MAX_PORT,
+};
 
 #endif
 
@@ -183,6 +199,11 @@ struct virtio_video_stream {
 	struct video_format_info out_info;
 	struct video_control_info control;
 	struct video_format_frame *current_frame;
+#ifdef VIRTIO_VIDEO_MSM
+	struct v4l2_format fmts[MAX_PORT];
+	struct mutex client_lock;
+	struct mutex lock;
+#endif
 };
 
 struct virtio_video_device {
@@ -243,6 +264,11 @@ struct virtio_video_device {
 
 	struct list_head controls_fmt_list;
 	struct virtio_video_device_ops *ops;
+
+#ifdef VIRTIO_VIDEO_MSM
+	struct task_struct* cmd_resp_thread;
+	bool exit_resp_handler;
+#endif
 };
 
 struct virtio_video_device_ops {
@@ -333,6 +359,10 @@ void virtio_video_state_update(struct virtio_video_stream *stream,
 int virtio_video_alloc_vbufs(struct virtio_video_device *vvd);
 void virtio_video_free_vbufs(struct virtio_video_device *vvd);
 int virtio_video_alloc_events(struct virtio_video_device *vvd);
+bool virtio_video_vbuf_is_pending(struct virtio_video_device *vvd,
+			    struct virtio_video_vbuffer *vbuf);
+void virtio_video_free_vbuf(struct virtio_video_device *vvd,
+		      struct virtio_video_vbuffer *vbuf);
 
 int virtio_video_device_init(struct virtio_video_device *vvd);
 void virtio_video_device_deinit(struct virtio_video_device *vvd);
@@ -472,5 +502,25 @@ int virtio_video_stream_get_params(struct virtio_video_device *vvd,
 				   struct virtio_video_stream *stream);
 int virtio_video_stream_get_controls(struct virtio_video_device *vvd,
 				     struct virtio_video_stream *stream);
+
+
+void *virtio_video_alloc_req(struct virtio_video_device *vvd,
+				    struct virtio_video_vbuffer **vbuffer_p,
+				    int size);
+
+
+void *virtio_video_alloc_req_resp(struct virtio_video_device *vvd,
+			    virtio_video_resp_cb cb,
+			    struct virtio_video_vbuffer **vbuffer_p,
+			    int req_size, int resp_size,
+			    void *resp_buf);
+
+
+int virtio_video_queue_cmd_buffer(struct virtio_video_device *vvd,
+			      struct virtio_video_vbuffer *vbuf);
+
+
+int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
+			      struct virtio_video_vbuffer *vbuf);
 
 #endif /* _VIRTIO_VIDEO_H */

@@ -15,7 +15,10 @@ virtio_video-y := \
 	virtio_video_caps.o \
 	virtio_video_helpers.o\
 	virtio_video_msm_driver.o\
-	virtio_video_msm_hab.o
+	virtio_video_msm_hab.o \
+	virtio_video_msm_debug.o \
+	virtio_video_msm_v4l2.o \
+	virtio_video_msm_vq.o
 
 obj-m += virtio_video.o
 

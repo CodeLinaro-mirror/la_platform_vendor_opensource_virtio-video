@@ -2,6 +2,7 @@
 /* Decoder for virtio video device.
  *
  * Copyright 2020 OpenSynergy GmbH.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,6 +23,9 @@
 #include <media/v4l2-ioctl.h>
 
 #include "virtio_video.h"
+#include "virtio_video_msm_v4l2.h"
+
+#pragma GCC diagnostic ignored "-Wunused-variable"
 
 static int virtio_video_dec_start_streaming(struct vb2_queue *vq,
 					    unsigned int count)
@@ -32,7 +36,7 @@ static int virtio_video_dec_start_streaming(struct vb2_queue *vq,
 		return -EIO;
 
 	if (!V4L2_TYPE_IS_OUTPUT(vq->type) &&
-	    virtio_video_state(stream) >= STREAM_STATE_INIT)
+		virtio_video_state(stream) >= STREAM_STATE_INIT)
 		virtio_video_state_update(stream, STREAM_STATE_RUNNING);
 
 	return 0;
@@ -63,6 +67,7 @@ static const struct vb2_ops virtio_video_dec_qops = {
 	.wait_finish	 = vb2_ops_wait_finish,
 };
 
+#ifndef VIRTIO_VIDEO_MSM
 static int virtio_video_dec_g_ctrl(struct v4l2_ctrl *ctrl)
 {
 	int ret = 0;
@@ -74,7 +79,7 @@ static int virtio_video_dec_g_ctrl(struct v4l2_ctrl *ctrl)
 	switch (ctrl->id) {
 	case V4L2_CID_MIN_BUFFERS_FOR_CAPTURE:
 		if (virtio_video_state(stream) >=
-		    STREAM_STATE_DYNAMIC_RES_CHANGE)
+			STREAM_STATE_DYNAMIC_RES_CHANGE)
 			ctrl->val = stream->out_info.min_buffers;
 		else
 			ctrl->val = 0;
@@ -86,9 +91,15 @@ static int virtio_video_dec_g_ctrl(struct v4l2_ctrl *ctrl)
 
 	return ret;
 }
+#endif
 
 static const struct v4l2_ctrl_ops virtio_video_dec_ctrl_ops = {
-	.g_volatile_ctrl	= virtio_video_dec_g_ctrl,
+#ifdef VIRTIO_VIDEO_MSM
+	.g_volatile_ctrl = msm_v4l2_g_ctrl,
+	.s_ctrl = msm_v4l2_op_s_ctrl,
+#else
+	.g_volatile_ctrl = virtio_video_dec_g_ctrl,
+#endif
 };
 
 int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
@@ -109,10 +120,20 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 	if (stream->ctrl_handler.error)
 		return stream->ctrl_handler.error;
 
+#ifdef VIRTIO_VIDEO_MSM
+	ctrl = v4l2_ctrl_new_std(&stream->ctrl_handler,
+				&virtio_video_dec_ctrl_ops,
+				V4L2_CID_MIN_BUFFERS_FOR_OUTPUT,
+				MIN_BUFS_MIN, MIN_BUFS_MAX, MIN_BUFS_STEP,
+				MIN_BUFS_DEF);
+	if (ctrl)
+		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
+#else
 	(void)v4l2_ctrl_new_std(&stream->ctrl_handler, NULL,
 				V4L2_CID_MIN_BUFFERS_FOR_OUTPUT,
 				MIN_BUFS_MIN, MIN_BUFS_MAX, MIN_BUFS_STEP,
 				stream->in_info.min_buffers);
+#endif
 
 	if (stream->ctrl_handler.error)
 		return stream->ctrl_handler.error;
@@ -358,6 +379,47 @@ static int virtio_video_dec_s_selection(struct file *file, void *fh,
 					   VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
 }
 
+static const struct v4l2_ioctl_ops virtio_video_msm_dec_ioctl_ops = {
+	.vidioc_querycap = msm_v4l2_querycap,
+	.vidioc_enum_fmt_vid_cap = msm_v4l2_enum_fmt,
+	.vidioc_enum_fmt_vid_out = msm_v4l2_enum_fmt,
+	.vidioc_enum_fmt_meta_cap = msm_v4l2_enum_fmt,
+	.vidioc_enum_fmt_meta_out = msm_v4l2_enum_fmt,
+	.vidioc_enum_framesizes = msm_v4l2_enum_framesizes,
+	.vidioc_enum_frameintervals = msm_v4l2_enum_frameintervals,
+	.vidioc_try_fmt_vid_cap_mplane = msm_v4l2_try_fmt,
+	.vidioc_try_fmt_vid_out_mplane = msm_v4l2_try_fmt,
+	.vidioc_try_fmt_meta_cap = msm_v4l2_try_fmt,
+	.vidioc_try_fmt_meta_out = msm_v4l2_try_fmt,
+	.vidioc_s_fmt_vid_cap = msm_v4l2_s_fmt,
+	.vidioc_s_fmt_vid_out = msm_v4l2_s_fmt,
+	.vidioc_s_fmt_vid_cap_mplane = msm_v4l2_s_fmt,
+	.vidioc_s_fmt_vid_out_mplane = msm_v4l2_s_fmt,
+	.vidioc_s_fmt_meta_out = msm_v4l2_s_fmt,
+	.vidioc_s_fmt_meta_cap = msm_v4l2_s_fmt,
+	.vidioc_g_fmt_vid_cap = msm_v4l2_g_fmt,
+	.vidioc_g_fmt_vid_out = msm_v4l2_g_fmt,
+	.vidioc_g_fmt_vid_cap_mplane = msm_v4l2_g_fmt,
+	.vidioc_g_fmt_vid_out_mplane = msm_v4l2_g_fmt,
+	.vidioc_g_fmt_meta_out = msm_v4l2_g_fmt,
+	.vidioc_g_fmt_meta_cap = msm_v4l2_g_fmt,
+	.vidioc_g_selection = msm_v4l2_g_selection,
+	.vidioc_s_selection = msm_v4l2_s_selection,
+	.vidioc_s_parm = msm_v4l2_s_parm,
+	.vidioc_g_parm = msm_v4l2_g_parm,
+	.vidioc_reqbufs = msm_v4l2_reqbufs,
+	.vidioc_querybuf = msm_v4l2_querybuf,
+	.vidioc_qbuf = msm_v4l2_qbuf,
+	.vidioc_dqbuf = msm_v4l2_dqbuf,
+	.vidioc_streamon = msm_v4l2_streamon,
+	.vidioc_streamoff = msm_v4l2_streamoff,
+	.vidioc_querymenu = msm_v4l2_querymenu,
+	.vidioc_subscribe_event = msm_v4l2_subscribe_event,
+	.vidioc_unsubscribe_event = msm_v4l2_unsubscribe_event,
+	.vidioc_try_decoder_cmd = msm_v4l2_try_decoder_cmd,
+	.vidioc_decoder_cmd = msm_v4l2_decoder_cmd,
+};
+
 static const struct v4l2_ioctl_ops virtio_video_dec_ioctl_ops = {
 	.vidioc_querycap	= virtio_video_querycap,
 
@@ -413,7 +475,11 @@ int virtio_video_dec_init(struct virtio_video_device *vvd)
 	ssize_t num;
 	struct video_device *vd = &vvd->video_dev;
 
+#ifndef VIRTIO_VIDEO_MSM
 	vd->ioctl_ops = &virtio_video_dec_ioctl_ops;
+#else
+	vd->ioctl_ops = &virtio_video_msm_dec_ioctl_ops;
+#endif
 	vvd->ops = &virtio_video_dec_ops;
 
 	num = strscpy(vd->name, "stateful-decoder", sizeof(vd->name));

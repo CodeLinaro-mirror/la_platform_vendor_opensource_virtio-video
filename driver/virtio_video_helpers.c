@@ -18,6 +18,7 @@
  */
 
 #include "virtio_video.h"
+#include "virtio_video_msm_debug.h"
 
 struct virtio_video_convert_table {
 	uint32_t virtio_value;
@@ -190,7 +191,7 @@ uint32_t virtio_video_v4l2_control_to_virtio(uint32_t v4l2_control)
 uint32_t virtio_video_get_format_from_virtio_profile(uint32_t virtio_profile)
 {
 	if (virtio_profile >= VIRTIO_VIDEO_PROFILE_H264_MIN &&
-	    virtio_profile <= VIRTIO_VIDEO_PROFILE_H264_MAX)
+		virtio_profile <= VIRTIO_VIDEO_PROFILE_H264_MAX)
 		return VIRTIO_VIDEO_FORMAT_H264;
 	else if (virtio_profile >= VIRTIO_VIDEO_PROFILE_HEVC_MIN &&
 		 virtio_profile <= VIRTIO_VIDEO_PROFILE_HEVC_MAX)
@@ -206,7 +207,7 @@ uint32_t virtio_video_get_format_from_virtio_profile(uint32_t virtio_profile)
 }
 
 struct video_format *virtio_video_find_video_format(struct list_head *fmts_list,
-						    uint32_t format)
+							uint32_t format)
 {
 	struct video_format *fmt = NULL;
 
@@ -219,7 +220,7 @@ struct video_format *virtio_video_find_video_format(struct list_head *fmts_list,
 }
 
 void virtio_video_format_from_info(struct video_format_info *info,
-				   struct v4l2_pix_format_mplane *pix_mp)
+					struct v4l2_pix_format_mplane *pix_mp)
 {
 	int i;
 
@@ -232,7 +233,7 @@ void virtio_video_format_from_info(struct video_format_info *info,
 	pix_mp->quantization = 0;
 	memset(pix_mp->reserved, 0, sizeof(pix_mp->reserved));
 	memset(pix_mp->plane_fmt[0].reserved, 0,
-	       sizeof(pix_mp->plane_fmt[0].reserved));
+			sizeof(pix_mp->plane_fmt[0].reserved));
 
 	pix_mp->num_planes = info->num_planes;
 	pix_mp->pixelformat = info->fourcc_format;
@@ -246,7 +247,7 @@ void virtio_video_format_from_info(struct video_format_info *info,
 }
 
 void virtio_video_format_fill_default_info(struct video_format_info *dst_info,
-					  struct video_format_info *src_info)
+						struct video_format_info *src_info)
 {
 	memcpy(dst_info, src_info, sizeof(*dst_info));
 }
@@ -256,7 +257,7 @@ void virtio_video_pix_fmt_sp2mp(const struct v4l2_pix_format *pix,
 {
 	memset(pix_mp->reserved, 0, sizeof(pix_mp->reserved));
 	memset(&pix_mp->plane_fmt[0].reserved, 0,
-	       sizeof(pix_mp->plane_fmt[0].reserved));
+			sizeof(pix_mp->plane_fmt[0].reserved));
 	pix_mp->num_planes = 1;
 	pix_mp->width = pix->width;
 	pix_mp->height = pix->height;

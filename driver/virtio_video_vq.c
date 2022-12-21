@@ -2,6 +2,7 @@
 /* Driver for virtio video device.
  *
  * Copyright 2020 OpenSynergy GmbH.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Based on drivers/gpu/drm/virtio/virtgpu_vq.c
  * Copyright (C) 2015 Red Hat, Inc.
@@ -25,8 +26,8 @@
 #include "virtio_video_msm_hab.h"
 #endif
 
-#define MAX_INLINE_CMD_SIZE   298
-#define MAX_INLINE_RESP_SIZE  298
+#define MAX_INLINE_CMD_SIZE   1024
+#define MAX_INLINE_RESP_SIZE  1024
 #define VBUFFER_SIZE          (sizeof(struct virtio_video_vbuffer) \
 			       + MAX_INLINE_CMD_SIZE		   \
 			       + MAX_INLINE_RESP_SIZE)
@@ -76,8 +77,8 @@ void virtio_video_stream_id_put(struct virtio_video_device *vvd, uint32_t id)
 	spin_unlock(&vvd->stream_idr_lock);
 }
 
-static bool vbuf_is_pending(struct virtio_video_device *vvd,
-			    struct virtio_video_vbuffer *vbuf)
+bool virtio_video_vbuf_is_pending(struct virtio_video_device *vvd,
+				struct virtio_video_vbuffer *vbuf)
 {
 	struct virtio_video_vbuffer *entry;
 
@@ -90,8 +91,8 @@ static bool vbuf_is_pending(struct virtio_video_device *vvd,
 	return false;
 }
 
-static void free_vbuf(struct virtio_video_device *vvd,
-		      struct virtio_video_vbuffer *vbuf)
+void virtio_video_free_vbuf(struct virtio_video_device *vvd,
+				struct virtio_video_vbuffer *vbuf)
 {
 	list_del(&vbuf->pending_list_entry);
 	kfree(vbuf->data_buf);
@@ -102,15 +103,22 @@ void virtio_video_cmd_cb(struct virtqueue *vq)
 {
 	struct virtio_video_device *vvd = vq->vdev->priv;
 	struct virtio_video_vbuffer *vbuf;
-	unsigned long flags;
-	unsigned int len;
+#ifndef CONFIG_MSM_VIRTIO_HAB
+	unsigned long flags = 0L;
+#endif
+	unsigned int len = 0;
 
+#ifdef CONFIG_MSM_VIRTIO_HAB
+	spin_lock(&vvd->commandq.qlock);
+#else
 	spin_lock_irqsave(&vvd->commandq.qlock, flags);
+#endif
 	while (vvd->commandq.ready) {
+
 		virtqueue_disable_cb(vq);
 
 		while ((vbuf = virtqueue_get_buf(vq, &len))) {
-			if (!vbuf_is_pending(vvd, vbuf))
+			if (!virtio_video_vbuf_is_pending(vvd, vbuf))
 				continue;
 
 			if (vbuf->resp_cb)
@@ -119,7 +127,7 @@ void virtio_video_cmd_cb(struct virtqueue *vq)
 			if (vbuf->is_sync)
 				complete(&vbuf->reclaimed);
 			else
-				free_vbuf(vvd, vbuf);
+				virtio_video_free_vbuf(vvd, vbuf);
 		}
 
 		if (unlikely(virtqueue_is_broken(vq)))
@@ -128,7 +136,12 @@ void virtio_video_cmd_cb(struct virtqueue *vq)
 		if (virtqueue_enable_cb(vq))
 			break;
 	}
+
+#ifndef CONFIG_MSM_VIRTIO_HAB
 	spin_unlock_irqrestore(&vvd->commandq.qlock, flags);
+#else
+	spin_unlock(&vvd->commandq.qlock);
+#endif
 
 	wake_up(&vvd->commandq.reclaim_queue);
 }
@@ -210,8 +223,8 @@ void virtio_video_free_vbufs(struct virtio_video_device *vvd)
            since before device was deinitialized and queues was stopped
            (in not ready state) */
 	while ((vbuf = virtqueue_detach_unused_buf(vvd->commandq.vq))) {
-		if (vbuf_is_pending(vvd, vbuf))
-			free_vbuf(vvd, vbuf);
+		if (virtio_video_vbuf_is_pending(vvd, vbuf))
+			virtio_video_free_vbuf(vvd, vbuf);
 	}
 
 	kmem_cache_destroy(vvd->vbufs);
@@ -224,7 +237,7 @@ void virtio_video_free_vbufs(struct virtio_video_device *vvd)
 	vvd->evts = NULL;
 }
 
-static void *virtio_video_alloc_req(struct virtio_video_device *vvd,
+void *virtio_video_alloc_req(struct virtio_video_device *vvd,
 				    struct virtio_video_vbuffer **vbuffer_p,
 				    int size)
 {
@@ -242,7 +255,7 @@ static void *virtio_video_alloc_req(struct virtio_video_device *vvd,
 	return vbuf->buf;
 }
 
-static void *virtio_video_alloc_req_resp(struct virtio_video_device *vvd,
+void *virtio_video_alloc_req_resp(struct virtio_video_device *vvd,
 			    virtio_video_resp_cb cb,
 			    struct virtio_video_vbuffer **vbuffer_p,
 			    int req_size, int resp_size,
@@ -260,7 +273,7 @@ static void *virtio_video_alloc_req_resp(struct virtio_video_device *vvd,
 	return vbuf->buf;
 }
 
-static int virtio_video_queue_cmd_buffer(struct virtio_video_device *vvd,
+int virtio_video_queue_cmd_buffer(struct virtio_video_device *vvd,
 			      struct virtio_video_vbuffer *vbuf)
 {
 	unsigned long flags;
@@ -268,6 +281,10 @@ static int virtio_video_queue_cmd_buffer(struct virtio_video_device *vvd,
 	struct scatterlist *sgs[3], vreq, vout, vresp;
 	int outcnt = 0, incnt = 0;
 	int ret;
+
+#ifdef CONFIG_MSM_VIRTIO_HAB
+	return virtio_video_msm_queue_cmd_buffer(vvd, vbuf);
+#endif
 
 	if (!vvd->commandq.ready)
 		return -ENODEV;
@@ -308,12 +325,14 @@ retry:
 
 	return ret;
 }
-static int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
+int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 				   struct virtio_video_vbuffer *vbuf)
 {
 	int ret;
 	unsigned long rem;
+#ifndef VIRTIO_VIDEO_MSM
 	unsigned long flags;
+#endif
 
 	vbuf->is_sync = true;
 	init_completion(&vbuf->reclaimed);
@@ -326,10 +345,12 @@ static int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 	if (rem == 0)
 		ret = -ETIMEDOUT;
 
+#ifndef VIRTIO_VIDEO_MSM
 	spin_lock_irqsave(&vvd->commandq.qlock, flags);
-	if (vbuf_is_pending(vvd, vbuf))
-		free_vbuf(vvd, vbuf);
+	if (virtio_video_vbuf_is_pending(vvd, vbuf))
+		virtio_video_free_vbuf(vvd, vbuf);
 	spin_unlock_irqrestore(&vvd->commandq.qlock, flags);
+#endif
 
 	return ret;
 }
@@ -444,10 +465,13 @@ int virtio_video_cmd_stream_create(struct virtio_video_device *vvd,
 	req_p->in_mem_type = cpu_to_le32(VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES);
 	req_p->out_mem_type = cpu_to_le32(VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES);
 	req_p->coded_format = cpu_to_le32(format);
+#ifdef VIRTIO_VIDEO_MSM
+	req_p->device_type = cpu_to_le32(vvd->type);
+#else
 	if (strscpy(req_p->tag, tag, sizeof(req_p->tag) - 1) < 0)
 		v4l2_err(&vvd->v4l2_dev, "failed to copy stream tag\n");
 	req_p->tag[sizeof(req_p->tag) - 1] = 0;
-
+#endif
 	return virtio_video_queue_cmd_buffer(vvd, vbuf);
 }
 
