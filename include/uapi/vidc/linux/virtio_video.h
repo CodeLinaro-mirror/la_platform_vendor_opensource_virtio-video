@@ -530,7 +530,8 @@ struct virtio_video_set_control_resp {
 enum virtio_video_event_type {
 	/* For all devices */
 	VIRTIO_VIDEO_EVENT_ERROR = 0x0100,
-
+	VIRTIO_VIDEO_EVENT_FBD,
+	VIRTIO_VIDEO_EVENT_EBD,
 	/* For decoder only */
 	VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED = 0x0200,
 };

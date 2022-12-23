@@ -24,6 +24,7 @@
 
 #include "virtio_video.h"
 #include "virtio_video_msm_v4l2.h"
+#include "virtio_video_msm_vb2.h"
 
 #pragma GCC diagnostic ignored "-Wunused-variable"
 
@@ -65,6 +66,16 @@ static const struct vb2_ops virtio_video_dec_qops = {
 	.stop_streaming  = virtio_video_dec_stop_streaming,
 	.wait_prepare	 = vb2_ops_wait_prepare,
 	.wait_finish	 = vb2_ops_wait_finish,
+};
+
+static struct vb2_ops virtio_video_msm_vb2_ops = {
+	.queue_setup = msm_vidc_queue_setup,
+	.start_streaming = msm_vidc_start_streaming,
+	.buf_queue = msm_vidc_buf_queue,
+	.buf_cleanup = msm_vidc_buf_cleanup,
+	.stop_streaming = msm_vidc_stop_streaming,
+	.buf_out_validate = msm_vidc_buf_out_validate,
+	.buf_request_complete = msm_vidc_buf_request_complete,
 };
 
 #ifndef VIRTIO_VIDEO_MSM
@@ -146,7 +157,7 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 int virtio_video_dec_init_queues(void *priv, struct vb2_queue *src_vq,
 				 struct vb2_queue *dst_vq)
 {
-	int ret;
+	int ret = 0;
 	struct virtio_video_stream *stream = priv;
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	struct device *dev = vvd->v4l2_dev.dev;
@@ -155,8 +166,14 @@ int virtio_video_dec_init_queues(void *priv, struct vb2_queue *src_vq,
 	src_vq->io_modes = VB2_MMAP | VB2_DMABUF;
 	src_vq->drv_priv = stream;
 	src_vq->buf_struct_size = sizeof(struct virtio_video_buffer);
+#ifndef VIRTIO_VIDEO_MSM
+	src_vq->allow_zero_bytesused = 1;
 	src_vq->ops = &virtio_video_dec_qops;
 	src_vq->mem_ops = virtio_video_mem_ops(vvd);
+#else
+	src_vq->ops = &virtio_video_msm_vb2_ops;
+	src_vq->mem_ops = vvd->vb2_mem_ops;
+#endif
 	src_vq->min_buffers_needed = stream->in_info.min_buffers;
 	src_vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_COPY;
 	src_vq->lock = &stream->vq_mutex;
@@ -165,21 +182,78 @@ int virtio_video_dec_init_queues(void *priv, struct vb2_queue *src_vq,
 
 	ret = vb2_queue_init(src_vq);
 	if (ret)
-		return ret;
-
+		goto exit;
+#ifdef VIRTIO_VIDEO_MSM
+	stream->bufq[INPUT_PORT].vb2q = src_vq;
+#endif
 	dst_vq->type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
 	dst_vq->io_modes = VB2_MMAP | VB2_DMABUF;
 	dst_vq->drv_priv = stream;
 	dst_vq->buf_struct_size = sizeof(struct virtio_video_buffer);
+#ifndef VIRTIO_VIDEO_MSM
+	dst_vq->allow_zero_bytesused = 1;
 	dst_vq->ops = &virtio_video_dec_qops;
 	dst_vq->mem_ops = virtio_video_mem_ops(vvd);
+#else
+	dst_vq->ops = &virtio_video_msm_vb2_ops;
+	dst_vq->mem_ops = vvd->vb2_mem_ops;
+#endif
 	dst_vq->min_buffers_needed = stream->out_info.min_buffers;
 	dst_vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_COPY;
 	dst_vq->lock = &stream->vq_mutex;
 	dst_vq->gfp_flags = virtio_video_gfp_flags(vvd);
 	dst_vq->dev = dev;
 
+#ifdef VIRTIO_VIDEO_MSM
+	ret = vb2_queue_init(dst_vq);
+	if (ret)
+		goto fail_out_vb2q_init;
+
+	stream->bufq[OUTPUT_PORT].vb2q = dst_vq;
+	/* allocate and init vb2_queue for meta buffers */
+	ret = msm_vmem_alloc(sizeof(struct vb2_queue),
+			(void **)&stream->bufq[INPUT_META_PORT].vb2q, "input meta port");
+	if (ret)
+		goto fail_in_meta_alloc;
+
+	/* do input meta port queues initialization */
+	ret = vb2q_init(stream, stream->bufq[INPUT_META_PORT].vb2q,
+		INPUT_META_PLANE, &virtio_video_msm_vb2_ops,
+		vvd->vb2_mem_ops);
+	if (ret)
+		goto fail_in_meta_vb2q_init;
+
+	ret = msm_vmem_alloc(sizeof(struct vb2_queue),
+			(void **)&stream->bufq[OUTPUT_META_PORT].vb2q, "output meta port");
+	if (ret)
+		goto fail_out_meta_alloc;
+
+	/* do output meta port queues initialization */
+	ret = vb2q_init(stream, stream->bufq[OUTPUT_META_PORT].vb2q,
+		OUTPUT_META_PLANE, &virtio_video_msm_vb2_ops,
+		vvd->vb2_mem_ops);
+	if (ret)
+		goto fail_out_meta_vb2q_init;
+	goto exit;
+
+fail_out_meta_vb2q_init:
+	msm_vmem_free((void **)&stream->bufq[OUTPUT_META_PORT].vb2q);
+	stream->bufq[OUTPUT_META_PORT].vb2q = NULL;
+fail_out_meta_alloc:
+	vb2_queue_release(stream->bufq[INPUT_META_PORT].vb2q);
+fail_in_meta_vb2q_init:
+	msm_vmem_free((void **)&stream->bufq[INPUT_META_PORT].vb2q);
+	stream->bufq[INPUT_META_PORT].vb2q = NULL;
+fail_in_meta_alloc:
+	stream->bufq[OUTPUT_PORT].vb2q = NULL;
+fail_out_vb2q_init:
+	stream->bufq[INPUT_PORT].vb2q = NULL;
+
+exit:
+	return ret;
+#else
 	return vb2_queue_init(dst_vq);
+#endif
 }
 
 static int virtio_video_try_decoder_cmd(struct file *file, void *fh,

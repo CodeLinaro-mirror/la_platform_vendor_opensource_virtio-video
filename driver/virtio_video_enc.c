@@ -24,6 +24,7 @@
 
 #include "virtio_video.h"
 #include "virtio_video_msm_v4l2.h"
+#include "virtio_video_msm_vb2.h"
 
 #pragma GCC diagnostic ignored "-Wunused-variable"
 static int virtio_video_enc_start_streaming(struct vb2_queue *vq,
@@ -76,6 +77,16 @@ static const struct vb2_ops virtio_video_enc_qops = {
 	.stop_streaming  = virtio_video_enc_stop_streaming,
 	.wait_prepare	 = vb2_ops_wait_prepare,
 	.wait_finish	 = vb2_ops_wait_finish,
+};
+
+static struct vb2_ops virtio_video_msm_vb2_ops = {
+	.queue_setup = msm_vidc_queue_setup,
+	.start_streaming = msm_vidc_start_streaming,
+	.buf_queue = msm_vidc_buf_queue,
+	.buf_cleanup = msm_vidc_buf_cleanup,
+	.stop_streaming = msm_vidc_stop_streaming,
+	.buf_out_validate = msm_vidc_buf_out_validate,
+	.buf_request_complete = msm_vidc_buf_request_complete,
 };
 
 static int virtio_video_enc_s_ctrl(struct v4l2_ctrl *ctrl)

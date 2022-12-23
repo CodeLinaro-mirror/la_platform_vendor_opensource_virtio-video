@@ -18,7 +18,9 @@ virtio_video-y := \
 	virtio_video_msm_hab.o \
 	virtio_video_msm_debug.o \
 	virtio_video_msm_v4l2.o \
-	virtio_video_msm_vq.o
+	virtio_video_msm_vq.o \
+	virtio_video_msm_vb2.o \
+	virtio_video_msm_mem.o
 
 obj-m += virtio_video.o
 
