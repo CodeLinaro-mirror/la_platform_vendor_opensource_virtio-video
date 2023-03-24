@@ -189,6 +189,9 @@ struct virtio_video_event_queue {
 	struct virtqueue *vq;
 	bool ready;
 	struct work_struct work;
+#ifdef CONFIG_MSM_VIRTIO_HAB
+	spinlock_t qlock;
+#endif
 };
 
 enum video_stream_state {
@@ -287,7 +290,9 @@ struct virtio_video_device {
 
 #ifdef VIRTIO_VIDEO_MSM
 	struct task_struct* cmd_resp_thread;
+	struct task_struct* evt_resp_thread;
 	bool exit_resp_handler;
+	bool exit_event_handler;
 	const struct vb2_mem_ops *vb2_mem_ops;
 #endif
 };

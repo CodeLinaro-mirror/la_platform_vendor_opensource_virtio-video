@@ -152,6 +152,7 @@ int virtio_video_probe(struct virtio_device* vdev)
 	spin_lock_init(&vvd->commandq.qlock);
 	init_waitqueue_head(&vvd->commandq.reclaim_queue);
 
+	spin_lock_init(&vvd->eventq.qlock);
 	INIT_WORK(&vvd->eventq.work, virtio_video_process_events);
 
 	INIT_LIST_HEAD(&vvd->pending_vbuf_list);

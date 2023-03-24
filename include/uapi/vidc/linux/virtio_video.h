@@ -539,6 +539,7 @@ enum virtio_video_event_type {
 struct virtio_video_event {
 	__le32 event_type; /* One of VIRTIO_VIDEO_EVENT_* types */
 	__le32 stream_id;
+	__u8 payload[MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE - 2 * sizeof(__le32)];
 };
 
 #endif /* _UAPI_LINUX_VIRTIO_VIDEO_H */

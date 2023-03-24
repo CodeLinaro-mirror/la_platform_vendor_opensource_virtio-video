@@ -12,7 +12,10 @@
 #include <linux/poll.h>
 #include "vidc/media/msm_media_info.h"
 
-#pragma GCC diagnostic ignored "-Wunused-variable"
+static int msm_vdec_subscribe_event(struct virtio_video_stream* inst,
+		const struct v4l2_event_subscription *sub);
+static int msm_venc_subscribe_event(struct virtio_video_stream* inst,
+		const struct v4l2_event_subscription *sub);
 
 static inline bool is_valid_v4l2_buffer(struct v4l2_buffer *buf,
 					struct virtio_video_stream *inst)
@@ -26,6 +29,76 @@ static inline bool is_valid_v4l2_buffer(struct v4l2_buffer *buf,
 		ret = true;
 
 	return ret;
+}
+
+static int get_poll_flags(struct virtio_video_stream *stream, enum msm_vidc_port_type port)
+{
+	int poll = 0;
+	struct vb2_queue *q = NULL;
+	struct vb2_buffer *vb = NULL;
+	unsigned long flags = 0;
+	struct virtio_video_device *vvd;
+
+	if (!stream || port >= MAX_PORT) {
+		pr_err("%s: invalid params, inst %pK, port %d\n",
+			__func__, stream, port);
+		return -EINVAL;
+	}
+
+	q = stream->bufq[port].vb2q;
+	vvd = to_virtio_vd(stream->video_dev);
+
+	spin_lock_irqsave(&q->done_lock, flags);
+	if (!list_empty(&q->done_list))
+		vb = list_first_entry(&q->done_list, struct vb2_buffer,
+				      done_entry);
+
+	if (vb && (vb->state == VB2_BUF_STATE_DONE ||
+			vb->state == VB2_BUF_STATE_ERROR)) {
+		if (port == OUTPUT_PORT || port == OUTPUT_META_PORT)
+			poll |= POLLIN | POLLRDNORM;
+		else if (port == INPUT_PORT || port == INPUT_META_PORT)
+			poll |= POLLOUT | POLLWRNORM;
+	}
+	spin_unlock_irqrestore(&q->done_lock, flags);
+
+	if (poll)
+		v4l2_info(&vvd->v4l2_dev, "%s: got poll=%#x for port=%d\n",
+			__func__, poll, port);
+
+	return poll;
+}
+
+unsigned int msm_v4l2_poll(struct file *file, struct poll_table_struct *pt)
+{
+	struct virtio_video_stream* stream = file2stream(file);
+	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
+	int poll = 0;
+
+	if (!stream || is_session_error(stream)) {
+		pr_err("%s: invalid stream\n", __func__);
+		return POLLERR;
+	}
+
+	poll_wait(file, &stream->fh.wait, pt);
+	poll_wait(file, &stream->bufq[INPUT_META_PORT].vb2q->done_wq, pt);
+	poll_wait(file, &stream->bufq[OUTPUT_META_PORT].vb2q->done_wq, pt);
+	poll_wait(file, &stream->bufq[INPUT_PORT].vb2q->done_wq, pt);
+	poll_wait(file, &stream->bufq[OUTPUT_PORT].vb2q->done_wq, pt);
+
+	if (v4l2_event_pending(&stream->fh))
+		poll |= POLLPRI;
+
+	poll |= get_poll_flags(stream, INPUT_META_PORT);
+	poll |= get_poll_flags(stream, OUTPUT_META_PORT);
+	poll |= get_poll_flags(stream, INPUT_PORT);
+	poll |= get_poll_flags(stream, OUTPUT_PORT);
+
+	if (poll)
+		v4l2_info(&vvd->v4l2_dev, "%s: return poll=%#x to user\n",
+			__func__, poll);
+
+	return poll;
 }
 
 int msm_v4l2_querycap(struct file *file, void *fh,
@@ -302,7 +375,6 @@ int msm_v4l2_qbuf(struct file *file, void *fh,
 	struct virtio_video_stream *stream = file2stream(file);
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	struct video_device *vdev = video_devdata(file);
-	int plane = 0;
 	int ret = 0;
 	struct vb2_queue *queue = NULL;
 
@@ -449,7 +521,15 @@ int msm_v4l2_subscribe_event(struct v4l2_fh *fh,
 	inst_lock(stream, __func__);
 
 	ret = virtio_video_cmd_subscribe_event(vvd, stream, sub);
+	if (ret)
+		goto unlock;
 
+	if (vvd->type == VIRTIO_VIDEO_DEVICE_DECODER)
+		ret = msm_vdec_subscribe_event(stream, sub);
+	if (vvd->type == VIRTIO_VIDEO_DEVICE_ENCODER)
+		ret = msm_venc_subscribe_event(stream, sub);
+
+unlock:
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
@@ -533,7 +613,6 @@ int msm_v4l2_try_encoder_cmd(struct file *file, void *fh,
 			     struct v4l2_encoder_cmd *enc)
 {
 	struct virtio_video_stream *stream = file2stream(file);
-	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
 	client_lock(stream, __func__);
@@ -543,13 +622,14 @@ int msm_v4l2_try_encoder_cmd(struct file *file, void *fh,
 		ret = -EINVAL;
 		goto unlock;
 	}
+
 	enc->flags = 0;
 
+unlock:
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
-unlock:
 	return ret;
 }
 
@@ -645,6 +725,73 @@ int msm_v4l2_querymenu(struct file *file, void *fh,
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
+
+	return ret;
+}
+
+int msm_vdec_subscribe_event(struct virtio_video_stream* stream,
+		const struct v4l2_event_subscription *sub)
+{
+	struct virtio_video_device* vvd = NULL;
+	int ret = 0;
+
+	if (!stream || !sub) {
+		v4l2_err(&vvd->v4l2_dev,"%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	vvd = to_virtio_vd(stream->video_dev);
+
+	switch (sub->type) {
+	case V4L2_EVENT_EOS:
+		ret = v4l2_event_subscribe(&stream->fh, sub, MAX_EVENTS, NULL);
+		break;
+	case V4L2_EVENT_SOURCE_CHANGE:
+		ret = v4l2_src_change_event_subscribe(&stream->fh, sub);
+		break;
+	case V4L2_EVENT_CTRL:
+		ret = v4l2_ctrl_subscribe_event(&stream->fh, sub);
+		break;
+	default:
+		v4l2_err(&vvd->v4l2_dev, "%s: invalid type %d id %d\n", __func__, sub->type, sub->id);
+		ret = -EINVAL;
+	}
+
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed, type %d id %d\n",
+			__func__, sub->type, sub->id);
+
+	return ret;
+}
+
+int msm_venc_subscribe_event(struct virtio_video_stream* stream,
+		const struct v4l2_event_subscription *sub)
+{
+	struct virtio_video_device* vvd = NULL;
+	int ret = 0;
+
+	if (!stream || !sub) {
+		v4l2_err(&vvd->v4l2_dev, "%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	vvd = to_virtio_vd(stream->video_dev);
+
+	switch (sub->type) {
+	case V4L2_EVENT_EOS:
+		ret = v4l2_event_subscribe(&stream->fh, sub, MAX_EVENTS, NULL);
+		break;
+	case V4L2_EVENT_CTRL:
+		ret = v4l2_ctrl_subscribe_event(&stream->fh, sub);
+		break;
+	default:
+		v4l2_err(&vvd->v4l2_dev, "%s: invalid type %d id %d\n", __func__, sub->type, sub->id);
+		ret = -EINVAL;
+	}
+
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed, type %d id %d\n",
+			__func__, sub->type, sub->id);
 
 	return ret;
 }

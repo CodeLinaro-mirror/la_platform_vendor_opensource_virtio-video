@@ -1115,7 +1115,11 @@ static const struct v4l2_file_operations virtio_video_device_m2m_fops = {
 	.owner		= THIS_MODULE,
 	.open		= virtio_video_device_open,
 	.release	= virtio_video_device_release,
+#ifndef VIRTIO_VIDEO_MSM
 	.poll		= v4l2_m2m_fop_poll,
+#else
+	.poll		= msm_v4l2_poll,
+#endif
 	.unlocked_ioctl	= video_ioctl2,
 	.mmap		= v4l2_m2m_fop_mmap,
 };

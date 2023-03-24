@@ -25,6 +25,8 @@
 #ifdef CONFIG_MSM_VIRTIO_HAB
 #include "virtio_video_msm_hab.h"
 #endif
+#include "virtio_video_msm_mem.h"
+#include "vidc/media/v4l2_vidc_extensions.h"
 
 #define MAX_INLINE_CMD_SIZE   1024
 #define MAX_INLINE_RESP_SIZE  1024
@@ -358,11 +360,15 @@ int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 					   struct virtio_video_event *evt)
 {
+
 	int ret;
 	struct scatterlist sg;
 	struct virtqueue *vq = vvd->eventq.vq;
 
 	memset(evt, 0, sizeof(struct virtio_video_event));
+#ifndef CONFIG_MSM_VIRTIO_HAB
+	return 0;
+#else
 	sg_init_one(&sg, evt, sizeof(struct virtio_video_event));
 
 	ret = virtqueue_add_inbuf(vq, &sg, 1, evt, GFP_KERNEL);
@@ -374,12 +380,90 @@ static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 	virtqueue_kick(vq);
 
 	return 0;
+#endif
+}
+
+static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
+					  struct virtio_video_event *evt)
+{
+	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
+	uint32_t stream_id = evt->stream_id;
+	int event_type = le32_to_cpu(evt->event_type);
+	uint32_t flags = 0;
+	uint64_t timestamp = 0;
+	struct virtio_video_buffer *entry = NULL, *virtio_vb = NULL;
+	struct v4l2_buffer *v4l2_buf = NULL;
+	struct vb2_v4l2_buffer *v4l2_vb = NULL;
+	struct vb2_buffer *vb = NULL;
+	int plane = 0;
+	uint32_t export_id = 0;
+
+	v4l2_info(&vvd->v4l2_dev, "%s: %s: stream_id=%u\n", __func__,
+		event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD", stream_id);
+	v4l2_buf = (struct v4l2_buffer*)evt->payload;
+
+	if (V4L2_TYPE_IS_MULTIPLANAR(v4l2_buf->type)) {
+		v4l2_buf->m.planes = (struct v4l2_plane*)((char*)v4l2_buf +
+								sizeof(struct v4l2_buffer));
+		export_id = v4l2_buf->m.planes[0].m.fd;
+		for (plane = 0; plane < v4l2_buf->length; plane++) {
+			v4l2_info(&vvd->v4l2_dev, "%s: %s, num_planes: %d, plane: %d, "
+					"fd: %#x, data_offset:%#x, length:%#x, bytesused:%#x",
+					__func__,
+					event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
+					v4l2_buf->length, plane, v4l2_buf->m.planes[plane].m.fd,
+					v4l2_buf->m.planes[plane].data_offset,
+					v4l2_buf->m.planes[plane].length,
+					v4l2_buf->m.planes[plane].bytesused);
+		}
+	} else {
+		export_id = v4l2_buf->m.fd;
+	}
+
+	spin_lock(&vvd->pending_buf_list_lock);
+	list_for_each_entry(entry, &vvd->pending_buf_list, list) {
+		v4l2_info(&vvd->v4l2_dev, "%s: loop looking, resource_id=%d, "
+				"export_id = %d\n", __func__, entry->resource_id, export_id);
+		if (entry->resource_id == export_id){
+			virtio_vb = entry;
+			break;
+		}
+	}
+	spin_unlock(&vvd->pending_buf_list_lock);
+
+	if (!virtio_vb) {
+		v4l2_err(&vvd->v4l2_dev, "%s: %s, stream_id=%u, vbuf not found\n",
+			__func__,
+			event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
+			stream_id);
+	} else {
+		virtio_video_pending_buf_list_del(vvd, virtio_vb);
+
+		v4l2_vb = &virtio_vb->v4l2_m2m_vb.vb;
+		vb = &v4l2_vb->vb2_buf;
+
+		if (V4L2_TYPE_IS_MULTIPLANAR(v4l2_buf->type)) {
+			for (plane = 0; plane < v4l2_buf->length; plane++)
+				vb->planes[plane].bytesused = v4l2_buf->m.planes[plane].bytesused;
+		} else {
+			vb->planes[0].bytesused = v4l2_buf->bytesused;
+		}
+
+		v4l2_info(&vvd->v4l2_dev, "%s: payload of buffer-done event: index %d, type %d",
+			__func__, v4l2_buf->index, v4l2_buf->type);
+
+		flags = v4l2_buf->flags;
+		timestamp = v4l2_timeval_to_ns(&v4l2_buf->timestamp);
+
+		msm_buf_put_export_id(stream, entry->resource_id, flags, event_type);
+		virtio_video_buf_done(virtio_vb, flags, timestamp, NULL);
+	}
 }
 
 static void virtio_video_handle_event(struct virtio_video_device *vvd,
 				      struct virtio_video_event *evt)
 {
-	struct virtio_video_stream *stream;
+	struct virtio_video_stream *stream = NULL;
 	uint32_t stream_id = evt->stream_id;
 	struct video_device *vd = &vvd->video_dev;
 
@@ -387,18 +471,23 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 
 	stream = idr_find(&vvd->stream_idr, stream_id);
 	if (!stream) {
-		v4l2_warn(&vvd->v4l2_dev, "stream_id=%u not found for event\n",
-			  stream_id);
-		mutex_unlock(vd->lock);
-		return;
+		v4l2_warn(&vvd->v4l2_dev, "%s: stream_id=%u not found for event\n",
+			__func__, stream_id);
+		goto unlock;
 	}
 
 	switch (le32_to_cpu(evt->event_type)) {
+	case VIRTIO_VIDEO_EVENT_FBD:
+	case VIRTIO_VIDEO_EVENT_EBD:
+		virtio_video_handle_buf_done(stream, evt);
+		break;
 	case VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED:
-		v4l2_dbg(1, vvd->debug, &vvd->v4l2_dev,
-			 "stream_id=%u: resolution change event\n", stream_id);
+		v4l2_info(&vvd->v4l2_dev, "%s: stream_id=%u: resolution change event\n",
+			  __func__, stream_id);
+#ifndef VIRTIO_VIDEO_MSM
 		virtio_video_cmd_get_params(vvd, stream,
 					   VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
+#endif
 		virtio_video_queue_res_chg_event(stream);
 		if (virtio_video_state(stream) == STREAM_STATE_INIT) {
 			virtio_video_state_update(stream,
@@ -407,7 +496,7 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 		}
 		break;
 	case VIRTIO_VIDEO_EVENT_ERROR:
-		v4l2_err(&vvd->v4l2_dev, "stream_id=%i: error event\n",
+		v4l2_err(&vvd->v4l2_dev, "%s: stream_id=%i: error event\n", __func__,
 			 stream_id);
 		virtio_video_state_update(stream, STREAM_STATE_ERROR);
 		virtio_video_handle_error(stream);
@@ -418,6 +507,7 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 		break;
 	}
 
+unlock:
 	mutex_unlock(vd->lock);
 }
 
