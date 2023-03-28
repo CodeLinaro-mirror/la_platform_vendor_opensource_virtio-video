@@ -202,8 +202,8 @@ int virtio_video_probe(struct virtio_device* vdev)
 	}
 #else
 	/* Set non-zero value only for addressing compilation error */
-	vvd->max_caps_len = 10;
-	vvd->max_resp_len = 10;
+	vvd->max_caps_len = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE;
+	vvd->max_resp_len = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE;
 #endif
 #ifndef CONFIG_MSM_VIRTIO_HAB
 	ret = virtio_video_alloc_events(vvd);

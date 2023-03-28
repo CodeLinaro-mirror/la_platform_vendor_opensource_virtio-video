@@ -340,4 +340,32 @@ int v4l2_type_to_driver_port(struct virtio_video_stream *stream, u32 type,
 	return port;
 }
 
+bool is_priv_ctrl(u32 id)
+{
+	bool private = false;
+
+	if (IS_PRIV_CTRL(id))
+		return true;
+
+	/*
+	 * Treat below standard controls as private because
+	 * we have added custom values to the controls
+	 */
+	switch (id) {
+	/*
+	 * V4L2_CID_MPEG_VIDEO_HEVC_PROFILE is std ctrl. But
+	 * V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_10_STILL_PICTURE support is not
+	 * available yet. Hence, make this as private ctrl for time being
+	 */
+	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
+		private = true;
+		break;
+	default:
+		private = false;
+		break;
+	}
+
+	return private;
+}
+
 #endif

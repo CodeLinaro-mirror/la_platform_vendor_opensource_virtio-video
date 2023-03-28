@@ -37,10 +37,6 @@
 #include <linux/kthread.h>
 #endif
 
-#ifndef CONFIG_MSM_VIRTIO_HAB
-#define CONFIG_MSM_VIRTIO_HAB
-#endif
-
 #define DRIVER_NAME "virtio-video"
 
 #define MIN_BUFS_MIN 0
@@ -54,6 +50,15 @@
 #define INPUT_META_PLANE V4L2_BUF_TYPE_META_OUTPUT
 #define OUTPUT_META_PLANE V4L2_BUF_TYPE_META_CAPTURE
 
+#ifdef V4L2_CTRL_CLASS_CODEC
+#define IS_PRIV_CTRL(idx) ( \
+	(V4L2_CTRL_ID2WHICH(idx) == V4L2_CTRL_CLASS_CODEC) && \
+	V4L2_CTRL_DRIVER_PRIV(idx))
+#else
+#define IS_PRIV_CTRL(idx) ( \
+	(V4L2_CTRL_ID2WHICH(idx) == V4L2_CTRL_CLASS_MPEG) && \
+	V4L2_CTRL_DRIVER_PRIV(idx))
+#endif
 struct buf_export_entry {
 	struct list_head list;
 	uint64_t fd;
@@ -99,6 +104,29 @@ enum msm_vidc_port_type {
 	OUTPUT_META_PORT,
 	PORT_NONE,
 	MAX_PORT,
+};
+
+struct virtio_video_ctrl_config {
+	__s32 size;
+	__le32 id;
+	__le64 name_offset;
+	enum v4l2_ctrl_type type;
+	__s64 min;
+	__s64 max;
+	__le64 step;
+	__s64 def;
+	__le32 dims[V4L2_CTRL_MAX_DIMS];
+	__le32 elem_size;
+	__le32 flags;
+	__le64 menu_skip_mask;
+	__le64 qmenu_offset;
+	__le64 qmenu_int_offset;
+	unsigned int is_private:1;
+};
+
+struct virtio_video_ctrl_entry {
+	struct list_head ctrls_list_entry;
+	struct virtio_video_ctrl_config *config;
 };
 
 #endif
@@ -294,6 +322,7 @@ struct virtio_video_device {
 	bool exit_resp_handler;
 	bool exit_event_handler;
 	const struct vb2_mem_ops *vb2_mem_ops;
+	struct list_head ctrl_config_list;
 #endif
 };
 
@@ -596,6 +625,8 @@ int virtio_video_pending_buf_list_add(struct virtio_video_device* vvd,
 
 int virtio_video_pending_buf_list_del(struct virtio_video_device* vvd,
 				      struct virtio_video_buffer* virtio_vb);
+
+bool is_priv_ctrl(u32 id);
 
 #endif
 

@@ -24,6 +24,7 @@
 #include "virtio_video.h"
 #ifdef CONFIG_MSM_VIRTIO_HAB
 #include "virtio_video_msm_hab.h"
+#include "virtio_video_msm_debug.h"
 #endif
 #include "virtio_video_msm_mem.h"
 #include "vidc/media/v4l2_vidc_extensions.h"
@@ -734,8 +735,11 @@ int virtio_video_cmd_query_capability(struct virtio_video_device *vvd,
 				      enum virtio_video_queue_type queue_type)
 {
 	int ret;
-	struct virtio_video_query_capability *req_p;
-	struct virtio_video_vbuffer *vbuf;
+	struct virtio_video_query_capability *req_p = NULL;
+	struct virtio_video_vbuffer *vbuf = NULL;
+#ifdef VIRTIO_VIDEO_MSM
+	struct virtio_video_resp* resp = NULL;
+#endif
 
 	req_p = virtio_video_alloc_req_resp(vvd, NULL, &vbuf, sizeof(*req_p),
 					    resp_size, resp_buf);
@@ -751,6 +755,19 @@ int virtio_video_cmd_query_capability(struct virtio_video_device *vvd,
 			 "timed out waiting for capabilities for %s\n",
 			 (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT) ?
 			 "OUTPUT" : "CAPTURE");
+#ifdef VIRTIO_VIDEO_MSM
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: sync cmd done: cmd_type is %s\n",
+		__func__, cmd_to_string(req_p->hdr.type));
+
+	resp = (struct virtio_video_resp*)resp_buf;
+	if (resp->result >= VIRTIO_VIDEO_RESP_ERR_INVALID_OPERATION)
+		ret = -EINVAL;
+	spin_lock(&vvd->commandq.qlock);
+	if (virtio_video_vbuf_is_pending(vvd, vbuf))
+		virtio_video_free_vbuf(vvd, vbuf);
+	spin_unlock(&vvd->commandq.qlock);
+#endif
 	return ret;
 }
 

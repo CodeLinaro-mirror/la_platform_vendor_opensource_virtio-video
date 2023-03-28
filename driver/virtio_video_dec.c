@@ -26,8 +26,6 @@
 #include "virtio_video_msm_v4l2.h"
 #include "virtio_video_msm_vb2.h"
 
-#pragma GCC diagnostic ignored "-Wunused-variable"
-
 static int virtio_video_dec_start_streaming(struct vb2_queue *vq,
 					    unsigned int count)
 {
@@ -115,6 +113,78 @@ static const struct v4l2_ctrl_ops virtio_video_dec_ctrl_ops = {
 
 int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 {
+#ifdef VIRTIO_VIDEO_MSM
+	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
+	struct v4l2_ctrl_config ctrl_cfg = {0};
+	int num_ctrls = 0;
+	struct virtio_video_ctrl_entry *entry = NULL;
+	struct virtio_video_ctrl_config *config = NULL;
+	struct v4l2_ctrl *ctrl = NULL;
+
+	list_for_each_entry(entry, &vvd->ctrl_config_list, ctrls_list_entry) {
+		num_ctrls++;
+	}
+	v4l2_ctrl_handler_init(&stream->ctrl_handler, num_ctrls);
+
+	list_for_each_entry(entry, &vvd->ctrl_config_list, ctrls_list_entry) {
+		config = entry->config;
+
+		v4l2_info(&vvd->v4l2_dev,"%s: add ctrl, id=%#x, type=%#x, flags=%#x, "
+		"max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n", __func__,
+		config->id, config->type, config->flags, config->max, config->min, config->step,
+		config->def, (char*)config + config->name_offset, config->is_private);
+
+		if (is_priv_ctrl(config->id)) {
+			v4l2_info(&vvd->v4l2_dev,"%s: add private ctrl", __func__);
+			ctrl_cfg.ops = &virtio_video_dec_ctrl_ops;
+			ctrl_cfg.id = config->id,
+			ctrl_cfg.name = (char*)config + config->name_offset;
+			ctrl_cfg.min = config->min;
+			ctrl_cfg.max = config->max;
+			ctrl_cfg.def = config->def;
+			ctrl_cfg.flags = config->flags;
+			ctrl_cfg.type = config->type;
+
+			if (ctrl_cfg.type == V4L2_CTRL_TYPE_MENU) {
+				ctrl_cfg.menu_skip_mask = ~(config->step);
+				ctrl_cfg.qmenu = (const char *const *)config
+						 + config->qmenu_offset;
+			} else {
+				ctrl_cfg.step = config->step;
+			}
+
+			ctrl = v4l2_ctrl_new_custom(&stream->ctrl_handler, &ctrl_cfg, NULL);
+		} else {
+			v4l2_info(&vvd->v4l2_dev,"%s: add std ctrl", __func__);
+
+			if (config->flags & V4L2_CTRL_TYPE_MENU) {
+				ctrl = v4l2_ctrl_new_std_menu(&stream->ctrl_handler,
+					&virtio_video_dec_ctrl_ops, config->id, config->max,
+					~(config->step), config->def);
+			} else {
+				ctrl = v4l2_ctrl_new_std(&stream->ctrl_handler,
+					&virtio_video_dec_ctrl_ops, config->id, config->min,
+					config->max, config->step, config->def);
+			}
+
+			if (ctrl && (config->flags & V4L2_CTRL_FLAG_VOLATILE))
+				ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
+
+			if (ctrl && (config->flags & V4L2_CTRL_FLAG_EXECUTE_ON_WRITE))
+				ctrl->flags |= V4L2_CTRL_FLAG_EXECUTE_ON_WRITE;
+		}
+
+		if (stream->ctrl_handler.error) {
+			v4l2_err(&vvd->v4l2_dev,"%s: failed to add ctrl, id=%#x, type=%#x,"
+			"flags=%#x, max=%#x, min=%#x, step=%#x, def=%#x, name=%s,"
+			"is_private=%d\n", __func__, config->id, config->type, config->flags,
+			config->max, config->min, config->step, config->def,
+			(char*)config + config->name_offset, config->is_private);
+
+			return stream->ctrl_handler.error;
+		}
+	}
+#else
 	struct v4l2_ctrl *ctrl;
 
 	v4l2_ctrl_handler_init(&stream->ctrl_handler, 2);
@@ -131,23 +201,14 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 	if (stream->ctrl_handler.error)
 		return stream->ctrl_handler.error;
 
-#ifdef VIRTIO_VIDEO_MSM
-	ctrl = v4l2_ctrl_new_std(&stream->ctrl_handler,
-				&virtio_video_dec_ctrl_ops,
-				V4L2_CID_MIN_BUFFERS_FOR_OUTPUT,
-				MIN_BUFS_MIN, MIN_BUFS_MAX, MIN_BUFS_STEP,
-				MIN_BUFS_DEF);
-	if (ctrl)
-		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
-#else
 	(void)v4l2_ctrl_new_std(&stream->ctrl_handler, NULL,
 				V4L2_CID_MIN_BUFFERS_FOR_OUTPUT,
 				MIN_BUFS_MIN, MIN_BUFS_MAX, MIN_BUFS_STEP,
 				stream->in_info.min_buffers);
-#endif
 
 	if (stream->ctrl_handler.error)
 		return stream->ctrl_handler.error;
+#endif
 
 	v4l2_ctrl_handler_setup(&stream->ctrl_handler);
 
