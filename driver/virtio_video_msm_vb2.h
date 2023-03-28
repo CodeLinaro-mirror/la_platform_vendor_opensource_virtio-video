@@ -12,8 +12,8 @@
 struct vb2_queue *msm_vidc_get_vb2q(struct virtio_video_stream* stream,
 				    u32 type, const char *func);
 
-void *msm_vb2_attach_dmabuf(struct device *dev, struct dma_buf *dbuf,
-			    unsigned long size, enum dma_data_direction dma_dir);
+void *msm_vb2_attach_dmabuf(struct vb2_buffer *vb, struct device *dev,
+			    struct dma_buf *dbuf, unsigned long size);
 void msm_vb2_detach_dmabuf(void *buf_priv);
 int msm_vb2_map_dmabuf(void *buf_priv);
 void msm_vb2_unmap_dmabuf(void *buf_priv);

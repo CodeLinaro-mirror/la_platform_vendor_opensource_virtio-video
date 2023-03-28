@@ -8,12 +8,10 @@
 #include "virtio_video_msm_hab.h"
 #include <linux/virtio.h>
 #include <linux/virtio_config.h>
-#include "../../../drivers/soc/qcom/hab/hab_virtio.h"
+#include <linux/habmm.h>
 #include "virtio_video_msm_debug.h"
 #include <media/v4l2-common.h>
 #include "virtio_video.h"
-
-#pragma GCC diagnostic ignored  "-Wunused-function"
 
 #define SESSION_ERROR -1
 

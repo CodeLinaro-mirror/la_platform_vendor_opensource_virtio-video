@@ -91,17 +91,19 @@ int virtio_video_probe(struct virtio_device* vdev)
 	vvd->is_m2m_dev = true;
 
 	switch (vdev->id.device) {
+#ifdef VIRTIO_VIDEO_CAM_SUPPORT
 	case VIRTIO_ID_VIDEO_CAM:
 		vvd->is_m2m_dev = false;
 		vvd->vid_dev_nr = vid_nr_cam;
 		vvd->is_mplane_cam = mplane_cam;
 		vvd->type = VIRTIO_VIDEO_DEVICE_CAMERA;
 		break;
-	case VIRTIO_ID_VIDEO_ENC:
+#endif
+	case VIRTIO_ID_VIDEO_ENCODER:
 		vvd->vid_dev_nr = vid_nr_enc;
 		vvd->type = VIRTIO_VIDEO_DEVICE_ENCODER;
 		break;
-	case VIRTIO_ID_VIDEO_DEC:
+	case VIRTIO_ID_VIDEO_DECODER:
 	default:
 		vvd->vid_dev_nr = vid_nr_dec;
 		vvd->type = VIRTIO_VIDEO_DEVICE_DECODER;
@@ -250,12 +252,14 @@ void virtio_video_remove(struct virtio_device* vdev)
 	devm_kfree(&vdev->dev, vvd);
 }
 
+#ifndef CONFIG_MSM_VIRTIO_HAB
 static struct virtio_device_id id_table[] = {
-	{ VIRTIO_ID_VIDEO_DEC, VIRTIO_DEV_ANY_ID },
-	{ VIRTIO_ID_VIDEO_ENC, VIRTIO_DEV_ANY_ID },
+	{ VIRTIO_ID_VIDEO_DECODER, VIRTIO_DEV_ANY_ID },
+	{ VIRTIO_ID_VIDEO_ENCODER, VIRTIO_DEV_ANY_ID },
 	{ VIRTIO_ID_VIDEO_CAM, VIRTIO_DEV_ANY_ID },
 	{ 0 },
 };
+#endif
 
 static unsigned int features[] = {
 	VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES,

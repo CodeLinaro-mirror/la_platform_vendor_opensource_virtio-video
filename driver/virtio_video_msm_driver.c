@@ -4,18 +4,10 @@
  */
 #include <linux/module.h>
 #include <linux/version.h>
-#include <linux/dma-mapping.h>
+#include <linux/habmm.h>
 
 #include "virtio_video.h"
-#include "../../../drivers/soc/qcom/hab/hab_virtio.h"
 
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wunused-label"
-#pragma GCC diagnostic ignored "-Wunused-function"
-
-#ifndef CONFIG_MSM_VIRTIO_HAB
-#define CONFIG_MSM_VIRTIO_HAB
-#endif
 extern struct virtio_device * virthab_get_vdev(int32_t mmid);
 extern int virtio_video_probe(struct virtio_device* vdev);
 extern int virtio_video_remove(struct virtio_device* vdev);

@@ -9,8 +9,6 @@
 #include "virtio_video_msm_debug.h"
 #include "virtio_video_msm_mem.h"
 
-#pragma GCC diagnostic ignored "-Wunused-variable"
-
 struct vb2_queue *msm_vidc_get_vb2q(struct virtio_video_stream* stream,
 				    uint32_t type, const char *func)
 {
@@ -41,8 +39,8 @@ exit:
 	return queue;
 }
 
-void *msm_vb2_attach_dmabuf(struct device *dev, struct dma_buf *dbuf,
-			    unsigned long size, enum dma_data_direction dma_dir)
+void *msm_vb2_attach_dmabuf(struct vb2_buffer *vb, struct device *dev,
+			    struct dma_buf *dbuf, unsigned long size)
 {
 	return (void *)0xdeadbeef;
 }
@@ -225,8 +223,6 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 	struct vb2_queue *queue = vb2->vb2_queue;
 	int export_id[VIDEO_MAX_PLANES] = { 0 };
 	u64 buf_fd = 0;
-	u64 timestamp_us = 0;
-	u64 ktime_ns = ktime_get_ns();
 
 	stream = vb2_get_drv_priv(vb2->vb2_queue);
 
