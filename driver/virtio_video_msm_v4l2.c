@@ -12,10 +12,9 @@
 #include <linux/poll.h>
 #include "vidc/media/msm_media_info.h"
 
-static int msm_vdec_subscribe_event(struct virtio_video_stream* inst,
-		const struct v4l2_event_subscription *sub);
-static int msm_venc_subscribe_event(struct virtio_video_stream* inst,
-		const struct v4l2_event_subscription *sub);
+#define MSM_VIRTIO_VIDEO_DRV_NAME "msm_virtio_video_driver"
+#define MSM_VIRTIO_VIDEO_BUS_NAME "platform:msm_virtio_video_bus"
+#define MSM_VIRTIO_VIDEO_VERSION  0x1
 
 static inline bool is_valid_v4l2_buffer(struct v4l2_buffer *buf,
 					struct virtio_video_stream *inst)
@@ -27,6 +26,73 @@ static inline bool is_valid_v4l2_buffer(struct v4l2_buffer *buf,
 		ret = true;
 	else if (buf->type == INPUT_META_PLANE || buf->type == OUTPUT_META_PLANE)
 		ret = true;
+
+	return ret;
+}
+
+static int msm_vdec_subscribe_event(struct virtio_video_stream* stream,
+		const struct v4l2_event_subscription *sub)
+{
+	struct virtio_video_device* vvd = NULL;
+	int ret = 0;
+
+	if (!stream || !sub) {
+		v4l2_err(&vvd->v4l2_dev,"%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	vvd = to_virtio_vd(stream->video_dev);
+
+	switch (sub->type) {
+	case V4L2_EVENT_EOS:
+		ret = v4l2_event_subscribe(&stream->fh, sub, MAX_EVENTS, NULL);
+		break;
+	case V4L2_EVENT_SOURCE_CHANGE:
+		ret = v4l2_src_change_event_subscribe(&stream->fh, sub);
+		break;
+	case V4L2_EVENT_CTRL:
+		ret = v4l2_ctrl_subscribe_event(&stream->fh, sub);
+		break;
+	default:
+		v4l2_err(&vvd->v4l2_dev, "%s: invalid type %d id %d\n", __func__, sub->type, sub->id);
+		ret = -EINVAL;
+	}
+
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed, type %d id %d\n",
+			__func__, sub->type, sub->id);
+
+	return ret;
+}
+
+static int msm_venc_subscribe_event(struct virtio_video_stream* stream,
+		const struct v4l2_event_subscription *sub)
+{
+	struct virtio_video_device* vvd = NULL;
+	int ret = 0;
+
+	if (!stream || !sub) {
+		v4l2_err(&vvd->v4l2_dev, "%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	vvd = to_virtio_vd(stream->video_dev);
+
+	switch (sub->type) {
+	case V4L2_EVENT_EOS:
+		ret = v4l2_event_subscribe(&stream->fh, sub, MAX_EVENTS, NULL);
+		break;
+	case V4L2_EVENT_CTRL:
+		ret = v4l2_ctrl_subscribe_event(&stream->fh, sub);
+		break;
+	default:
+		v4l2_err(&vvd->v4l2_dev, "%s: invalid type %d id %d\n", __func__, sub->type, sub->id);
+		ret = -EINVAL;
+	}
+
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed, type %d id %d\n",
+			__func__, sub->type, sub->id);
 
 	return ret;
 }
@@ -108,6 +174,10 @@ int msm_v4l2_querycap(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
+	strlcpy(cap->driver, MSM_VIRTIO_VIDEO_DRV_NAME, sizeof(cap->driver));
+	strlcpy(cap->bus_info, MSM_VIRTIO_VIDEO_BUS_NAME, sizeof(cap->bus_info));
+	cap->version = MSM_VIRTIO_VIDEO_VERSION << 16;
+
 	client_lock(stream, __func__);
 	inst_lock(stream, __func__);
 
@@ -116,6 +186,14 @@ int msm_v4l2_querycap(struct file *file, void *fh,
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
+
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: driver=%s, card=%s, bus_info=%s, "
+			"version=%#x, device_cap=%#x and capabilities=%#x.\n",
+			__func__, cap->driver, cap->card, cap->bus_info, cap->version,
+			cap->device_caps, cap->capabilities);
 
 	return ret;
 }
@@ -135,6 +213,14 @@ int msm_v4l2_enum_fmt(struct file *file, void *fh,
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
+
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: index=%#x, type=%#x, flags=%#x, "
+			"pixelformat=%#x and description=%s.\n", __func__,
+			fmtdesc->index, fmtdesc->type, fmtdesc->flags,
+			fmtdesc->pixelformat, fmtdesc->description);
 
 	return ret;
 }
@@ -173,6 +259,21 @@ int msm_v4l2_s_fmt(struct file* file, void* fh,
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
+	if (ret) {
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	} else if (V4L2_TYPE_IS_MULTIPLANAR(format->type)) {
+		v4l2_info(&vvd->v4l2_dev, "%s: type=%d, width=%d, height=%d, "
+		"pixelfmt=%#x, num_planes=%d, sizeimage=%d bytesperline=%d\n", __func__,
+		format->type, format->fmt.pix_mp.width, format->fmt.pix_mp.height,
+		format->fmt.pix_mp.pixelformat, format->fmt.pix_mp.num_planes,
+		format->fmt.pix_mp.plane_fmt[0].sizeimage,
+		format->fmt.pix_mp.plane_fmt[0].bytesperline);
+	} else {
+		v4l2_info(&vvd->v4l2_dev, "%s: type=%d, dataformat=%#x, buffersize=%d\n",
+		__func__, format->type, format->fmt.meta.dataformat,
+		format->fmt.meta.buffersize);
+	}
+
 	return ret;
 }
 
@@ -191,6 +292,22 @@ int msm_v4l2_g_fmt(struct file *file, void *fh,
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
+
+	if (ret) {
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	} else if (V4L2_TYPE_IS_MULTIPLANAR(format->type)) {
+		v4l2_info(&vvd->v4l2_dev, "%s: type=%d, width=%d, height=%d, "
+		"pixelfmt=%#x, num_planes=%d, sizeimage=%d bytesperline=%d\n", __func__,
+		format->type, format->fmt.pix_mp.width, format->fmt.pix_mp.height,
+		format->fmt.pix_mp.pixelformat, format->fmt.pix_mp.num_planes,
+		format->fmt.pix_mp.plane_fmt[0].sizeimage,
+		format->fmt.pix_mp.plane_fmt[0].bytesperline);
+	} else {
+		v4l2_info(&vvd->v4l2_dev, "%s: type=%d, dataformat=%#x, buffersize=%d\n",
+		__func__, format->type, format->fmt.meta.dataformat,
+		format->fmt.meta.buffersize);
+	}
+
 
 	return ret;
 }
@@ -211,6 +328,12 @@ int msm_v4l2_s_selection(struct file *file, void *fh,
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: type=%d, target=%d, flags=%#x\n",
+			__func__, sel->type, sel->target, sel->flags);
+
 	return ret;
 }
 
@@ -229,6 +352,12 @@ int msm_v4l2_g_selection(struct file *file, void *fh,
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
+
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: type=%d, target=%d, flags=%#x\n",
+			__func__, sel->type, sel->target, sel->flags);
 
 	return ret;
 }
@@ -249,6 +378,12 @@ int msm_v4l2_s_parm(struct file *file, void *fh,
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: type=%d\n",
+			__func__, parm->type);
+
 	return ret;
 }
 
@@ -268,10 +403,16 @@ int msm_v4l2_g_parm(struct file* file, void* fh,
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: type=%d\n",
+			__func__, parm->type);
+
 	return ret;
 }
 
-int msm_v4l2_g_ctrl(struct v4l2_ctrl *ctrl)
+int msm_v4l2_op_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct virtio_video_stream* stream = ctrl2stream(ctrl);
 	struct virtio_video_device* vvd = to_virtio_vd(stream->video_dev);
@@ -292,6 +433,12 @@ unlock:
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: ctrl_id=%#x, ctrl_value=%#x\n",
+				__func__, ctrl->id, ctrl->val);
+
 	return ret;
 }
 int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
@@ -311,6 +458,12 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
+
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: ctrl_id=%#x, ctrl_value=%#x\n",
+				__func__, ctrl->id, ctrl->val);
 
 	return ret;
 }
@@ -347,6 +500,12 @@ unlock:
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: count=%d, type=%d, memory=%d\n",
+				__func__, buf->count, buf->type, buf->memory);
+
 	return ret;
 }
 
@@ -365,6 +524,12 @@ int msm_v4l2_querybuf(struct file *file, void *fh,
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
+
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: index=%d, type=%d, memory=%d\n",
+				__func__, buf->index, buf->type, buf->memory);
 
 	return ret;
 }
@@ -395,6 +560,12 @@ int msm_v4l2_qbuf(struct file *file, void *fh,
 
 exit:
 	put_inst(stream);
+
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: index=%d, type=%d, memory=%d\n",
+				__func__, buf->index, buf->type, buf->memory);
 
 	return ret;
 }
@@ -435,6 +606,10 @@ unlock:
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
+
+	if (!ret)
+		v4l2_info(&vvd->v4l2_dev, "%s: index=%d, type=%d, memory=%d\n",
+			__func__, buf->index, buf->type, buf->memory);
 
 	return ret;
 }
@@ -534,6 +709,12 @@ unlock:
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: type=%d, id=%d, flags=%#x\n",
+				__func__, sub->type, sub->id, sub->flags);
+
 	return ret;
 }
 
@@ -554,6 +735,12 @@ int msm_v4l2_unsubscribe_event(struct v4l2_fh *fh,
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
+
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: type=%d, id=%d, flags=%#x\n",
+				__func__, sub->type, sub->id, sub->flags);
 
 	return ret;
 }
@@ -606,6 +793,12 @@ int msm_v4l2_decoder_cmd(struct file *file, void *fh,
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: cmd=%#x, flags=%#x\n",
+				__func__, dec->cmd, dec->flags);
+
 	return ret;
 }
 
@@ -649,6 +842,12 @@ int msm_v4l2_encoder_cmd(struct file *file, void *fh,
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: cmd=%#x, flags=%#x\n",
+				__func__, enc->cmd, enc->flags);
+
 	return ret;
 }
 
@@ -669,6 +868,13 @@ int msm_v4l2_enum_framesizes(struct file *file, void *fh,
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: index=%d, pixel_format=%#x, "
+			"type=%d", __func__, fsize->index, fsize->pixel_format,
+			fsize->type);
+
 	return ret;
 }
 
@@ -687,6 +893,13 @@ int msm_v4l2_enum_frameintervals(struct file *file, void *fh,
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
+
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: index=%d, pixel_format=%#x, "
+			"type=%d", __func__, fival->index, fival->pixel_format,
+			fival->type);
 
 	return ret;
 }
@@ -707,6 +920,12 @@ int msm_v4l2_queryctrl(struct file *file, void *fh,
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
+	if (ret)
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: id=%d, type=%d\n",
+				__func__, ctrl->id, ctrl->type);
+
 	return ret;
 }
 
@@ -726,72 +945,11 @@ int msm_v4l2_querymenu(struct file *file, void *fh,
 	client_unlock(stream, __func__);
 	put_inst(stream);
 
-	return ret;
-}
-
-int msm_vdec_subscribe_event(struct virtio_video_stream* stream,
-		const struct v4l2_event_subscription *sub)
-{
-	struct virtio_video_device* vvd = NULL;
-	int ret = 0;
-
-	if (!stream || !sub) {
-		v4l2_err(&vvd->v4l2_dev,"%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-
-	vvd = to_virtio_vd(stream->video_dev);
-
-	switch (sub->type) {
-	case V4L2_EVENT_EOS:
-		ret = v4l2_event_subscribe(&stream->fh, sub, MAX_EVENTS, NULL);
-		break;
-	case V4L2_EVENT_SOURCE_CHANGE:
-		ret = v4l2_src_change_event_subscribe(&stream->fh, sub);
-		break;
-	case V4L2_EVENT_CTRL:
-		ret = v4l2_ctrl_subscribe_event(&stream->fh, sub);
-		break;
-	default:
-		v4l2_err(&vvd->v4l2_dev, "%s: invalid type %d id %d\n", __func__, sub->type, sub->id);
-		ret = -EINVAL;
-	}
-
 	if (ret)
-		v4l2_err(&vvd->v4l2_dev, "%s: failed, type %d id %d\n",
-			__func__, sub->type, sub->id);
-
-	return ret;
-}
-
-int msm_venc_subscribe_event(struct virtio_video_stream* stream,
-		const struct v4l2_event_subscription *sub)
-{
-	struct virtio_video_device* vvd = NULL;
-	int ret = 0;
-
-	if (!stream || !sub) {
-		v4l2_err(&vvd->v4l2_dev, "%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-
-	vvd = to_virtio_vd(stream->video_dev);
-
-	switch (sub->type) {
-	case V4L2_EVENT_EOS:
-		ret = v4l2_event_subscribe(&stream->fh, sub, MAX_EVENTS, NULL);
-		break;
-	case V4L2_EVENT_CTRL:
-		ret = v4l2_ctrl_subscribe_event(&stream->fh, sub);
-		break;
-	default:
-		v4l2_err(&vvd->v4l2_dev, "%s: invalid type %d id %d\n", __func__, sub->type, sub->id);
-		ret = -EINVAL;
-	}
-
-	if (ret)
-		v4l2_err(&vvd->v4l2_dev, "%s: failed, type %d id %d\n",
-			__func__, sub->type, sub->id);
+		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
+	else
+		v4l2_info(&vvd->v4l2_dev, "%s: id=%#x, index=%d\n",
+				__func__, qmenu->id, qmenu->index);
 
 	return ret;
 }

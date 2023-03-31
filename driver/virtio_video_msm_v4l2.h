@@ -33,7 +33,7 @@ int msm_v4l2_s_parm(struct file *file, void *fh,
 int msm_v4l2_g_parm(struct file *file, void *fh,
 		    struct v4l2_streamparm *a);
 int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl);
-int msm_v4l2_g_ctrl(struct v4l2_ctrl *ctrl);
+int msm_v4l2_op_g_volatile_ctrl(struct v4l2_ctrl *ctrl);
 int msm_v4l2_reqbufs(struct file *file, void *fh,
 		     struct v4l2_requestbuffers *b);
 int msm_v4l2_querybuf(struct file *file, void *fh,

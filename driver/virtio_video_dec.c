@@ -104,7 +104,7 @@ static int virtio_video_dec_g_ctrl(struct v4l2_ctrl *ctrl)
 
 static const struct v4l2_ctrl_ops virtio_video_dec_ctrl_ops = {
 #ifdef VIRTIO_VIDEO_MSM
-	.g_volatile_ctrl = msm_v4l2_g_ctrl,
+	.g_volatile_ctrl = msm_v4l2_op_g_volatile_ctrl,
 	.s_ctrl = msm_v4l2_op_s_ctrl,
 #else
 	.g_volatile_ctrl = virtio_video_dec_g_ctrl,
