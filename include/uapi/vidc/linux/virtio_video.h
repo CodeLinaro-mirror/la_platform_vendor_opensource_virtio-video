@@ -38,7 +38,7 @@
 #include <linux/types.h>
 #include <linux/virtio_config.h>
 
-#define MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE (2048)
+#define MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE (1024)
 
 enum virtio_video_device_type {
 	VIRTIO_VIDEO_DEVICE_ENCODER = 0x0100,

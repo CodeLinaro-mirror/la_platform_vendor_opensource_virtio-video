@@ -29,8 +29,14 @@
 #include "virtio_video_msm_mem.h"
 #include "vidc/media/v4l2_vidc_extensions.h"
 
-#define MAX_INLINE_CMD_SIZE   1024
-#define MAX_INLINE_RESP_SIZE  1024
+#ifdef VIRTIO_VIDEO_MSM
+#define MAX_INLINE_CMD_SIZE   512
+#define MAX_INLINE_RESP_SIZE  512
+#else
+#define MAX_INLINE_CMD_SIZE   298
+#define MAX_INLINE_RESP_SIZE  298
+#endif
+
 #define VBUFFER_SIZE          (sizeof(struct virtio_video_vbuffer) \
 			       + MAX_INLINE_CMD_SIZE		   \
 			       + MAX_INLINE_RESP_SIZE)
