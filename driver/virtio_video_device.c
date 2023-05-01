@@ -1357,7 +1357,13 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 		}
 		vfl_dir = VFL_DIR_M2M;
 		fops = &virtio_video_device_m2m_fops;
+#ifdef VIRTIO_VIDEO_MSM
+		dev_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M_MPLANE
+			   | V4L2_CAP_META_CAPTURE | V4L2_CAP_META_OUTPUT;
+#else
 		dev_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M_MPLANE;
+#endif
+
 	} else {
 		input_resp_buf = NULL;
 		m2m_dev = NULL;

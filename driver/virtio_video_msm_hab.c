@@ -237,6 +237,9 @@ static int virtio_video_hab_cmd_resp_handler(void* p)
 		if (vvd->exit_resp_handler == true)
 			done = 1;
 	}
+
+	v4l2_info(&vvd->v4l2_dev, "%s: exited: %d", __func__, ret);
+
 	return ret;
 }
 
@@ -267,6 +270,9 @@ static int virtio_video_hab_evt_resp_handler(void* p)
 		if (vvd->exit_event_handler == true)
 			done = 1;
 	}
+
+	v4l2_info(&vvd->v4l2_dev, "%s: exited: %d", __func__, ret);
+
 	return ret;
 }
 
