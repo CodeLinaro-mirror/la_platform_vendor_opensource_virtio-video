@@ -61,7 +61,7 @@
 #endif
 struct buf_export_entry {
 	struct list_head list;
-	uint64_t fd;
+	uint64_t inode;
 	uint32_t size;
 	uint32_t buffer_id;
 	enum virtio_video_queue_type buf_type;
