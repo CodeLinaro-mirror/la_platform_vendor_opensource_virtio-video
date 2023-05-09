@@ -143,7 +143,7 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 			ctrl_cfg.max = config->max;
 			ctrl_cfg.def = config->def;
 			ctrl_cfg.flags = config->flags;
-			ctrl_cfg.type = config->type;
+			ctrl_cfg.type = (enum v4l2_ctrl_type)config->type;
 
 			if (ctrl_cfg.type == V4L2_CTRL_TYPE_MENU) {
 				ctrl_cfg.menu_skip_mask = ~(config->step);
