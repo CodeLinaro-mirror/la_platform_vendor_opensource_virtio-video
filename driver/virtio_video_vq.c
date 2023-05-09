@@ -41,6 +41,12 @@
 			       + MAX_INLINE_CMD_SIZE		   \
 			       + MAX_INLINE_RESP_SIZE)
 
+struct done_buffer {
+	struct virtio_video_buffer *virtio_vb;
+	uint32_t flags;
+	uint64_t timestamp;
+};
+
 static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 					   struct virtio_video_event *evt);
 static void virtio_video_handle_event(struct virtio_video_device *vvd,
@@ -390,20 +396,32 @@ static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 #endif
 }
 
+static void virtio_video_buf_done_per_port(struct done_buffer *buffers, int port)
+{
+	struct virtio_video_buffer *virtio_vb = NULL;
+	uint32_t flags = 0;
+	uint64_t timestamp = 0;
+
+	virtio_vb = buffers[port].virtio_vb;
+	flags = buffers[port].flags;
+	timestamp = buffers[port].timestamp;
+	virtio_video_buf_done(virtio_vb, flags, timestamp, NULL);
+}
+
 static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 					  struct virtio_video_event *evt)
 {
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	uint32_t stream_id = evt->stream_id;
 	int event_type = le32_to_cpu(evt->event_type);
-	uint32_t flags = 0;
-	uint64_t timestamp = 0;
 	struct virtio_video_buffer *entry = NULL, *virtio_vb = NULL;
 	struct v4l2_buffer *v4l2_buf = NULL;
 	struct vb2_v4l2_buffer *v4l2_vb = NULL;
 	struct vb2_buffer *vb = NULL;
 	int plane = 0;
 	uint32_t export_id = 0;
+	static struct done_buffer buffers[MAX_PORT] = {0};
+	int port = 0;
 
 	v4l2_info(&vvd->v4l2_dev, "%s: %s: stream_id=%u\n", __func__,
 		event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD", stream_id);
@@ -456,14 +474,28 @@ static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 			vb->planes[0].bytesused = v4l2_buf->bytesused;
 		}
 
-		v4l2_info(&vvd->v4l2_dev, "%s: payload of buffer-done event: index %d, type %d",
-			__func__, v4l2_buf->index, v4l2_buf->type);
+		v4l2_info(&vvd->v4l2_dev, "%s: payload: index %d, type %d, flag %#x",
+			  __func__, v4l2_buf->index, v4l2_buf->type, v4l2_buf->flags);
 
-		flags = v4l2_buf->flags;
-		timestamp = v4l2_buffer_get_timestamp(v4l2_buf);
+		port = v4l2_type_to_driver_port(stream, v4l2_buf->type, __func__);
+		buffers[port].virtio_vb = virtio_vb;
+		buffers[port].flags = v4l2_buf->flags;
+		buffers[port].timestamp = v4l2_buffer_get_timestamp(v4l2_buf);
 
 		msm_buf_put_export_id(stream, entry->resource_id, event_type);
-		virtio_video_buf_done(virtio_vb, flags, timestamp, NULL);
+
+		if (buffers[INPUT_PORT].virtio_vb && buffers[INPUT_META_PORT].virtio_vb) {
+			virtio_video_buf_done_per_port(buffers, INPUT_PORT);
+			buffers[INPUT_PORT].virtio_vb = NULL;
+			virtio_video_buf_done_per_port(buffers, INPUT_META_PORT);
+			buffers[INPUT_META_PORT].virtio_vb = NULL;
+
+		} else if (buffers[OUTPUT_PORT].virtio_vb && buffers[OUTPUT_META_PORT].virtio_vb) {
+			virtio_video_buf_done_per_port(buffers, OUTPUT_PORT);
+			buffers[OUTPUT_PORT].virtio_vb = NULL;
+			virtio_video_buf_done_per_port(buffers, OUTPUT_META_PORT);
+			buffers[OUTPUT_META_PORT].virtio_vb = NULL;
+		}
 	}
 }
 
