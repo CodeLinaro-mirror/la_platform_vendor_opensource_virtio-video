@@ -482,7 +482,7 @@ static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 		buffers[port].flags = v4l2_buf->flags;
 		buffers[port].timestamp = v4l2_buffer_get_timestamp(v4l2_buf);
 
-		msm_buf_put_export_id(stream, entry->resource_id, event_type);
+		msm_buf_put_export_id(stream, entry->resource_id, event_type, v4l2_buf->flags);
 
 		if (buffers[INPUT_PORT].virtio_vb && buffers[INPUT_META_PORT].virtio_vb) {
 			virtio_video_buf_done_per_port(buffers, INPUT_PORT);
