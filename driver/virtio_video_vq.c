@@ -485,16 +485,15 @@ static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 		msm_buf_put_export_id(stream, entry->resource_id, event_type, v4l2_buf->flags);
 
 		if (buffers[INPUT_PORT].virtio_vb && buffers[INPUT_META_PORT].virtio_vb) {
-			virtio_video_buf_done_per_port(buffers, INPUT_PORT);
-			buffers[INPUT_PORT].virtio_vb = NULL;
 			virtio_video_buf_done_per_port(buffers, INPUT_META_PORT);
 			buffers[INPUT_META_PORT].virtio_vb = NULL;
-
+			virtio_video_buf_done_per_port(buffers, INPUT_PORT);
+			buffers[INPUT_PORT].virtio_vb = NULL;
 		} else if (buffers[OUTPUT_PORT].virtio_vb && buffers[OUTPUT_META_PORT].virtio_vb) {
-			virtio_video_buf_done_per_port(buffers, OUTPUT_PORT);
-			buffers[OUTPUT_PORT].virtio_vb = NULL;
 			virtio_video_buf_done_per_port(buffers, OUTPUT_META_PORT);
 			buffers[OUTPUT_META_PORT].virtio_vb = NULL;
+			virtio_video_buf_done_per_port(buffers, OUTPUT_PORT);
+			buffers[OUTPUT_PORT].virtio_vb = NULL;
 		}
 	}
 }
