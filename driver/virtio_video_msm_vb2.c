@@ -183,31 +183,40 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 	stream = queue->drv_priv;
 	vvd = to_virtio_vd(stream->video_dev);
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	if (queue->type == INPUT_META_PLANE || queue->type == OUTPUT_META_PLANE) {
 		v4l2_info(&vvd->v4l2_dev, "%s: nothing to stop on %s\n",
 			__func__, v4l2_type_name(queue->type));
-		goto unlock;
+		goto exit;
 	}
 
 	if (!is_decode_session(vvd) && !is_encode_session(vvd)) {
 		v4l2_err(&vvd->v4l2_dev, "%s: invalid session %d\n",
 			__func__, vvd->type);
-		goto unlock;
+		goto exit;
 	}
+
+	client_lock(stream, __func__);
+	inst_lock(stream, __func__);
 
 	ret = virtio_video_cmd_streamoff(vvd, stream, queue->type);
-	if (ret) {
-		v4l2_err(&vvd->v4l2_dev, "%s: streamoff %s failed\n",
-			__func__, v4l2_type_name(queue->type));
-	}
 
-unlock:
 	inst_unlock(stream, __func__);
 	client_unlock(stream, __func__);
 	put_inst(stream);
+
+	if (ret) {
+		v4l2_err(&vvd->v4l2_dev, "%s: streamoff %s failed %d\n",
+			__func__, v4l2_type_name(queue->type), ret);
+	} else {
+		v4l2_info(&vvd->v4l2_dev, "%s: waiting %s buffer done\n", __func__,
+			  v4l2_type_name(queue->type));
+		vb2_wait_for_all_buffers(queue);
+		v4l2_info(&vvd->v4l2_dev, "%s: all %s buffer done\n", __func__,
+			  v4l2_type_name(queue->type));
+	}
+
+exit:
+	return;
 }
 
 void msm_vidc_buf_queue(struct vb2_buffer *vb2)
