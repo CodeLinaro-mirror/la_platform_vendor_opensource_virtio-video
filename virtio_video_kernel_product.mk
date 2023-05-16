@@ -8,6 +8,6 @@ else
 TARGET_VIRTIO_VIDEO_ENABLE := true
 endif
 
-ifeq ($(TARGET_VIRTIO_VDIEO_ENABLE),true)
+ifeq ($(TARGET_VIRTIO_VIDEO_ENABLE),true)
 PRODUCT_PACKAGES += msm_virtio_video.ko
 endif
