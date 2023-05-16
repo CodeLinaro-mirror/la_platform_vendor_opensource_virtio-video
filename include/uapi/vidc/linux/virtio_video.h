@@ -411,11 +411,12 @@ struct virtio_video_meta_format {
  */
 struct virtio_video_data_format {
 	__u32     type;
+        __u32     padding;
 	union {
 		struct virtio_video_pix_format           pix;     /* VIRTIO_VIDEO_BUF_TYPE_VIDEO_CAPTURE */
 		struct virtio_video_pix_format_mplane    pix_mp;  /* VIRTIO_VIDEO_BUF_TYPE_VIDEO_CAPTURE_MPLANE */
 		struct virtio_video_meta_format          meta;    /*VIRTIO_VIDEO_BUF_TYPE_META_CAPTURE */
-		__u8    raw_data[200];                   /* user-defined */
+		__u8                                     raw_data[200];                   /* user-defined */
 		} fmt;
 };
 
@@ -681,6 +682,7 @@ struct virtio_video_captureparm {
 	struct virtio_video_fract  timeperframe;  /*  Time per frame in seconds */
 	__u32                      extendedmode;  /*  Driver-specific extensions */
 	__u32                      readbuffers;   /*  # of buffers for read */
+	__u32                      padding[4];
 };
 
 struct virtio_video_outputparm {
@@ -689,6 +691,7 @@ struct virtio_video_outputparm {
 	struct virtio_video_fract  timeperframe;   /*  Time per frame in seconds */
 	__u32                      extendedmode;   /*  Driver-specific extensions */
 	__u32                      writebuffers;   /*  # of buffers for write */
+	__u32                      padding[4];
 };
 
 /*    Stream type-dependent parameters
