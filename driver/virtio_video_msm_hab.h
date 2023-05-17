@@ -19,18 +19,12 @@ struct hab_vq_buffer {
 	struct list_head list;
 };
 
-int  msm_hab_virtqueue_add_inbuf(struct msm_hab_virtqueue *vq,
-			struct scatterlist sg[],
-			unsigned int num,
-			void *data,
-			gfp_t gfp);
-
+int msm_hab_virtqueue_add_inbuf(struct msm_hab_virtqueue *vq,
+				struct scatterlist sg[], unsigned int num,
+				void *data, gfp_t gfp);
 void* msm_hab_virtqueue_get_buf(struct msm_hab_virtqueue* vq, unsigned int* len);
 void* msm_hab_virtqueue_detach_unused_buf(struct msm_hab_virtqueue* vq);
 int msm_hab_virtqueue_add_sgs(struct msm_hab_virtqueue *vq,
-					struct scatterlist *sgs[],
-					unsigned int out_sgs,
-					unsigned int in_sgs,
-					void *data,
-					gfp_t gfp);
+			      struct scatterlist *sgs[], unsigned int out_sgs,
+			      unsigned int in_sgs, void *data, gfp_t gfp);
 #endif //_VIRTIO_VIDEO_MSM_HAB_H_

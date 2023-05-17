@@ -27,10 +27,22 @@
 #ifdef CONFIG_MSM_VIRTIO_HAB
 #include "virtio_video_msm_hab.h"
 #endif
+#include "virtio_video_msm_v4l2.h"
+#include "virtio_video_msm_vb2.h"
+#include "virtio_video_msm_mem.h"
 
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wunused-label"
-#pragma GCC diagnostic ignored "-Wunused-function"
+static const struct vb2_mem_ops msm_vb2_mem_ops = {
+	.attach_dmabuf = msm_vb2_attach_dmabuf,
+	.detach_dmabuf = msm_vb2_detach_dmabuf,
+	.map_dmabuf = msm_vb2_map_dmabuf,
+	.unmap_dmabuf = msm_vb2_unmap_dmabuf,
+};
+
+static int msm_vidc_init_ops(struct virtio_video_device* vvd)
+{
+	vvd->vb2_mem_ops = &msm_vb2_mem_ops;
+	return 0;
+}
 
 enum video_stream_state virtio_video_state(struct virtio_video_stream *stream)
 {
@@ -58,12 +70,12 @@ void virtio_video_state_update(struct virtio_video_stream *stream,
 int virtio_video_pending_buf_list_empty(struct virtio_video_device *vvd)
 {
 	int ret = 0;
-
+#ifndef VIRTIO_VIDEO_MSM
 	if (vvd->is_m2m_dev) {
 		v4l2_err(&vvd->v4l2_dev, "Unexpected call for m2m device!\n");
 		return -EPERM;
 	}
-
+#endif
 	spin_lock(&vvd->pending_buf_list_lock);
 	if (list_empty(&vvd->pending_buf_list))
 		ret = 1;
@@ -76,12 +88,12 @@ int virtio_video_pending_buf_list_pop(struct virtio_video_device *vvd,
 				      struct virtio_video_buffer **virtio_vb)
 {
 	struct virtio_video_buffer *retbuf;
-
+#ifndef VIRTIO_VIDEO_MSM
 	if (vvd->is_m2m_dev) {
 		v4l2_err(&vvd->v4l2_dev, "Unexpected call for m2m device!\n");
 		return -EPERM;
 	}
-
+#endif
 	spin_lock(&vvd->pending_buf_list_lock);
 	if (list_empty(&vvd->pending_buf_list)) {
 		spin_unlock(&vvd->pending_buf_list_lock);
@@ -99,11 +111,12 @@ int virtio_video_pending_buf_list_pop(struct virtio_video_device *vvd,
 int virtio_video_pending_buf_list_add(struct virtio_video_device *vvd,
 				      struct virtio_video_buffer *virtio_vb)
 {
+#ifndef VIRTIO_VIDEO_MSM
 	if (vvd->is_m2m_dev) {
 		v4l2_err(&vvd->v4l2_dev, "Unexpected call for m2m device!\n");
 		return -EPERM;
 	}
-
+#endif
 	spin_lock(&vvd->pending_buf_list_lock);
 	list_add_tail(&virtio_vb->list, &vvd->pending_buf_list);
 	spin_unlock(&vvd->pending_buf_list_lock);
@@ -117,11 +130,12 @@ int virtio_video_pending_buf_list_del(struct virtio_video_device *vvd,
 	struct virtio_video_buffer *vb, *vb_tmp;
 	int ret = -EINVAL;
 
+#ifndef VIRTIO_VIDEO_MSM
 	if (vvd->is_m2m_dev) {
 		v4l2_err(&vvd->v4l2_dev, "Unexpected call for m2m device!\n");
 		return -EPERM;
 	}
-
+#endif
 	spin_lock(&vvd->pending_buf_list_lock);
 	if (list_empty(&vvd->pending_buf_list)) {
 		spin_unlock(&vvd->pending_buf_list_lock);
@@ -932,7 +946,9 @@ static int virtio_video_device_open(struct file *file)
 	uint32_t stream_id;
 	char name[TASK_COMM_LEN];
 	struct virtio_video_stream *stream;
+#ifndef VIRTIO_VIDEO_MSM
 	struct video_format *default_fmt;
+#endif
 	enum virtio_video_format format;
 	struct video_device *video_dev = video_devdata(file);
 	struct virtio_video_device *vvd = video_drvdata(file);
@@ -991,6 +1007,11 @@ static int virtio_video_device_open(struct file *file)
 
 	mutex_init(&stream->vq_mutex);
 	v4l2_fh_init(&stream->fh, video_dev);
+	if (video_dev->ctrl_handler) {
+		v4l2_err(&vvd->v4l2_dev, "%s %d: video_dev->ctrl_handler is not NULL\n",
+			 __func__, __LINE__);
+		video_dev->ctrl_handler = NULL;
+	}
 	stream->fh.ctrl_handler = &stream->ctrl_handler;
 
 	if (vvd->is_m2m_dev) {
@@ -1000,14 +1021,18 @@ static int virtio_video_device_open(struct file *file)
 			ret = PTR_ERR(stream->fh.m2m_ctx);
 			goto err_init_ctx;
 		}
-
+#ifndef VIRTIO_VIDEO_MSM
 		v4l2_m2m_set_src_buffered(stream->fh.m2m_ctx, true);
 		v4l2_m2m_set_dst_buffered(stream->fh.m2m_ctx, true);
+#endif
 	} else {
 		vvd->ops->init_queues(stream, NULL, &vvd->vb2_output_queue);
 		/* Video dev queue is required for vb2 ioctl wrappers */
 		video_dev->queue = &vvd->vb2_output_queue;
 	}
+#ifdef VIRTIO_VIDEO_MSM
+	msm_export_cache_init(&stream->buf_cache);
+#endif
 
 	file->private_data = &stream->fh;
 	v4l2_fh_add(&stream->fh);
@@ -1057,7 +1082,9 @@ static int virtio_video_device_release(struct file *file)
 
 	virtio_video_cmd_stream_destroy(vvd, stream->stream_id);
 	virtio_video_stream_id_put(vvd, stream->stream_id);
-
+#ifdef VIRTIO_VIDEO_MSM
+	msm_export_cache_destroy(&stream->buf_cache);
+#endif
 	kfree(stream);
 
 	/* Mutex already locked here, passing NULL */
@@ -1072,7 +1099,11 @@ static const struct v4l2_file_operations virtio_video_device_m2m_fops = {
 	.owner		= THIS_MODULE,
 	.open		= virtio_video_device_open,
 	.release	= virtio_video_device_release,
+#ifndef VIRTIO_VIDEO_MSM
 	.poll		= v4l2_m2m_fop_poll,
+#else
+	.poll		= msm_v4l2_poll,
+#endif
 	.unlocked_ioctl	= video_ioctl2,
 	.mmap		= v4l2_m2m_fop_mmap,
 };
@@ -1132,18 +1163,113 @@ static void virtio_video_device_unregister(struct virtio_video_device *vvd)
 	video_unregister_device(&vvd->video_dev);
 }
 
+#ifdef VIRTIO_VIDEO_MSM
+static int virtio_video_parse_controls(struct virtio_video_device *vvd,
+				       void *resp_buf, bool *is_end)
+{
+	int ret = 0;
+	struct virtio_video_ctrl_config *config = NULL, *new_config = NULL;
+	struct virtio_video_ctrl_entry *ctrl = NULL;
+	struct virtio_video_query_capability_resp *resp = NULL;
+	__le32 num_descs = 0;
+
+	if (!resp_buf) {
+		return -EINVAL;
+	}
+
+	resp = (struct virtio_video_query_capability_resp*)((char*)resp_buf +
+			sizeof(struct virtio_video_resp));
+	num_descs = resp->num_descs;
+	config = (struct virtio_video_ctrl_config*)((char*)resp + sizeof(*resp));
+
+	while (num_descs--) {
+		if (!config->size) {
+			*is_end = true;
+			v4l2_info(&vvd->v4l2_dev,"%s: got all controls from BE", __func__);
+			break;
+		}
+
+		new_config = kzalloc(config->size, GFP_KERNEL);
+		if (!new_config) {
+			ret = -ENOMEM;
+			goto exit;
+		}
+
+		memcpy(new_config, config, config->size);
+		ctrl = kzalloc(sizeof(*ctrl), GFP_KERNEL);
+		if (!ctrl) {
+			ret = -ENOMEM;
+			goto err_ctrl;
+		}
+
+		ctrl->config = new_config;
+		list_add_tail(&ctrl->ctrls_list_entry, &vvd->ctrl_config_list);
+		config = (struct virtio_video_ctrl_config*)((char*)config + config->size);
+
+		v4l2_info(&vvd->v4l2_dev,"%s: add ctrl to ctrl list, id=%#x, type=%#x,"
+		"flags=%#x, max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n",
+		__func__, ctrl->config->id, ctrl->config->type, ctrl->config->flags,
+		ctrl->config->max, ctrl->config->min, ctrl->config->step, ctrl->config->def,
+		(char*)ctrl->config + ctrl->config->name_offset, ctrl->config->is_private);
+	}
+
+	goto exit;
+
+err_ctrl:
+	kfree(new_config);
+exit:
+	return ret;
+}
+
+static void virtio_video_clean_controls(struct virtio_video_device *vvd)
+{
+	struct virtio_video_ctrl_entry *ctrl = NULL, *tmp = NULL;
+
+	list_for_each_entry_safe(ctrl, tmp, &vvd->ctrl_config_list,
+				 ctrls_list_entry) {
+		list_del(&ctrl->ctrls_list_entry);
+		kfree(ctrl->config);
+		kfree(ctrl);
+	}
+}
+#endif
+
 static int
 virtio_video_query_capability(struct virtio_video_device *vvd,
 			      void *resp_buf,
 			      enum virtio_video_queue_type queue_type)
 {
-	int ret;
+	int ret = 0;
+#ifdef VIRTIO_VIDEO_MSM
+	int resp_size = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE
+			- sizeof(struct virtio_video_query_capability);
+	bool is_end = false;
+#else
 	int resp_size = vvd->max_caps_len;
+#endif
 
+#ifdef VIRTIO_VIDEO_MSM
+	while (!is_end) {
+		ret = virtio_video_cmd_query_capability(vvd, resp_buf, resp_size,
+							queue_type);
+		if (ret) {
+			v4l2_err(&vvd->v4l2_dev, "%s: failed to query capability", __func__);
+			break;
+		}
+
+		ret = virtio_video_parse_controls(vvd, resp_buf, &is_end);
+		if (ret) {
+			v4l2_err(&vvd->v4l2_dev, "%s: failed to parse controls", __func__);
+			virtio_video_clean_controls(vvd);
+			break;
+		}
+	}
+#else
 	ret = virtio_video_cmd_query_capability(vvd, resp_buf, resp_size,
 						queue_type);
 	if (ret)
 		v4l2_err(&vvd->v4l2_dev, "failed to query capability\n");
+#endif
 
 	return ret;
 }
@@ -1176,12 +1302,25 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 		virtio_video_msm_hab_close(vvd);
 		goto err_output_cap;
 	}
+	msm_vidc_init_ops(vvd);
+	INIT_LIST_HEAD(&vvd->ctrl_config_list);
 #endif
 
+	output_resp_buf = kzalloc(vvd->max_caps_len, GFP_KERNEL);
+	if (!output_resp_buf)
+		return -ENOMEM;
+
+	ret = virtio_video_query_capability(vvd, output_resp_buf,
+					    VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
+	if (ret) {
+		v4l2_err(&vvd->v4l2_dev, "failed to get output caps\n");
+		goto err_output_cap;
+	}
+
 	if (vvd->is_m2m_dev) {
-	    input_resp_buf = kzalloc(vvd->max_caps_len, GFP_KERNEL);
+		input_resp_buf = kzalloc(vvd->max_caps_len, GFP_KERNEL);
 		if (!input_resp_buf) {
-		    ret = -ENOMEM;
+			ret = -ENOMEM;
 			goto err_input_buf;
 		}
 
@@ -1202,7 +1341,13 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 		}
 		vfl_dir = VFL_DIR_M2M;
 		fops = &virtio_video_device_m2m_fops;
+#ifdef VIRTIO_VIDEO_MSM
+		dev_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M_MPLANE
+			   | V4L2_CAP_META_CAPTURE | V4L2_CAP_META_OUTPUT;
+#else
 		dev_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M_MPLANE;
+#endif
+
 	} else {
 		input_resp_buf = NULL;
 		m2m_dev = NULL;
@@ -1276,14 +1421,20 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 	goto out_cleanup;
 
 register_err:
+#ifdef VIRTIO_VIDEO_MSM
+	virtio_video_clean_controls(vvd);
+#else
 	virtio_video_clean_control(vvd);
+#endif
+#ifndef MSM_HAB_NO_SUPPORT
 parse_ctrl_err:
 	virtio_video_clean_capability(vvd);
 parse_cap_err:
 	if (vvd->is_m2m_dev)
 		v4l2_m2m_release(vvd->m2m_dev);
-err_m2m_dev:
 err_input_cap:
+#endif
+err_m2m_dev:
 out_cleanup:
 	if (vvd->is_m2m_dev)
 		kfree(input_resp_buf);
@@ -1304,6 +1455,10 @@ void virtio_video_device_deinit(struct virtio_video_device *vvd)
 	virtio_video_device_unregister(vvd);
 	if (vvd->is_m2m_dev)
 		v4l2_m2m_release(vvd->m2m_dev);
+#ifdef VIRTIO_VIDEO_MSM
+	virtio_video_clean_controls(vvd);
+#else
 	virtio_video_clean_control(vvd);
+#endif
 	virtio_video_clean_capability(vvd);
 }

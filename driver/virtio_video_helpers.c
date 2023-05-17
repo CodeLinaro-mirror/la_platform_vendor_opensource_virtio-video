@@ -288,3 +288,84 @@ void virtio_video_pix_fmt_mp2sp(const struct v4l2_pix_format_mplane *pix_mp,
 	pix->quantization = pix_mp->quantization;
 	pix->xfer_func = pix_mp->xfer_func;
 }
+
+#ifdef VIRTIO_VIDEO_MSM
+
+int msm_vmem_alloc(unsigned long size, void **mem, const char *msg)
+{
+	int rc = 0;
+
+	if (*mem) {
+		pr_err("%s: error: double alloc\n", msg);
+		rc = -EINVAL;
+	}
+
+	*mem = vzalloc(size);
+	if (!*mem) {
+		pr_err("allocation failed for %s\n", msg);
+		rc = -ENOMEM;
+	}
+
+	return rc;
+}
+
+void msm_vmem_free(void **addr)
+{
+	if (addr && *addr) {
+		vfree(*addr);
+		*addr = NULL;
+	}
+}
+
+int v4l2_type_to_driver_port(struct virtio_video_stream *stream, u32 type,
+	const char *func)
+{
+	int port = -EINVAL;
+	struct virtio_video_device* vvd = to_virtio_vd(stream->video_dev);
+
+	if (type == INPUT_MPLANE) {
+		port = INPUT_PORT;
+	} else if (type == INPUT_META_PLANE) {
+		port = INPUT_META_PORT;
+	} else if (type == OUTPUT_MPLANE) {
+		port = OUTPUT_PORT;
+	} else if (type == OUTPUT_META_PLANE) {
+		port = OUTPUT_META_PORT;
+	} else {
+		v4l2_err(&vvd->v4l2_dev, "%s: port not found for v4l2 type %d\n",
+			func, type);
+		port = -EINVAL;
+	}
+
+	return port;
+}
+
+bool is_priv_ctrl(u32 id)
+{
+	bool private = false;
+
+	if (IS_PRIV_CTRL(id))
+		return true;
+
+	/*
+	 * Treat below standard controls as private because
+	 * we have added custom values to the controls
+	 */
+	switch (id) {
+	/*
+	 * V4L2_CID_MPEG_VIDEO_HEVC_PROFILE is std ctrl. But
+	 * V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_10_STILL_PICTURE support is not
+	 * available yet. Hence, make this as private ctrl for time being
+	 */
+	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
+		private = true;
+		break;
+	default:
+		private = false;
+		break;
+	}
+
+	return private;
+}
+
+#endif

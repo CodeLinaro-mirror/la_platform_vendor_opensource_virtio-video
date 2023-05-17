@@ -37,10 +37,6 @@
 #include <linux/kthread.h>
 #endif
 
-#ifndef CONFIG_MSM_VIRTIO_HAB
-#define CONFIG_MSM_VIRTIO_HAB
-#endif
-
 #define DRIVER_NAME "virtio-video"
 
 #define MIN_BUFS_MIN 0
@@ -54,6 +50,29 @@
 #define INPUT_META_PLANE V4L2_BUF_TYPE_META_OUTPUT
 #define OUTPUT_META_PLANE V4L2_BUF_TYPE_META_CAPTURE
 
+#ifdef V4L2_CTRL_CLASS_CODEC
+#define IS_PRIV_CTRL(idx) ( \
+	(V4L2_CTRL_ID2WHICH(idx) == V4L2_CTRL_CLASS_CODEC) && \
+	V4L2_CTRL_DRIVER_PRIV(idx))
+#else
+#define IS_PRIV_CTRL(idx) ( \
+	(V4L2_CTRL_ID2WHICH(idx) == V4L2_CTRL_CLASS_MPEG) && \
+	V4L2_CTRL_DRIVER_PRIV(idx))
+#endif
+struct buf_export_entry {
+	struct list_head list;
+	uint64_t inode;
+	uint32_t size;
+	uint32_t buffer_id;
+	enum virtio_video_queue_type buf_type;
+	bool is_export;
+};
+
+struct buf_export_cache {
+	struct kmem_cache* exports;
+	struct list_head export_fifo;
+	int export_avail;
+};
 
 struct msm_hab_virtqueue {
 	void (*callback)(struct msm_hab_virtqueue* vq);
@@ -85,6 +104,11 @@ enum msm_vidc_port_type {
 	OUTPUT_META_PORT,
 	PORT_NONE,
 	MAX_PORT,
+};
+
+struct virtio_video_ctrl_entry {
+	struct list_head ctrls_list_entry;
+	struct virtio_video_ctrl_config *config;
 };
 
 #endif
@@ -175,6 +199,9 @@ struct virtio_video_event_queue {
 	struct virtqueue *vq;
 	bool ready;
 	struct work_struct work;
+#ifdef CONFIG_MSM_VIRTIO_HAB
+	spinlock_t qlock;
+#endif
 };
 
 enum video_stream_state {
@@ -186,6 +213,10 @@ enum video_stream_state {
 	STREAM_STATE_STOPPED,
 	STREAM_STATE_RESET, /* specific to encoder */
 	STREAM_STATE_ERROR,
+};
+
+struct buf_queue {
+	struct vb2_queue *vb2q;
 };
 
 struct virtio_video_stream {
@@ -201,8 +232,10 @@ struct virtio_video_stream {
 	struct video_format_frame *current_frame;
 #ifdef VIRTIO_VIDEO_MSM
 	struct v4l2_format fmts[MAX_PORT];
+	struct buf_queue bufq[MAX_PORT];
 	struct mutex client_lock;
 	struct mutex lock;
+	struct buf_export_cache buf_cache;
 #endif
 };
 
@@ -267,7 +300,11 @@ struct virtio_video_device {
 
 #ifdef VIRTIO_VIDEO_MSM
 	struct task_struct* cmd_resp_thread;
+	struct task_struct* evt_resp_thread;
 	bool exit_resp_handler;
+	bool exit_event_handler;
+	const struct vb2_mem_ops *vb2_mem_ops;
+	struct list_head ctrl_config_list;
 #endif
 };
 
@@ -522,5 +559,57 @@ int virtio_video_queue_cmd_buffer(struct virtio_video_device *vvd,
 
 int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 			      struct virtio_video_vbuffer *vbuf);
+
+#ifdef VIRTIO_VIDEO_MSM
+
+int msm_vmem_alloc(unsigned long size, void **mem, const char *msg);
+void msm_vmem_free(void **addr);
+
+int v4l2_type_to_driver_port(struct virtio_video_stream *stream, u32 type,
+			     const char *func);
+
+static inline bool is_decode_session(struct virtio_video_device* vvd)
+{
+	return vvd->type == VIRTIO_VIDEO_DEVICE_DECODER;
+}
+
+static inline bool is_encode_session(struct virtio_video_device* vvd)
+{
+	return vvd->type == VIRTIO_VIDEO_DEVICE_ENCODER;
+}
+static inline bool is_session_error(struct virtio_video_stream* stream)
+{
+	return virtio_video_state(stream) == STREAM_STATE_ERROR;
+}
+
+static inline void inst_lock(struct virtio_video_stream* inst, const char* function)
+{
+	mutex_lock(&inst->lock);
+}
+
+static inline void inst_unlock(struct virtio_video_stream* inst, const char* function)
+{
+	mutex_unlock(&inst->lock);
+}
+
+static inline void client_lock(struct virtio_video_stream* inst, const char* function)
+{
+	mutex_lock(&inst->client_lock);
+}
+
+static inline void client_unlock(struct virtio_video_stream* inst, const char* function)
+{
+	mutex_unlock(&inst->client_lock);
+}
+
+int virtio_video_pending_buf_list_add(struct virtio_video_device* vvd,
+				      struct virtio_video_buffer* virtio_vb);
+
+int virtio_video_pending_buf_list_del(struct virtio_video_device* vvd,
+				      struct virtio_video_buffer* virtio_vb);
+
+bool is_priv_ctrl(u32 id);
+
+#endif
 
 #endif /* _VIRTIO_VIDEO_H */
