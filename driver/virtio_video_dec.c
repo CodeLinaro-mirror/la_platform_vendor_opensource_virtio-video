@@ -157,7 +157,7 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 		} else {
 			v4l2_info(&vvd->v4l2_dev,"%s: add std ctrl", __func__);
 
-			if (config->flags & V4L2_CTRL_TYPE_MENU) {
+			if (config->type == V4L2_CTRL_TYPE_MENU) {
 				ctrl = v4l2_ctrl_new_std_menu(&stream->ctrl_handler,
 					&virtio_video_dec_ctrl_ops, config->id, config->max,
 					~(config->step), config->def);
