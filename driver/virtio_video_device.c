@@ -1006,6 +1006,8 @@ static int virtio_video_device_open(struct file *file)
 #endif
 
 	mutex_init(&stream->vq_mutex);
+	mutex_init(&stream->client_lock);
+	mutex_init(&stream->lock);
 	v4l2_fh_init(&stream->fh, video_dev);
 	if (video_dev->ctrl_handler) {
 		v4l2_err(&vvd->v4l2_dev, "%s %d: video_dev->ctrl_handler is not NULL\n",
