@@ -576,13 +576,13 @@ int msm_v4l2_dqbuf(struct file *file, void *fh,
 	struct vb2_queue *queue = NULL;
 	int ret = 0;
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	if (!stream || !buf || !is_valid_v4l2_buffer(buf, stream)) {
 		v4l2_err(&vvd->v4l2_dev,"%s: invalid params %pK %pK\n", __func__, stream, buf);
 		return -EINVAL;
 	}
+
+	client_lock(stream, __func__);
+	inst_lock(stream, __func__);
 
 	v4l2_info(&vvd->v4l2_dev, "%s: index=%d, type=%s, flags=%d\n",
 		  __func__, buf->index, v4l2_type_name(buf->type), buf->flags);
