@@ -203,11 +203,11 @@ void process_msm_hab_evt_resp(struct virtio_video_device* vvd,
 	v4l2_info(&vvd->v4l2_dev, "%s: event received, event type %#x, stream id %d",
 		__func__, evt->event_type, evt->stream_id);
 
-	spin_lock(&vvd->eventq.qlock);
+	spin_lock(&vvd->eventq.vq->qlock);
 
 	list_add_tail(&vq_buf->list, &vvd->eventq.vq->resp_list);
 
-	spin_unlock(&vvd->eventq.qlock);
+	spin_unlock(&vvd->eventq.vq->qlock);
 
 	virtio_video_event_cb(vvd->eventq.vq);
 }
@@ -316,6 +316,7 @@ void* msm_hab_virtqueue_get_buf(struct msm_hab_virtqueue* vq, unsigned int* len)
 	struct hab_vq_buffer* entry = NULL;
 	void* buf = NULL;
 
+	spin_lock(&vq->qlock);
 	entry = list_first_entry_or_null(&vq->resp_list,
 					 struct hab_vq_buffer, list);
 
@@ -324,6 +325,7 @@ void* msm_hab_virtqueue_get_buf(struct msm_hab_virtqueue* vq, unsigned int* len)
 		buf = entry->buf;
 		kfree(entry);
 	}
+	spin_unlock(&vq->qlock);
 
 	return buf;
 }

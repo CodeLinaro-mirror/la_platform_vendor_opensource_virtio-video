@@ -169,7 +169,6 @@ int virtio_video_probe(struct virtio_device* vdev)
 	spin_lock_init(&vvd->commandq.qlock);
 	init_waitqueue_head(&vvd->commandq.reclaim_queue);
 
-	spin_lock_init(&vvd->eventq.qlock);
 	INIT_WORK(&vvd->eventq.work, virtio_video_process_events);
 
 	INIT_LIST_HEAD(&vvd->pending_vbuf_list);
@@ -179,11 +178,13 @@ int virtio_video_probe(struct virtio_device* vdev)
 	vvd->commandq.vq->habmm_handle = 0;
 	vvd->commandq.vq->vdev = vdev;
 	vvd->commandq.vq->priv = vvd;
+	spin_lock_init(&vvd->commandq.vq->qlock);
 	INIT_LIST_HEAD(&vvd->commandq.vq->resp_list);
 	vvd->eventq.vq = kmalloc(sizeof(struct virtqueue), GFP_KERNEL);
 	vvd->eventq.vq->habmm_handle = 0;
 	vvd->eventq.vq->vdev = vdev;
 	vvd->eventq.vq->priv = vvd;
+	spin_lock_init(&vvd->eventq.vq->qlock);
 	INIT_LIST_HEAD(&vvd->eventq.vq->resp_list);
 #else
 	ret = virtio_find_vqs(vdev, 2, vqs, callbacks, names, NULL);
