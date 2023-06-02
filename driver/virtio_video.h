@@ -199,9 +199,6 @@ struct virtio_video_event_queue {
 	struct virtqueue *vq;
 	bool ready;
 	struct work_struct work;
-#ifdef CONFIG_MSM_VIRTIO_HAB
-	spinlock_t qlock;
-#endif
 };
 
 enum video_stream_state {
