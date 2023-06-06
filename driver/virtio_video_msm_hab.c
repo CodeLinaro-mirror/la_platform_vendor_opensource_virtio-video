@@ -64,9 +64,12 @@ int virtio_video_msm_hab_open(struct virtio_video_device* vvd)
 {
 	int ret = 0;
 	uint32_t* ph = NULL;
+	int mmid = vvd->type == VIRTIO_VIDEO_DEVICE_DECODER ? MM_VID : MM_VID_2;
+
+	v4l2_info(&vvd->v4l2_dev, "%s mmid %d", __func__, mmid);
 
 	ph = &vvd->commandq.vq->habmm_handle;
-	ret = habmm_socket_open(ph, MM_VID, 0, 0);
+	ret = habmm_socket_open(ph, mmid, 0, 0);
 	if (ret) {
 		v4l2_err(&vvd->v4l2_dev,"habmm command socket open failed %d", ret);
 		goto err;
@@ -81,7 +84,7 @@ int virtio_video_msm_hab_open(struct virtio_video_device* vvd)
 	v4l2_info(&vvd->v4l2_dev, "commandq hab open done, handle %x", *ph);
 
 	ph = &vvd->eventq.vq->habmm_handle;
-	ret = habmm_socket_open(ph, MM_VID, 0, 0);
+	ret = habmm_socket_open(ph, mmid, 0, 0);
 	if (ret) {
 		v4l2_err(&vvd->v4l2_dev,"habmm event socket open failed %d", ret);
 		goto err;
