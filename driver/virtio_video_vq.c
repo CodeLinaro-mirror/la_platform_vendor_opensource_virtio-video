@@ -116,7 +116,7 @@ void virtio_video_free_vbuf(struct virtio_video_device *vvd,
 
 void virtio_video_cmd_cb(struct virtqueue *vq)
 {
-	struct virtio_video_device *vvd = vq->vdev->priv;
+	struct virtio_video_device *vvd = (struct virtio_video_device *)vq->priv;
 	struct virtio_video_vbuffer *vbuf;
 #ifndef CONFIG_MSM_VIRTIO_HAB
 	unsigned long flags = 0L;
