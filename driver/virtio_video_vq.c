@@ -514,6 +514,8 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 		goto unlock;
 	}
 
+	inst_lock(stream, __func__);
+
 	switch (le32_to_cpu(evt->event_type)) {
 	case VIRTIO_VIDEO_EVENT_FBD:
 	case VIRTIO_VIDEO_EVENT_EBD:
@@ -544,6 +546,8 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 			  stream_id);
 		break;
 	}
+
+	inst_unlock(stream, __func__);
 
 unlock:
 	mutex_unlock(vd->lock);

@@ -65,13 +65,12 @@ struct buf_export_entry {
 	uint32_t size;
 	uint32_t buffer_id;
 	enum virtio_video_queue_type buf_type;
-	bool is_export;
 };
 
 struct buf_export_cache {
 	struct kmem_cache* exports;
 	struct list_head export_fifo;
-	int export_avail;
+	int used_count;
 };
 
 struct msm_hab_virtqueue {
