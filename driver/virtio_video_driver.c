@@ -38,11 +38,11 @@ MODULE_PARM_DESC(use_dma_mem, "Try to allocate buffers from the DMA zone");
 
 static atomic_t v4l2_instance = ATOMIC_INIT(0);
 
-static int vid_nr_dec = -1;
+static int vid_nr_dec = 32;
 module_param(vid_nr_dec, int, 0644);
 MODULE_PARM_DESC(vid_nr_dec, "videoN start number, -1 is autodetect");
 
-static int vid_nr_enc = -1;
+static int vid_nr_enc = 33;
 module_param(vid_nr_enc, int, 0644);
 MODULE_PARM_DESC(vid_nr_enc, "videoN start number, -1 is autodetect");
 
