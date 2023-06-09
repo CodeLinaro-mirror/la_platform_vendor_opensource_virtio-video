@@ -1080,7 +1080,7 @@ enum virtio_video_queue_type {
 struct virtio_video_query_capability {
 	struct virtio_video_cmd_hdr hdr;
 	__le32 queue_type; /* One of VIRTIO_VIDEO_QUEUE_TYPE_* types */
-	__u8 padding[4];
+	__le32 device_type;
 };
 
 enum virtio_video_planes_layout_flag {
