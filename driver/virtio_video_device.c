@@ -879,6 +879,7 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 	}
 
 	if (!V4L2_TYPE_IS_OUTPUT(vb2_queue->type)) {
+#ifndef VIRTIO_VIDEO_MSM
 		switch (vvd->type) {
 		case VIRTIO_VIDEO_DEVICE_ENCODER:
 			for (i = 0; i < vb->num_planes; i++)
@@ -893,7 +894,16 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 					p_info->plane_format[i].plane_size;
 			break;
 		}
+#else
+		if (vvd->type == VIRTIO_VIDEO_DEVICE_ENCODER)
+			p_info = &stream->in_info;
+		else
+			p_info = &stream->out_info;
 
+		for (i = 0; i < p_info->num_planes; i++)
+			vb->planes[i].bytesused =
+				p_info->plane_format[i].plane_size;
+#endif
 		vb->timestamp = timestamp;
 	}
 
