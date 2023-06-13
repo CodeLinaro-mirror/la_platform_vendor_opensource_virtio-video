@@ -21,13 +21,10 @@ KERNEL_SRC="/usr/src/kernels"
 CURDIR=${PWD}
 cd ${KERNEL_SRC}/%{kversion}/
 scripts/headers_install.sh ${CURDIR}/linux/virtio_video.h ${CURDIR}/linux/virtio_video.h
-scripts/headers_install.sh ${CURDIR}/media/msm_media_info.h ${CURDIR}/media/msm_media_info.h
 
 %install
 mkdir -p "$RPM_BUILD_ROOT/usr/include/uapi/virtio-video/"
 cp linux/virtio_video.h $RPM_BUILD_ROOT/usr/include/uapi/virtio-video/
-cp media/msm_media_info.h $RPM_BUILD_ROOT/usr/include/uapi/virtio-video/
 
 %files
 %{_includedir}/uapi/virtio-video/virtio_video.h
-%{_includedir}/uapi/virtio-video/msm_media_info.h

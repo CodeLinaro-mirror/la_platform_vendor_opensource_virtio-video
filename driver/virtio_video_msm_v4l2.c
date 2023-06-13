@@ -10,7 +10,6 @@
 #include <linux/mutex.h>
 #include <media/v4l2-event.h>
 #include <linux/poll.h>
-#include "vidc/media/msm_media_info.h"
 
 #define MSM_VIRTIO_VIDEO_DRV_NAME "msm_virtio_video_driver"
 #define MSM_VIRTIO_VIDEO_BUS_NAME "platform:msm_virtio_video_bus"
