@@ -23,6 +23,10 @@ static int __init msm_virtio_video_init(void)
 		goto err;
 	}
 
+	vdev->id.device = VIRTIO_ID_VIDEO_DECODER;
+	ret = virtio_video_probe(vdev);
+
+	vdev->id.device = VIRTIO_ID_VIDEO_ENCODER;
 	ret = virtio_video_probe(vdev);
 	if (ret) {
 		pr_err("%s probe failed %d\n", __func__, ret);
@@ -47,5 +51,5 @@ static void __exit msm_virtio_video_exit(void)
 module_init(msm_virtio_video_init);
 module_exit(msm_virtio_video_exit);
 
-MODULE_DESCRIPTION("MSM virtual io video driver");
+MODULE_DESCRIPTION("MSM VirtIO-video driver");
 MODULE_LICENSE("GPL");

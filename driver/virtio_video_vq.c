@@ -116,7 +116,11 @@ void virtio_video_free_vbuf(struct virtio_video_device *vvd,
 
 void virtio_video_cmd_cb(struct virtqueue *vq)
 {
+#ifdef CONFIG_MSM_VIRTIO_HAB
+	struct virtio_video_device *vvd = (struct virtio_video_device *)vq->priv;
+#else
 	struct virtio_video_device *vvd = vq->vdev->priv;
+#endif
 	struct virtio_video_vbuffer *vbuf;
 #ifndef CONFIG_MSM_VIRTIO_HAB
 	unsigned long flags = 0L;
@@ -187,7 +191,11 @@ void virtio_video_process_events(struct work_struct *work)
 
 void virtio_video_event_cb(struct virtqueue *vq)
 {
+#ifdef CONFIG_MSM_VIRTIO_HAB
+	struct virtio_video_device *vvd = (struct virtio_video_device *)vq->priv;
+#else
 	struct virtio_video_device *vvd = vq->vdev->priv;
+#endif
 
 	schedule_work(&vvd->eventq.work);
 }
@@ -514,6 +522,8 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 		goto unlock;
 	}
 
+	inst_lock(stream, __func__);
+
 	switch (le32_to_cpu(evt->event_type)) {
 	case VIRTIO_VIDEO_EVENT_FBD:
 	case VIRTIO_VIDEO_EVENT_EBD:
@@ -544,6 +554,8 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 			  stream_id);
 		break;
 	}
+
+	inst_unlock(stream, __func__);
 
 unlock:
 	mutex_unlock(vd->lock);
@@ -784,6 +796,9 @@ int virtio_video_cmd_query_capability(struct virtio_video_device *vvd,
 		return PTR_ERR(req_p);
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_QUERY_CAPABILITY);
+#ifdef VIRTIO_VIDEO_MSM
+	req_p->device_type = cpu_to_le32(vvd->type);
+#endif
 	req_p->queue_type = cpu_to_le32(queue_type);
 
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);

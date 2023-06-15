@@ -86,6 +86,9 @@ static int msm_venc_subscribe_event(struct virtio_video_stream* stream,
 	case V4L2_EVENT_CTRL:
 		ret = v4l2_ctrl_subscribe_event(&stream->fh, sub);
 		break;
+	case V4L2_EVENT_SOURCE_CHANGE:
+		ret = v4l2_src_change_event_subscribe(&stream->fh, sub);
+		break;
 	default:
 		v4l2_err(&vvd->v4l2_dev, "%s: invalid type=%d id=%d\n", __func__,
 			 sub->type, sub->id);
