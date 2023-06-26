@@ -147,3 +147,19 @@ const char *cmd_to_string(uint32_t cmd_type)
 
 	return "UNKNOWN";
 }
+
+const char *codec_cmd_name(uint32_t cmd)
+{
+	switch (cmd) {
+	case V4L2_DEC_CMD_START:
+		return "START";
+	case V4L2_DEC_CMD_STOP:
+		return "STOP";
+	case V4L2_DEC_CMD_PAUSE:
+		return "PAUSE";
+	case V4L2_DEC_CMD_RESUME:
+		return "RESUME";
+	}
+
+	return "UNKNOWN";
+}

@@ -27,9 +27,7 @@
 
 #include "virtio_video.h"
 
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wunused-label"
-#pragma GCC diagnostic ignored "-Wunused-function"
+#define NUM_VIDEO_DEVICE 3
 
 static unsigned int debug;
 module_param(debug, uint, 0644);
@@ -40,11 +38,11 @@ MODULE_PARM_DESC(use_dma_mem, "Try to allocate buffers from the DMA zone");
 
 static atomic_t v4l2_instance = ATOMIC_INIT(0);
 
-static int vid_nr_dec = -1;
+static int vid_nr_dec = 32;
 module_param(vid_nr_dec, int, 0644);
 MODULE_PARM_DESC(vid_nr_dec, "videoN start number, -1 is autodetect");
 
-static int vid_nr_enc = -1;
+static int vid_nr_enc = 33;
 module_param(vid_nr_enc, int, 0644);
 MODULE_PARM_DESC(vid_nr_enc, "videoN start number, -1 is autodetect");
 
@@ -65,10 +63,15 @@ int virtio_video_probe(struct virtio_device* vdev)
 {
 	int ret;
 	struct virtio_video_device *vvd;
+#ifndef CONFIG_MSM_VIRTIO_HAB
 	struct virtqueue *vqs[2];
+#endif
 	struct device *dev = &vdev->dev;
 	struct device *pdev = dev->parent;
 
+	struct virtio_video_device **vvd_arr;
+	int idx = 0;
+	static int once = 0;
 #ifndef CONFIG_MSM_VIRTIO_HAB
 	static const char * const names[] = { "commandq", "eventq" };
 	static vq_callback_t *callbacks[] = {
@@ -97,24 +100,34 @@ int virtio_video_probe(struct virtio_device* vdev)
 		vvd->vid_dev_nr = vid_nr_cam;
 		vvd->is_mplane_cam = mplane_cam;
 		vvd->type = VIRTIO_VIDEO_DEVICE_CAMERA;
+		idx = 2
 		break;
 #endif
 	case VIRTIO_ID_VIDEO_ENCODER:
 		vvd->vid_dev_nr = vid_nr_enc;
 		vvd->type = VIRTIO_VIDEO_DEVICE_ENCODER;
+		idx = 1;
 		break;
 	case VIRTIO_ID_VIDEO_DECODER:
 	default:
 		vvd->vid_dev_nr = vid_nr_dec;
 		vvd->type = VIRTIO_VIDEO_DEVICE_DECODER;
+		idx = 0;
 		break;
 	}
 
 	vvd->vdev = vdev;
 	vvd->debug = debug;
 	vvd->use_dma_mem = use_dma_mem;
-	vdev->priv = vvd;
 
+	if (!once) {
+		vvd_arr = devm_kzalloc(dev, NUM_VIDEO_DEVICE * sizeof(vvd), GFP_KERNEL);
+		vdev->priv = vvd_arr;
+	} else {
+		vvd_arr = vdev->priv;
+	}
+
+	vvd_arr[idx] = vvd;
 	spin_lock_init(&vvd->pending_buf_list_lock);
 	spin_lock_init(&vvd->resource_idr_lock);
 	idr_init(&vvd->resource_idr);
@@ -132,21 +145,23 @@ int virtio_video_probe(struct virtio_device* vdev)
 #else
 	vvd->has_iommu = !virtio_has_iommu_quirk(vdev);
 #endif
+	if (!once) {
+		if (!dev->dma_ops)
+			set_dma_ops(dev, pdev->dma_ops);
 
-	if (!dev->dma_ops)
-		set_dma_ops(dev, pdev->dma_ops);
+		/*
+		* Set it to coherent_dma_mask by default if the architecture
+		* code has not set it.
+		*/
+		if (!dev->dma_mask)
+			dev->dma_mask = &dev->coherent_dma_mask;
 
-	/*
-	 * Set it to coherent_dma_mask by default if the architecture
-	 * code has not set it.
-	 */
-	if (!dev->dma_mask)
-		dev->dma_mask = &dev->coherent_dma_mask;
-
-	dma_set_mask(dev, *pdev->dma_mask);
+		dma_set_mask(dev, *pdev->dma_mask);
+	}
 
 	v4l2_device_set_name(&vvd->v4l2_dev, DRIVER_NAME, &v4l2_instance);
-	dev_set_name(dev, "%s.%i", DRIVER_NAME, vdev->index);
+	dev_set_name(dev, "%s.%i", DRIVER_NAME, idx);
+
 	ret = v4l2_device_register(dev, &vvd->v4l2_dev);
 	if (ret)
 		goto err_v4l2_reg;
@@ -154,7 +169,6 @@ int virtio_video_probe(struct virtio_device* vdev)
 	spin_lock_init(&vvd->commandq.qlock);
 	init_waitqueue_head(&vvd->commandq.reclaim_queue);
 
-	spin_lock_init(&vvd->eventq.qlock);
 	INIT_WORK(&vvd->eventq.work, virtio_video_process_events);
 
 	INIT_LIST_HEAD(&vvd->pending_vbuf_list);
@@ -163,10 +177,14 @@ int virtio_video_probe(struct virtio_device* vdev)
 	vvd->commandq.vq = kmalloc(sizeof(struct virtqueue), GFP_KERNEL);
 	vvd->commandq.vq->habmm_handle = 0;
 	vvd->commandq.vq->vdev = vdev;
+	vvd->commandq.vq->priv = vvd;
+	spin_lock_init(&vvd->commandq.vq->qlock);
 	INIT_LIST_HEAD(&vvd->commandq.vq->resp_list);
 	vvd->eventq.vq = kmalloc(sizeof(struct virtqueue), GFP_KERNEL);
 	vvd->eventq.vq->habmm_handle = 0;
 	vvd->eventq.vq->vdev = vdev;
+	vvd->eventq.vq->priv = vvd;
+	spin_lock_init(&vvd->eventq.vq->qlock);
 	INIT_LIST_HEAD(&vvd->eventq.vq->resp_list);
 #else
 	ret = virtio_find_vqs(vdev, 2, vqs, callbacks, names, NULL);
@@ -183,7 +201,6 @@ int virtio_video_probe(struct virtio_device* vdev)
 		v4l2_err(&vvd->v4l2_dev, "failed to alloc vbufs\n");
 		goto err_vbufs;
 	}
-
 #ifndef CONFIG_MSM_VIRTIO_HAB
 	virtio_cread(vdev, struct virtio_video_config, max_caps_length,
 		     &vvd->max_caps_len);
@@ -205,31 +222,38 @@ int virtio_video_probe(struct virtio_device* vdev)
 	vvd->max_caps_len = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE;
 	vvd->max_resp_len = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE;
 #endif
+
 #ifndef CONFIG_MSM_VIRTIO_HAB
 	ret = virtio_video_alloc_events(vvd);
 	if (ret)
 		goto err_events;
-
-	virtio_device_ready(vdev);
+	if (!once) {
+		virtio_device_ready(vdev);
+	}
 #endif
 	vvd->commandq.ready = true;
 	vvd->eventq.ready = true;
 
 	ret = virtio_video_device_init(vvd);
 	if (ret) {
-		v4l2_err(&vvd->v4l2_dev,
-			 "failed to init virtio video\n");
+		v4l2_err(&vvd->v4l2_dev,"failed to init virtio video\n");
 		goto err_init;
 	}
+
+	once = 1;
 	return 0;
 
 err_init:
+#ifndef CONFIG_MSM_VIRTIO_HAB
 err_events:
 err_config:
+#endif
 	virtio_video_free_vbufs(vvd);
 err_vbufs:
 	vdev->config->del_vqs(vdev);
+#ifndef CONFIG_MSM_VIRTIO_HAB
 err_vqs:
+#endif
 	v4l2_device_unregister(&vvd->v4l2_dev);
 err_v4l2_reg:
 	devm_kfree(&vdev->dev, vvd);
@@ -243,13 +267,25 @@ static void virtio_video_remove(struct virtio_device *vdev)
 void virtio_video_remove(struct virtio_device* vdev)
 #endif
 {
-	struct virtio_video_device *vvd = vdev->priv;
+	struct virtio_video_device **vvd_arr
+				= (struct virtio_video_device **)vdev->priv;
+	struct virtio_video_device *vvd = NULL;
+	int idx = 0;
 
-	virtio_video_device_deinit(vvd);
-	virtio_video_free_vbufs(vvd);
-	vdev->config->del_vqs(vdev);
-	v4l2_device_unregister(&vvd->v4l2_dev);
-	devm_kfree(&vdev->dev, vvd);
+	for(idx = 0; idx < NUM_VIDEO_DEVICE; idx++) {
+		vvd = vvd_arr[idx];
+		if (!vvd)
+			continue;
+
+		virtio_video_device_deinit(vvd);
+		virtio_video_free_vbufs(vvd);
+#ifndef CONFIG_MSM_VIRTIO_HAB
+		vdev->config->del_vqs(vdev);
+#endif
+		v4l2_device_unregister(&vvd->v4l2_dev);
+		devm_kfree(&vdev->dev, vvd);
+	}
+	devm_kfree(&vdev->dev, vdev->priv);
 }
 
 #ifndef CONFIG_MSM_VIRTIO_HAB
@@ -259,14 +295,12 @@ static struct virtio_device_id id_table[] = {
 	{ VIRTIO_ID_VIDEO_CAM, VIRTIO_DEV_ANY_ID },
 	{ 0 },
 };
-#endif
 
 static unsigned int features[] = {
 	VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES,
 	VIRTIO_VIDEO_F_RESOURCE_NON_CONTIG,
 };
 
-#ifndef CONFIG_MSM_VIRTIO_HAB
 static struct virtio_driver virtio_video_driver = {
 	.feature_table = features,
 	.feature_table_size = ARRAY_SIZE(features),

@@ -111,6 +111,25 @@ static const struct v4l2_ctrl_ops virtio_video_dec_ctrl_ops = {
 #endif
 };
 
+
+static const char * const hevc_profile[] = {
+	"Main",
+	"Main Still Picture",
+	"Main 10",
+	NULL,
+};
+
+static const char * const * msm_vidc_get_qmenu_type(u32 control_id)
+{
+	switch (control_id) {
+		case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
+			return hevc_profile;
+		default:
+			return NULL;
+	}
+}
+
+
 int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 {
 #ifdef VIRTIO_VIDEO_MSM
@@ -127,12 +146,13 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 	v4l2_ctrl_handler_init(&stream->ctrl_handler, num_ctrls);
 
 	list_for_each_entry(entry, &vvd->ctrl_config_list, ctrls_list_entry) {
+		memset(&ctrl_cfg, 0, sizeof(ctrl_cfg));
 		config = entry->config;
 
-		v4l2_info(&vvd->v4l2_dev,"%s: add ctrl, id=%#x, type=%#x, flags=%#x, "
-		"max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n", __func__,
-		config->id, config->type, config->flags, config->max, config->min, config->step,
-		config->def, (char*)config + config->name_offset, config->is_private);
+		v4l2_info(&vvd->v4l2_dev,"%s: add ctrl, id=%#x, type=%#x, flags=%#x, max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n",
+			  __func__, config->id, config->type, config->flags, config->max,
+			  config->min, config->step, config->def,
+			  (char*)config + config->name_offset, config->is_private);
 
 		if (is_priv_ctrl(config->id)) {
 			v4l2_info(&vvd->v4l2_dev,"%s: add private ctrl", __func__);
@@ -143,12 +163,12 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 			ctrl_cfg.max = config->max;
 			ctrl_cfg.def = config->def;
 			ctrl_cfg.flags = config->flags;
-			ctrl_cfg.type = config->type;
+			ctrl_cfg.type = (enum v4l2_ctrl_type)config->type;
 
 			if (ctrl_cfg.type == V4L2_CTRL_TYPE_MENU) {
 				ctrl_cfg.menu_skip_mask = ~(config->step);
-				ctrl_cfg.qmenu = (const char *const *)config
-						 + config->qmenu_offset;
+				ctrl_cfg.qmenu = msm_vidc_get_qmenu_type(config->id);
+				ctrl_cfg.step = 0;
 			} else {
 				ctrl_cfg.step = config->step;
 			}
@@ -157,7 +177,7 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 		} else {
 			v4l2_info(&vvd->v4l2_dev,"%s: add std ctrl", __func__);
 
-			if (config->flags & V4L2_CTRL_TYPE_MENU) {
+			if (config->type == V4L2_CTRL_TYPE_MENU) {
 				ctrl = v4l2_ctrl_new_std_menu(&stream->ctrl_handler,
 					&virtio_video_dec_ctrl_ops, config->id, config->max,
 					~(config->step), config->def);
@@ -175,11 +195,10 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 		}
 
 		if (stream->ctrl_handler.error) {
-			v4l2_err(&vvd->v4l2_dev,"%s: failed to add ctrl, id=%#x, type=%#x,"
-			"flags=%#x, max=%#x, min=%#x, step=%#x, def=%#x, name=%s,"
-			"is_private=%d\n", __func__, config->id, config->type, config->flags,
-			config->max, config->min, config->step, config->def,
-			(char*)config + config->name_offset, config->is_private);
+			v4l2_err(&vvd->v4l2_dev,"%s: failed to add ctrl, id=%#x, type=%#x, flags=%#x, max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n",
+				 __func__, config->id, config->type, config->flags,
+				 config->max, config->min, config->step, config->def,
+				 (char*)config + config->name_offset, config->is_private);
 
 			return stream->ctrl_handler.error;
 		}

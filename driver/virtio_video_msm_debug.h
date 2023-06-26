@@ -20,5 +20,6 @@ void print_vb2_buffer(const char *str, struct virtio_video_stream *inst,
 void put_inst(struct virtio_video_stream* inst);
 const char* v4l2_type_name(uint32_t port);
 const char *cmd_to_string(uint32_t cmd_type);
+const char *codec_cmd_name(uint32_t cmd);
 
 #endif //_VIRTIO_VIDEO_MSM_DEBUG_H_

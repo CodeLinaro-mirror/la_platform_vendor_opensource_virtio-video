@@ -61,17 +61,16 @@
 #endif
 struct buf_export_entry {
 	struct list_head list;
-	uint64_t fd;
+	uint64_t inode;
 	uint32_t size;
 	uint32_t buffer_id;
 	enum virtio_video_queue_type buf_type;
-	bool is_export;
 };
 
 struct buf_export_cache {
 	struct kmem_cache* exports;
 	struct list_head export_fifo;
-	int export_avail;
+	int used_count;
 };
 
 struct msm_hab_virtqueue {
@@ -104,24 +103,6 @@ enum msm_vidc_port_type {
 	OUTPUT_META_PORT,
 	PORT_NONE,
 	MAX_PORT,
-};
-
-struct virtio_video_ctrl_config {
-	__s32 size;
-	__le32 id;
-	__le64 name_offset;
-	enum v4l2_ctrl_type type;
-	__s64 min;
-	__s64 max;
-	__le64 step;
-	__s64 def;
-	__le32 dims[V4L2_CTRL_MAX_DIMS];
-	__le32 elem_size;
-	__le32 flags;
-	__le64 menu_skip_mask;
-	__le64 qmenu_offset;
-	__le64 qmenu_int_offset;
-	unsigned int is_private:1;
 };
 
 struct virtio_video_ctrl_entry {
@@ -217,9 +198,6 @@ struct virtio_video_event_queue {
 	struct virtqueue *vq;
 	bool ready;
 	struct work_struct work;
-#ifdef CONFIG_MSM_VIRTIO_HAB
-	spinlock_t qlock;
-#endif
 };
 
 enum video_stream_state {

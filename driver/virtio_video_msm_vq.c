@@ -8,12 +8,12 @@
 #include "virtio_video_msm_hab.h"
 #include <linux/videodev2.h>
 
-static int virtio_video_v4l2_to_hab (struct virtio_video_device* vvd,
-				     uint32_t stream_id,
-				     enum virtio_video_cmd_type cmd_type,
-				     enum virtio_video_sub_cmd_type sub_cmd_type,
-				     void* payload, size_t size,
-				     void* priv, bool sync)
+static int virtio_video_v4l2_to_hab(struct virtio_video_device* vvd,
+				    uint32_t stream_id,
+				    enum virtio_video_cmd_type cmd_type,
+				    enum virtio_video_sub_cmd_type sub_cmd_type,
+				    void* payload, size_t size,
+				    void* priv, bool sync)
 {
 	int ret = 0;
 	struct virtio_video_stream_ioctl_cmd* req_p;
@@ -44,13 +44,12 @@ static int virtio_video_v4l2_to_hab (struct virtio_video_device* vvd,
 	if (sync) {
 		ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 		if (ret) {
-			v4l2_err(&vvd->v4l2_dev, "%s sync cmd failed: cmd_type is %s and "
-				 "sub_cmd_type is %s\n", __func__, cmd_to_string(cmd_type),
-				 cmd_to_string(sub_cmd_type));
+			v4l2_err(&vvd->v4l2_dev, "%s: sync cmd failed. %s-%s ret %d",
+				 __func__, cmd_to_string(cmd_type),
+				 cmd_to_string(sub_cmd_type), ret);
 		} else {
-			v4l2_info(&vvd->v4l2_dev, "%s sync cmd done: cmd_type is %s and "
-				  "sub_cmd_type is %s\n", __func__, cmd_to_string(cmd_type),
-				  cmd_to_string(sub_cmd_type));
+			v4l2_info(&vvd->v4l2_dev, "%s: sync cmd ok. %s-%s", __func__,
+				  cmd_to_string(cmd_type), cmd_to_string(sub_cmd_type));
 			resp = (struct virtio_video_resp*)vbuf->resp_buf;
 			resp_payload = (char*)resp + sizeof(*resp);
 			if (resp->result >= VIRTIO_VIDEO_RESP_ERR_INVALID_OPERATION)

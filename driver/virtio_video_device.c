@@ -31,10 +31,6 @@
 #include "virtio_video_msm_vb2.h"
 #include "virtio_video_msm_mem.h"
 
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wunused-label"
-#pragma GCC diagnostic ignored "-Wunused-function"
-
 static const struct vb2_mem_ops msm_vb2_mem_ops = {
 	.attach_dmabuf = msm_vb2_attach_dmabuf,
 	.detach_dmabuf = msm_vb2_detach_dmabuf,
@@ -852,12 +848,10 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 	struct video_format_info *p_info;
 
 	virtio_vb->queued = false;
-#ifndef VIRTIO_VIDEO_MSM
+
 	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_ERR)
 		done_state = VB2_BUF_STATE_ERROR;
-#endif
 
-#ifndef VIRTIO_VIDEO_MSM
 	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_KEY_FRAME)
 		v4l2_vb->flags |= V4L2_BUF_FLAG_KEYFRAME;
 
@@ -867,26 +861,14 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_PFRAME)
 		v4l2_vb->flags |= V4L2_BUF_FLAG_PFRAME;
 
-#else
-	v4l2_vb->flags = flags;
-#endif
-
-#ifndef VIRTIO_VIDEO_MSM
 	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_EOS) {
 		v4l2_vb->flags |= V4L2_BUF_FLAG_LAST;
-#else
-	if (flags & V4L2_BUF_FLAG_LAST) {
-#endif
 		virtio_video_state_update(stream, STREAM_STATE_STOPPED);
 		virtio_video_queue_eos_event(stream);
 	}
 
-#ifndef VIRTIO_VIDEO_MSM
 	if ((flags & VIRTIO_VIDEO_DEQUEUE_FLAG_ERR) ||
 	    (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_EOS)) {
-#else
-	if (flags & V4L2_BUF_FLAG_LAST) {
-#endif
 		vb->planes[0].bytesused = 0;
 
 		if (!vvd->is_m2m_dev)
@@ -897,6 +879,7 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 	}
 
 	if (!V4L2_TYPE_IS_OUTPUT(vb2_queue->type)) {
+#ifndef VIRTIO_VIDEO_MSM
 		switch (vvd->type) {
 		case VIRTIO_VIDEO_DEVICE_ENCODER:
 			for (i = 0; i < vb->num_planes; i++)
@@ -911,7 +894,16 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 					p_info->plane_format[i].plane_size;
 			break;
 		}
+#else
+		if (vvd->type == VIRTIO_VIDEO_DEVICE_ENCODER)
+			p_info = &stream->in_info;
+		else
+			p_info = &stream->out_info;
 
+		for (i = 0; i < p_info->num_planes; i++)
+			vb->planes[i].bytesused =
+				p_info->plane_format[i].plane_size;
+#endif
 		vb->timestamp = timestamp;
 	}
 
@@ -964,7 +956,9 @@ static int virtio_video_device_open(struct file *file)
 	uint32_t stream_id;
 	char name[TASK_COMM_LEN];
 	struct virtio_video_stream *stream;
+#ifndef VIRTIO_VIDEO_MSM
 	struct video_format *default_fmt;
+#endif
 	enum virtio_video_format format;
 	struct video_device *video_dev = video_devdata(file);
 	struct virtio_video_device *vvd = video_drvdata(file);
@@ -1022,6 +1016,8 @@ static int virtio_video_device_open(struct file *file)
 #endif
 
 	mutex_init(&stream->vq_mutex);
+	mutex_init(&stream->client_lock);
+	mutex_init(&stream->lock);
 	v4l2_fh_init(&stream->fh, video_dev);
 	if (video_dev->ctrl_handler) {
 		v4l2_err(&vvd->v4l2_dev, "%s %d: video_dev->ctrl_handler is not NULL\n",
@@ -1357,7 +1353,13 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 		}
 		vfl_dir = VFL_DIR_M2M;
 		fops = &virtio_video_device_m2m_fops;
+#ifdef VIRTIO_VIDEO_MSM
+		dev_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M_MPLANE
+			   | V4L2_CAP_META_CAPTURE | V4L2_CAP_META_OUTPUT;
+#else
 		dev_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M_MPLANE;
+#endif
+
 	} else {
 		input_resp_buf = NULL;
 		m2m_dev = NULL;
@@ -1436,13 +1438,15 @@ register_err:
 #else
 	virtio_video_clean_control(vvd);
 #endif
+#ifndef MSM_HAB_NO_SUPPORT
 parse_ctrl_err:
 	virtio_video_clean_capability(vvd);
 parse_cap_err:
 	if (vvd->is_m2m_dev)
 		v4l2_m2m_release(vvd->m2m_dev);
-err_m2m_dev:
 err_input_cap:
+#endif
+err_m2m_dev:
 out_cleanup:
 	if (vvd->is_m2m_dev)
 		kfree(input_resp_buf);
