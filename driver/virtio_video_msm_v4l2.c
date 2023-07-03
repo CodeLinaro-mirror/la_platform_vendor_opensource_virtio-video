@@ -456,6 +456,12 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	control.id = ctrl->id;
 	control.value = ctrl->val;
+
+	if (ctrl->id == VIRTIO_VIDEO_CID_MPEG_VIDC_LAST_FLAG_EVENT_ENABLE) {
+		v4l2_info(&vvd->v4l2_dev, "%s: enable eos event=%#x\n",
+			  __func__, ctrl->val);
+		stream->enable_eos_event = control.value;
+	}
 	ret = virtio_video_cmd_s_ctrl(vvd, stream, &control);
 
 	inst_unlock(stream, __func__);
