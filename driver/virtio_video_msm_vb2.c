@@ -252,6 +252,10 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 								 vvd->commandq.vq->habmm_handle,
 								 buf_fd, vb2->planes[plane].length,
 								 vb2->type, true);
+			if (!export_id[plane]) {
+				ret = -1;
+				goto exit;
+			}
 			v4l2_info(&vvd->v4l2_dev, "%s, export buf fd 0x%x to export_id[%d] 0x%x",
 				  __func__, buf_fd, plane, export_id[plane]);
 		}
@@ -275,6 +279,10 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		buf_fd = pb->m.fd;
 		export_id[0] = msm_buf_get_export_id(stream, vvd->commandq.vq->habmm_handle,
 						     buf_fd, pb->length, pb->type, true);
+		if (!export_id[0]) {
+			ret = -1;
+			goto exit;
+		}
 		pb->m.fd = export_id[0];
 		v4l2_info(&vvd->v4l2_dev, "%s: QBUF: %s: idx %d, memory %d, fd %d=%#x, "
 			  "size %d, filled %d, time-stamp %d", __func__,
@@ -287,7 +295,9 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 
 	virtio_video_pending_buf_list_add(vvd, virtio_vb);
 	ret = virtio_video_cmd_qbuf(vvd, stream, pb, virtio_vb);
+exit:
 	if (ret) {
+		vb2->state = VB2_BUF_STATE_ERROR;
 		vb2_buffer_done(vb2, VB2_BUF_STATE_ERROR);
 	}
 
