@@ -1182,6 +1182,31 @@ static void virtio_video_device_unregister(struct virtio_video_device *vvd)
 }
 
 #ifdef VIRTIO_VIDEO_MSM
+
+#define MAX_QMENU_ELEMENT_COUNT     64
+/* When passing qmenu from BE, it is structured with qmenu length, followed by
+ * data offsets, followed by actual qmenu data. This function restructures the
+ * same buffer into a NULL-terminated array of string pointers.
+ */
+static void virtio_video_parse_qmenu(char *menu_buf, int size)
+{
+	int64_t element_count = *(int64_t *)menu_buf;
+	int64_t *offsets = (int64_t *)(menu_buf + sizeof(int64_t));
+	char **qmenu_list = (char **)menu_buf;
+	int menu_iter = 0;
+
+	if ((element_count <= MAX_QMENU_ELEMENT_COUNT) &&
+	    ((element_count + 1) * sizeof(int64_t) < size)) {
+		for (menu_iter = 0; menu_iter < element_count; menu_iter++) {
+			if (offsets[menu_iter] < size)
+				qmenu_list[menu_iter] = menu_buf +
+							offsets[menu_iter];
+		}
+	}
+
+	qmenu_list[menu_iter] = NULL;
+}
+
 static int virtio_video_parse_controls(struct virtio_video_device *vvd,
 				       void *resp_buf, bool *is_end)
 {
@@ -1219,6 +1244,13 @@ static int virtio_video_parse_controls(struct virtio_video_device *vvd,
 			ret = -ENOMEM;
 			goto err_ctrl;
 		}
+
+		/* parse qmenu - replace count/offsets with pointers. */
+		if (new_config->type == V4L2_CTRL_TYPE_MENU)
+			virtio_video_parse_qmenu((char*)new_config +
+						 new_config->qmenu_offset,
+						 new_config->size -
+						 new_config->qmenu_offset);
 
 		ctrl->config = new_config;
 		list_add_tail(&ctrl->ctrls_list_entry, &vvd->ctrl_config_list);
