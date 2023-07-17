@@ -26,7 +26,6 @@
 #include "virtio_video_msm_v4l2.h"
 #include "virtio_video_msm_vb2.h"
 
-#pragma GCC diagnostic ignored "-Wunused-variable"
 static int virtio_video_enc_start_streaming(struct vb2_queue *vq,
 					    unsigned int count)
 {
