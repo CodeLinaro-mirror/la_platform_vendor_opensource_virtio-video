@@ -232,6 +232,7 @@ struct virtio_video_stream {
 	struct mutex client_lock;
 	struct mutex lock;
 	struct buf_export_cache buf_cache;
+	bool enable_eos_event;
 #endif
 };
 

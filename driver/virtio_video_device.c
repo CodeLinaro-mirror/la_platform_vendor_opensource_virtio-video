@@ -864,7 +864,13 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_EOS) {
 		v4l2_vb->flags |= V4L2_BUF_FLAG_LAST;
 		virtio_video_state_update(stream, STREAM_STATE_STOPPED);
+#ifndef VIRTIO_VIDEO_MSM
 		virtio_video_queue_eos_event(stream);
+#else
+		v4l2_err(&vvd->v4l2_dev, "vvd type %d eos %d.\n", vvd->type, stream->enable_eos_event);
+		if (stream->enable_eos_event)
+			virtio_video_queue_eos_event(stream);
+#endif
 	}
 
 	if ((flags & VIRTIO_VIDEO_DEQUEUE_FLAG_ERR) ||
