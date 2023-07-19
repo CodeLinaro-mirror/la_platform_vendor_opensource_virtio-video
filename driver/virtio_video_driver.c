@@ -27,6 +27,11 @@
 
 #include "virtio_video.h"
 
+#ifdef CONFIG_MSM_VIRTIO_HAB
+#include <linux/habmm.h>
+extern struct virtio_device * virthab_get_vdev(int32_t mmid);
+#endif
+
 #define NUM_VIDEO_DEVICE 3
 
 static unsigned int debug;
@@ -55,38 +60,30 @@ module_param(mplane_cam, bool, 0644);
 MODULE_PARM_DESC(mplane_cam,
 	"1 (default) - multiplanar camera, 0 - single planar camera");
 
-#ifndef CONFIG_MSM_VIRTIO_HAB
 static int virtio_video_probe(struct virtio_device* vdev)
-#else
-int virtio_video_probe(struct virtio_device* vdev)
-#endif
 {
-	int ret;
+	int ret = 0;
 	struct virtio_video_device *vvd;
 #ifndef CONFIG_MSM_VIRTIO_HAB
 	struct virtqueue *vqs[2];
 #endif
 	struct device *dev = &vdev->dev;
+#ifndef CONFIG_MSM_VIRTIO_HAB
 	struct device *pdev = dev->parent;
-
-	struct virtio_video_device **vvd_arr;
-	int idx = 0;
-	static int once = 0;
+#endif
 #ifndef CONFIG_MSM_VIRTIO_HAB
 	static const char * const names[] = { "commandq", "eventq" };
 	static vq_callback_t *callbacks[] = {
 		virtio_video_cmd_cb,
 		virtio_video_event_cb
 	};
-
 #endif
 
-#ifndef MSM_HAB_NO_SUPPORT
 	if (!virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES)) {
 		dev_err(dev, "device must support guest allocated buffers\n");
 		return -ENODEV;
 	}
-#endif
+
 	vvd = devm_kzalloc(dev, sizeof(*vvd), GFP_KERNEL);
 	if (!vvd)
 		return -ENOMEM;
@@ -100,19 +97,16 @@ int virtio_video_probe(struct virtio_device* vdev)
 		vvd->vid_dev_nr = vid_nr_cam;
 		vvd->is_mplane_cam = mplane_cam;
 		vvd->type = VIRTIO_VIDEO_DEVICE_CAMERA;
-		idx = 2
 		break;
 #endif
 	case VIRTIO_ID_VIDEO_ENCODER:
 		vvd->vid_dev_nr = vid_nr_enc;
 		vvd->type = VIRTIO_VIDEO_DEVICE_ENCODER;
-		idx = 1;
 		break;
 	case VIRTIO_ID_VIDEO_DECODER:
 	default:
 		vvd->vid_dev_nr = vid_nr_dec;
 		vvd->type = VIRTIO_VIDEO_DEVICE_DECODER;
-		idx = 0;
 		break;
 	}
 
@@ -120,14 +114,8 @@ int virtio_video_probe(struct virtio_device* vdev)
 	vvd->debug = debug;
 	vvd->use_dma_mem = use_dma_mem;
 
-	if (!once) {
-		vvd_arr = devm_kzalloc(dev, NUM_VIDEO_DEVICE * sizeof(vvd), GFP_KERNEL);
-		vdev->priv = vvd_arr;
-	} else {
-		vvd_arr = vdev->priv;
-	}
+	vdev->priv = vvd;
 
-	vvd_arr[idx] = vvd;
 	spin_lock_init(&vvd->pending_buf_list_lock);
 	spin_lock_init(&vvd->resource_idr_lock);
 	idr_init(&vvd->resource_idr);
@@ -135,9 +123,8 @@ int virtio_video_probe(struct virtio_device* vdev)
 	idr_init(&vvd->stream_idr);
 
 	init_waitqueue_head(&vvd->wq);
-#ifndef MSM_HAB_NO_SUPPORT
+
 	if (virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_NON_CONTIG))
-#endif
 		vvd->supp_non_contig = true;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,9,0)
@@ -145,23 +132,26 @@ int virtio_video_probe(struct virtio_device* vdev)
 #else
 	vvd->has_iommu = !virtio_has_iommu_quirk(vdev);
 #endif
-	if (!once) {
-		if (!dev->dma_ops)
-			set_dma_ops(dev, pdev->dma_ops);
+#ifndef CONFIG_MSM_VIRTIO_HAB
+	if (!dev->dma_ops)
+		set_dma_ops(dev, pdev->dma_ops);
 
 		/*
 		* Set it to coherent_dma_mask by default if the architecture
 		* code has not set it.
 		*/
-		if (!dev->dma_mask)
-			dev->dma_mask = &dev->coherent_dma_mask;
+	if (!dev->dma_mask)
+		dev->dma_mask = &dev->coherent_dma_mask;
 
-		dma_set_mask(dev, *pdev->dma_mask);
-	}
+	dma_set_mask(dev, *pdev->dma_mask);
+
+#endif
 
 	v4l2_device_set_name(&vvd->v4l2_dev, DRIVER_NAME, &v4l2_instance);
-	dev_set_name(dev, "%s.%i", DRIVER_NAME, idx);
-
+#ifndef CONFIG_MSM_VIRTIO_HAB
+	/* when using HAB, the dev name has been set in register_virtio_device */
+	dev_set_name(dev, "%s.%i", DRIVER_NAME, vdev->index);
+#endif
 	ret = v4l2_device_register(dev, &vvd->v4l2_dev);
 	if (ret)
 		goto err_v4l2_reg;
@@ -240,7 +230,6 @@ int virtio_video_probe(struct virtio_device* vdev)
 		goto err_init;
 	}
 
-	once = 1;
 	return 0;
 
 err_init:
@@ -256,43 +245,32 @@ err_vqs:
 #endif
 	v4l2_device_unregister(&vvd->v4l2_dev);
 err_v4l2_reg:
-	devm_kfree(&vdev->dev, vvd);
+	devm_kfree(dev, vvd);
 
 	return ret;
 }
 
-#ifndef CONFIG_MSM_VIRTIO_HAB
 static void virtio_video_remove(struct virtio_device *vdev)
-#else
-void virtio_video_remove(struct virtio_device* vdev)
-#endif
 {
-	struct virtio_video_device **vvd_arr
-				= (struct virtio_video_device **)vdev->priv;
-	struct virtio_video_device *vvd = NULL;
-	int idx = 0;
+	struct virtio_video_device *vvd = vdev->priv;
 
-	for(idx = 0; idx < NUM_VIDEO_DEVICE; idx++) {
-		vvd = vvd_arr[idx];
-		if (!vvd)
-			continue;
+	pr_info("%s %s\n", __func__, dev_name(&vdev->dev));
 
-		virtio_video_device_deinit(vvd);
-		virtio_video_free_vbufs(vvd);
+	virtio_video_device_deinit(vvd);
+	virtio_video_free_vbufs(vvd);
 #ifndef CONFIG_MSM_VIRTIO_HAB
-		vdev->config->del_vqs(vdev);
+	vdev->config->del_vqs(vdev);
 #endif
-		v4l2_device_unregister(&vvd->v4l2_dev);
-		devm_kfree(&vdev->dev, vvd);
-	}
-	devm_kfree(&vdev->dev, vdev->priv);
+	v4l2_device_unregister(&vvd->v4l2_dev);
+	devm_kfree(&vdev->dev, vvd);
 }
 
-#ifndef CONFIG_MSM_VIRTIO_HAB
 static struct virtio_device_id id_table[] = {
 	{ VIRTIO_ID_VIDEO_DECODER, VIRTIO_DEV_ANY_ID },
 	{ VIRTIO_ID_VIDEO_ENCODER, VIRTIO_DEV_ANY_ID },
+#ifdef VIRTIO_VIDEO_CAM_SUPPORT
 	{ VIRTIO_ID_VIDEO_CAM, VIRTIO_DEV_ANY_ID },
+#endif
 	{ 0 },
 };
 
@@ -311,6 +289,7 @@ static struct virtio_driver virtio_video_driver = {
 	.remove = virtio_video_remove,
 };
 
+#ifndef CONFIG_MSM_VIRTIO_HAB
 module_virtio_driver(virtio_video_driver);
 
 MODULE_DEVICE_TABLE(virtio, id_table);
@@ -320,5 +299,149 @@ MODULE_AUTHOR("Kiran Pawar <kiran.pawar@opensynergy.com>");
 MODULE_AUTHOR("Nikolay Martyanov <nikolay.martyanov@opensynergy.com>");
 MODULE_AUTHOR("Samiullah Khawaja <samiullah.khawaja@opensynergy.com>");
 MODULE_VERSION(DRIVER_VERSION);
+MODULE_LICENSE("GPL");
+
+#else
+
+static void msm_vdev_release(struct device *dev)
+{
+	pr_info("%s\n", __func__);
+}
+
+static void msm_vdev_reset(struct virtio_device *dev)
+{
+	pr_info("%s: virtio_device is being reset!\n", __func__);
+}
+
+static void msm_vdev_set_status(struct virtio_device *dev, uint8_t status)
+{
+	pr_info("%s: setting status %d\n", __func__, status);
+}
+
+static uint8_t msm_vdev_get_status(struct virtio_device *dev)
+{
+	pr_info("%s: getting status\n", __func__);
+
+	return 0;
+}
+static u64 msm_vdev_get_features(struct virtio_device *vdev)
+{
+	pr_info("%s: \n", __func__);
+
+	return VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES|
+	       VIRTIO_VIDEO_F_RESOURCE_NON_CONTIG;
+}
+
+static int msm_vdev_finalize_features(struct virtio_device *vdev)
+{
+	pr_info("%s: \n", __func__);
+
+	return 0;
+}
+
+void msm_vdev_del_vqs(struct virtio_device *vdev)
+{
+	pr_info("%s: \n", __func__);
+}
+
+static const struct virtio_config_ops msm_vdev_config_ops = {
+	.reset              = msm_vdev_reset,
+	.set_status         = msm_vdev_set_status,
+	.get_status         = msm_vdev_get_status,
+	.del_vqs            = msm_vdev_del_vqs,
+	.get_features       = msm_vdev_get_features,
+	.finalize_features  = msm_vdev_finalize_features,
+};
+
+static struct virtio_device* venc = NULL;
+static struct virtio_device* vdec = NULL;
+
+static int __init msm_virtio_video_init(void)
+{
+	int ret = 0;
+	struct virtio_device* vdev = NULL;
+
+	vdev = virthab_get_vdev(MM_VID);
+	if (!vdev) {
+		pr_err("failed to get vdev for video\n");
+		ret = -ENODEV;
+		goto err;
+	}
+
+	ret = register_virtio_driver(&virtio_video_driver);
+	if (ret) {
+		pr_err("%s: virtio video driver registration failed\n", __func__);
+		goto err;
+	}
+
+	vdec = kzalloc(sizeof(*vdec), GFP_KERNEL);
+	if (vdec != NULL) {
+		vdec->config = &msm_vdev_config_ops;
+		vdec->id.device = VIRTIO_ID_VIDEO_DECODER;
+		vdec->id.vendor = VIRTIO_DEV_ANY_ID;
+		vdec->dev.parent = &vdev->dev;
+		vdec->dev.release = msm_vdev_release;
+		pr_info("%s: registering virtio device for video decoder\n", __func__);
+		ret = register_virtio_device(vdec);
+		if (ret) {
+			put_device(&vdec->dev);
+			pr_err("%s: virtio device for decoder registration failed\n", __func__);
+			goto err_dec;
+		}
+	} else {
+		ret = -ENOMEM;
+		goto err_vdec;
+	}
+
+	venc = kzalloc(sizeof(*venc), GFP_KERNEL);
+	if (venc != NULL) {
+		venc->config = &msm_vdev_config_ops;
+		venc->id.device = VIRTIO_ID_VIDEO_ENCODER;
+		venc->id.vendor = VIRTIO_DEV_ANY_ID;
+		venc->dev.parent = &vdev->dev;
+		venc->dev.release = msm_vdev_release;
+		pr_info("%s: registering virtio device for video encoder\n", __func__);
+		ret = register_virtio_device(venc);
+		if (ret) {
+			put_device(&venc->dev);
+			pr_err("%s: virtio device for encoder registration failed\n", __func__);
+			goto err_enc;
+		}
+	} else {
+		ret = -ENOMEM;
+		goto err_venc;
+	}
+
+	return 0;
+
+err_enc:
+	kfree(venc);
+err_venc:
+	unregister_virtio_device(vdec);
+err_dec:
+	kfree(vdec);
+err_vdec:
+	unregister_virtio_driver(&virtio_video_driver);
+err:
+	return ret;
+}
+
+static void __exit msm_virtio_video_exit(void)
+{
+	pr_info("%s\n", __func__);
+
+	unregister_virtio_device(vdec);
+	unregister_virtio_device(venc);
+
+	unregister_virtio_driver(&virtio_video_driver);
+
+	kfree(vdec);
+	kfree(venc);
+}
+
+module_init(msm_virtio_video_init);
+module_exit(msm_virtio_video_exit);
+
+MODULE_DESCRIPTION("MSM VirtIO-video driver");
 MODULE_LICENSE("GPL");
 #endif
