@@ -10,7 +10,7 @@ endif
 
 # Build video kernel driver
 ifeq ($(TARGET_VIRTIO_VIDEO_ENABLE),true)
-#BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/msm_virtio_video.ko
+BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/msm_virtio_video.ko
 
 BUILD_VIDEO_TECHPACK_SOURCE := true
 endif
