@@ -373,15 +373,12 @@ int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 					   struct virtio_video_event *evt)
 {
-
+#ifndef CONFIG_MSM_VIRTIO_HAB
 	int ret;
 	struct scatterlist sg;
 	struct virtqueue *vq = vvd->eventq.vq;
 
 	memset(evt, 0, sizeof(struct virtio_video_event));
-#ifndef CONFIG_MSM_VIRTIO_HAB
-	return 0;
-#else
 	sg_init_one(&sg, evt, sizeof(struct virtio_video_event));
 
 	ret = virtqueue_add_inbuf(vq, &sg, 1, evt, GFP_KERNEL);
@@ -391,9 +388,10 @@ static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 	}
 
 	virtqueue_kick(vq);
-
-	return 0;
+#else
+	kfree(evt);
 #endif
+	return 0;
 }
 
 static void virtio_video_buf_done_per_port(struct done_buffer *buffers, int port)

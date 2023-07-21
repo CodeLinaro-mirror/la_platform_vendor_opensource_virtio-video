@@ -59,6 +59,7 @@
 	(V4L2_CTRL_ID2WHICH(idx) == V4L2_CTRL_CLASS_MPEG) && \
 	V4L2_CTRL_DRIVER_PRIV(idx))
 #endif
+
 struct buf_export_entry {
 	struct list_head list;
 	uint64_t inode;
@@ -73,20 +74,6 @@ struct buf_export_cache {
 	int used_count;
 };
 
-struct msm_hab_virtqueue {
-	void (*callback)(struct msm_hab_virtqueue* vq);
-	const char* name;
-	struct virtio_device* vdev;
-	unsigned int index;
-	unsigned int num_free;
-	void* priv;
-	spinlock_t qlock;
-	uint32_t habmm_handle;
-	struct list_head vbuf_list;
-	struct list_head resp_list;
-};
-
-#define virtqueue msm_hab_virtqueue
 #define virtqueue_get_buf msm_hab_virtqueue_get_buf
 #define virtqueue_detach_unused_buf msm_hab_virtqueue_detach_unused_buf
 #define virtqueue_add_sgs msm_hab_virtqueue_add_sgs
@@ -296,10 +283,6 @@ struct virtio_video_device {
 	struct virtio_video_device_ops *ops;
 
 #ifdef VIRTIO_VIDEO_MSM
-	struct task_struct* cmd_resp_thread;
-	struct task_struct* evt_resp_thread;
-	bool exit_resp_handler;
-	bool exit_event_handler;
 	const struct vb2_mem_ops *vb2_mem_ops;
 	struct list_head ctrl_config_list;
 #endif

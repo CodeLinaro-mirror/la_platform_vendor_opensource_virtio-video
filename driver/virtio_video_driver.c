@@ -29,6 +29,7 @@
 
 #ifdef CONFIG_MSM_VIRTIO_HAB
 #include <linux/habmm.h>
+#include "virtio_video_msm_hab.h"
 extern struct virtio_device * virthab_get_vdev(int32_t mmid);
 #endif
 
@@ -64,20 +65,16 @@ static int virtio_video_probe(struct virtio_device* vdev)
 {
 	int ret = 0;
 	struct virtio_video_device *vvd;
-#ifndef CONFIG_MSM_VIRTIO_HAB
 	struct virtqueue *vqs[2];
-#endif
 	struct device *dev = &vdev->dev;
 #ifndef CONFIG_MSM_VIRTIO_HAB
 	struct device *pdev = dev->parent;
 #endif
-#ifndef CONFIG_MSM_VIRTIO_HAB
 	static const char * const names[] = { "commandq", "eventq" };
 	static vq_callback_t *callbacks[] = {
 		virtio_video_cmd_cb,
 		virtio_video_event_cb
 	};
-#endif
 
 	if (!virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES)) {
 		dev_err(dev, "device must support guest allocated buffers\n");
@@ -163,20 +160,6 @@ static int virtio_video_probe(struct virtio_device* vdev)
 
 	INIT_LIST_HEAD(&vvd->pending_vbuf_list);
 
-#ifdef CONFIG_MSM_VIRTIO_HAB
-	vvd->commandq.vq = kmalloc(sizeof(struct virtqueue), GFP_KERNEL);
-	vvd->commandq.vq->habmm_handle = 0;
-	vvd->commandq.vq->vdev = vdev;
-	vvd->commandq.vq->priv = vvd;
-	spin_lock_init(&vvd->commandq.vq->qlock);
-	INIT_LIST_HEAD(&vvd->commandq.vq->resp_list);
-	vvd->eventq.vq = kmalloc(sizeof(struct virtqueue), GFP_KERNEL);
-	vvd->eventq.vq->habmm_handle = 0;
-	vvd->eventq.vq->vdev = vdev;
-	vvd->eventq.vq->priv = vvd;
-	spin_lock_init(&vvd->eventq.vq->qlock);
-	INIT_LIST_HEAD(&vvd->eventq.vq->resp_list);
-#else
 	ret = virtio_find_vqs(vdev, 2, vqs, callbacks, names, NULL);
 	if (ret) {
 		v4l2_err(&vvd->v4l2_dev, "failed to find virt queues\n");
@@ -185,7 +168,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 
 	vvd->commandq.vq = vqs[0];
 	vvd->eventq.vq = vqs[1];
-#endif
+
 	ret = virtio_video_alloc_vbufs(vvd);
 	if (ret) {
 		v4l2_err(&vvd->v4l2_dev, "failed to alloc vbufs\n");
@@ -235,9 +218,7 @@ err_config:
 	virtio_video_free_vbufs(vvd);
 err_vbufs:
 	vdev->config->del_vqs(vdev);
-#ifndef CONFIG_MSM_VIRTIO_HAB
 err_vqs:
-#endif
 	v4l2_device_unregister(&vvd->v4l2_dev);
 err_v4l2_reg:
 	devm_kfree(dev, vvd);
@@ -253,9 +234,7 @@ static void virtio_video_remove(struct virtio_device *vdev)
 
 	virtio_video_device_deinit(vvd);
 	virtio_video_free_vbufs(vvd);
-#ifndef CONFIG_MSM_VIRTIO_HAB
 	vdev->config->del_vqs(vdev);
-#endif
 	v4l2_device_unregister(&vvd->v4l2_dev);
 	devm_kfree(&vdev->dev, vvd);
 }
@@ -353,19 +332,15 @@ static int msm_vdev_finalize_features(struct virtio_device *vdev)
 	return 0;
 }
 
-void msm_vdev_del_vqs(struct virtio_device *vdev)
-{
-	pr_info("%s: \n", __func__);
-}
-
 static const struct virtio_config_ops msm_vdev_config_ops = {
 	.get                = msm_vdev_get,
+	.finalize_features  = msm_vdev_finalize_features,
+	.get_features       = msm_vdev_get_features,
 	.reset              = msm_vdev_reset,
 	.set_status         = msm_vdev_set_status,
 	.get_status         = msm_vdev_get_status,
-	.del_vqs            = msm_vdev_del_vqs,
-	.get_features       = msm_vdev_get_features,
-	.finalize_features  = msm_vdev_finalize_features,
+	.find_vqs           = msm_hab_find_vqs,
+	.del_vqs            = msm_hab_del_vqs,
 };
 
 static struct virtio_device* venc = NULL;

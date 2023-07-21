@@ -1337,6 +1337,7 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 	output_resp_buf = kzalloc(vvd->max_caps_len, GFP_KERNEL);
 	if (!output_resp_buf)
 		return -ENOMEM;
+
 #ifndef MSM_HAB_NO_SUPPORT
 	ret = virtio_video_query_capability(vvd, output_resp_buf,
 					    VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
@@ -1346,12 +1347,6 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 	}
 #endif
 #ifdef VIRTIO_VIDEO_MSM
-	ret = virtio_video_msm_hab_open(vvd);
-	if (ret) {
-		v4l2_err(&vvd->v4l2_dev, "close hab due to open errors");
-		virtio_video_msm_hab_close(vvd);
-		goto err_output_cap;
-	}
 	msm_vidc_init_ops(vvd);
 	INIT_LIST_HEAD(&vvd->ctrl_config_list);
 #endif
@@ -1499,9 +1494,6 @@ void virtio_video_device_deinit(struct virtio_video_device *vvd)
 {
 	vvd->commandq.ready = false;
 	vvd->eventq.ready = false;
-#ifdef VIRTIO_VIDEO_MSM
-	virtio_video_msm_hab_close(vvd);
-#endif
 	virtio_video_device_unregister(vvd);
 	if (vvd->is_m2m_dev)
 		v4l2_m2m_release(vvd->m2m_dev);
