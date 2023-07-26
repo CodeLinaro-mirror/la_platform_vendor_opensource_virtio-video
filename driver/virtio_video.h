@@ -33,10 +33,6 @@
 #include <media/videobuf2-dma-sg.h>
 #include <media/videobuf2-dma-contig.h>
 
-#ifdef VIRTIO_VIDEO_MSM
-#include <linux/kthread.h>
-#endif
-
 #define DRIVER_NAME "virtio-video"
 
 #define MIN_BUFS_MIN 0
@@ -74,6 +70,7 @@ struct buf_export_cache {
 	int used_count;
 };
 
+#define sg_init_one msm_hab_sg_init_one
 #define virtqueue_get_buf msm_hab_virtqueue_get_buf
 #define virtqueue_detach_unused_buf msm_hab_virtqueue_detach_unused_buf
 #define virtqueue_add_sgs msm_hab_virtqueue_add_sgs

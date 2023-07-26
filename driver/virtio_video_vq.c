@@ -366,7 +366,6 @@ int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 					   struct virtio_video_event *evt)
 {
-#ifndef CONFIG_MSM_VIRTIO_HAB
 	int ret;
 	struct scatterlist sg;
 	struct virtqueue *vq = vvd->eventq.vq;
@@ -381,9 +380,6 @@ static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 	}
 
 	virtqueue_kick(vq);
-#else
-	kfree(evt);
-#endif
 	return 0;
 }
 
