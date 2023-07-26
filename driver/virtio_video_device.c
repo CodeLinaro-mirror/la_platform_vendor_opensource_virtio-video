@@ -867,7 +867,8 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 #ifndef VIRTIO_VIDEO_MSM
 		virtio_video_queue_eos_event(stream);
 #else
-		v4l2_err(&vvd->v4l2_dev, "vvd type %d eos %d.\n", vvd->type, stream->enable_eos_event);
+		v4l2_err(&vvd->v4l2_dev, "%s: vvd type %d eos %d.\n", __func__,
+		         vvd->type, stream->enable_eos_event);
 		if (stream->enable_eos_event)
 			virtio_video_queue_eos_event(stream);
 #endif
@@ -1025,11 +1026,13 @@ static int virtio_video_device_open(struct file *file)
 	mutex_init(&stream->client_lock);
 	mutex_init(&stream->lock);
 	v4l2_fh_init(&stream->fh, video_dev);
+#ifdef VIRTIO_VIDEO_MSM
 	if (video_dev->ctrl_handler) {
-		v4l2_err(&vvd->v4l2_dev, "%s %d: video_dev->ctrl_handler is not NULL\n",
-			 __func__, __LINE__);
+		v4l2_err(&vvd->v4l2_dev, "%s: ctrl_handler is not NULL\n",
+			 __func__);
 		video_dev->ctrl_handler = NULL;
 	}
+#endif
 	stream->fh.ctrl_handler = &stream->ctrl_handler;
 
 	if (vvd->is_m2m_dev) {
@@ -1214,21 +1217,22 @@ static int virtio_video_parse_controls(struct virtio_video_device *vvd,
 	struct virtio_video_ctrl_config *config = NULL, *new_config = NULL;
 	struct virtio_video_ctrl_entry *ctrl = NULL;
 	struct virtio_video_query_capability_resp *resp = NULL;
+	char *offset = NULL;
 	__le32 num_descs = 0;
 
-	if (!resp_buf) {
+	if (!resp_buf)
 		return -EINVAL;
-	}
 
-	resp = (struct virtio_video_query_capability_resp*)((char*)resp_buf +
-			sizeof(struct virtio_video_resp));
+	resp = (struct virtio_video_query_capability_resp*)resp_buf;
+	offset = (char*)resp + sizeof(*resp);
 	num_descs = resp->num_descs;
-	config = (struct virtio_video_ctrl_config*)((char*)resp + sizeof(*resp));
 
 	while (num_descs--) {
+		config = (struct virtio_video_ctrl_config*)offset;
 		if (!config->size) {
 			*is_end = true;
-			v4l2_info(&vvd->v4l2_dev,"%s: got all controls from BE", __func__);
+			v4l2_info(&vvd->v4l2_dev,"%s: got all ctrls from BE",
+			          __func__);
 			break;
 		}
 
@@ -1254,13 +1258,18 @@ static int virtio_video_parse_controls(struct virtio_video_device *vvd,
 
 		ctrl->config = new_config;
 		list_add_tail(&ctrl->ctrls_list_entry, &vvd->ctrl_config_list);
-		config = (struct virtio_video_ctrl_config*)((char*)config + config->size);
 
-		v4l2_info(&vvd->v4l2_dev,"%s: add ctrl to ctrl list, id=%#x, type=%#x,"
-		"flags=%#x, max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n",
-		__func__, ctrl->config->id, ctrl->config->type, ctrl->config->flags,
-		ctrl->config->max, ctrl->config->min, ctrl->config->step, ctrl->config->def,
-		(char*)ctrl->config + ctrl->config->name_offset, ctrl->config->is_private);
+		offset += config->size;
+
+		v4l2_info(&vvd->v4l2_dev,"%s: add ctrl to ctrl list, id=%#x, "
+		          "type=%#x, flags=%#x, max=%#x, min=%#x, step=%#x, "
+		          "def=%#x, name=%s, is_private=%d\n",
+		          __func__, ctrl->config->id, ctrl->config->type,
+		          ctrl->config->flags, ctrl->config->max,
+		          ctrl->config->min, ctrl->config->step,
+		          ctrl->config->def,
+		          (char*)ctrl->config + ctrl->config->name_offset,
+		          ctrl->config->is_private);
 	}
 
 	goto exit;
@@ -1300,16 +1309,19 @@ virtio_video_query_capability(struct virtio_video_device *vvd,
 
 #ifdef VIRTIO_VIDEO_MSM
 	while (!is_end) {
-		ret = virtio_video_cmd_query_capability(vvd, resp_buf, resp_size,
-							queue_type);
+		ret = virtio_video_cmd_query_capability(vvd, resp_buf,
+		                                        resp_size,
+		                                        queue_type);
 		if (ret) {
-			v4l2_err(&vvd->v4l2_dev, "%s: failed to query capability", __func__);
+			v4l2_err(&vvd->v4l2_dev, "%s: failed to query capability",
+			         __func__);
 			break;
 		}
 
 		ret = virtio_video_parse_controls(vvd, resp_buf, &is_end);
 		if (ret) {
-			v4l2_err(&vvd->v4l2_dev, "%s: failed to parse controls", __func__);
+			v4l2_err(&vvd->v4l2_dev, "%s: failed to parse controls",
+			         __func__);
 			virtio_video_clean_controls(vvd);
 			break;
 		}

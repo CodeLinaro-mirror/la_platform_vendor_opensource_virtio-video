@@ -8,8 +8,14 @@
 
 #include "virtio_video.h"
 
-int virtio_video_msm_queue_cmd_buffer(struct virtio_video_device* vvd,
-	struct virtio_video_vbuffer* vbuf);
+#ifdef spin_lock_irqsave
+#undef spin_lock_irqsave
+#define spin_lock_irqsave(a, b)        {spin_lock(a); b = 0;}
+#endif
+#ifdef spin_lock_irqrestore
+#undef spin_lock_irqrestore
+#define spin_unlock_irqrestore(a, b)   {spin_unlock(a); b = 0;}
+#endif
 
 struct hab_vq_buffer {
 	void* buf;
@@ -38,6 +44,7 @@ static inline struct hab_virtqueue *to_hab_vq(struct virtqueue *_vq)
 	return container_of(_vq, struct hab_virtqueue, vq);
 }
 
+bool msm_hab_virtqueue_kick(struct virtqueue *vq);
 void msm_hab_sg_init_one(struct scatterlist *sg, const void *buf, unsigned int buflen);
 int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		     struct virtqueue *vqs[], vq_callback_t *callbacks[],

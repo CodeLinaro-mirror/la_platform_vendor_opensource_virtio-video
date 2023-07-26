@@ -46,14 +46,14 @@ static int attach_buf_to_vq_buf(struct hab_virtqueue *hvq,
 }
 
 static void* unattach_buf_from_vq_buf(struct hab_virtqueue *hvq,
-                                      struct list_head *list)
+                                      struct list_head *ls)
 {
 	struct hab_vq_buffer *vq_buf = NULL;
 	void *data = NULL;
 
 	spin_lock(&hvq->qlock);
 
-	vq_buf = list_first_entry_or_null(list, struct hab_vq_buffer, list);
+	vq_buf = list_first_entry_or_null(ls, struct hab_vq_buffer, list);
 
 	if (vq_buf) {
 		list_del(&vq_buf->list);
@@ -65,47 +65,6 @@ static void* unattach_buf_from_vq_buf(struct hab_virtqueue *hvq,
 	spin_unlock(&hvq->qlock);
 
 	return data;
-}
-
-int virtio_video_msm_queue_cmd_buffer(struct virtio_video_device* vvd,
-	struct virtio_video_vbuffer* vbuf)
-{
-	int ret = 0;
-	struct v4l2_device *v4l2_dev = &vvd->v4l2_dev;
-	struct hab_virtqueue *hvq = to_hab_vq(vvd->commandq.vq);
-	struct virtio_video_msg msg = {0};
-	uint8_t* pmsg = (uint8_t *)&msg;
-
-	spin_lock(&vvd->commandq.qlock);
-
-	vbuf->id = vvd->vbufs_sent++;
-	list_add_tail(&vbuf->pending_list_entry, &vvd->pending_vbuf_list);
-
-	memcpy(pmsg, vbuf->buf, vbuf->size);
-	pmsg += vbuf->size;
-
-	if (vbuf->data_size) {
-		memcpy(pmsg, vbuf->data_buf, vbuf->data_size);
-		pmsg += vbuf->data_size;
-	}
-
-	if (vbuf->resp_size) {
-		memcpy(pmsg, vbuf->resp_buf, vbuf->resp_size);
-		pmsg += vbuf->data_size;
-	}
-
-	v4l2_info(v4l2_dev, "%s: socket 0x%x: type %s, stream_id 0x%x\n",
-	          __func__, hvq->habmm_handle, cmd_to_string(msg.hdr.type),
-	          msg.hdr.stream_id);
-
-	spin_unlock(&vvd->commandq.qlock);
-
-	ret = habmm_socket_send(hvq->habmm_handle, &msg, sizeof(msg), 0);
-	if (ret)
-		v4l2_err(v4l2_dev, "%s: habmm_socket_send failed %d\n",
-		         __func__, ret);
-
-	return ret;
 }
 
 static int virtio_video_msm_hab_open(struct hab_virtqueue *hvq)
@@ -122,7 +81,7 @@ static int virtio_video_msm_hab_open(struct hab_virtqueue *hvq)
 	ret = habmm_socket_open(&hvq->habmm_handle, mmid, 0, 0);
 	if (ret) {
 		v4l2_err(v4l2_dev, "%s: %s failed %d\n",
-			 __func__, hvq->vq.name, ret);
+		         __func__, hvq->vq.name, ret);
 		goto err;
 	}
 
@@ -132,7 +91,7 @@ static int virtio_video_msm_hab_open(struct hab_virtqueue *hvq)
 	}
 
 	v4l2_info(v4l2_dev, "%s: %s mmid=%d done, socket 0x%x\n",
-		  __func__, hvq->vq.name, mmid, hvq->habmm_handle);
+	          __func__, hvq->vq.name, mmid, hvq->habmm_handle);
 
 	return 0;
 
@@ -194,58 +153,71 @@ static void stop_event_handler(struct hab_virtqueue *hvq)
 	}
 }
 
-static int process_msm_hab_cmd_resp(struct hab_virtqueue* hvq, uint8_t* data)
+static int process_msm_hab_cmd_resp(struct hab_virtqueue* hvq, void* data)
 {
 	int found = 0;
 	struct virtio_video_vbuffer *vbuf = NULL, *vbuf_tmp = NULL;
-	struct virtio_video_resp *resp = NULL;
-	struct hab_vq_buffer *vq_buf = NULL;
 	struct virtqueue *vq = &hvq->vq;
 	struct virtio_video_device* vvd = hvq->vq.vdev->priv;
 	struct v4l2_device *v4l2_dev = &vvd->v4l2_dev;
-	struct virtio_video_msg *msg = (struct virtio_video_msg *)data;
+	struct virtio_video_cmd_hdr *hdr = (struct virtio_video_cmd_hdr *)data;
+	void *resp = NULL;
+	int ret = 0;
+	int resp_rc = 0;
 
-	if (msg->hdr.type == SESSION_ERROR)
+	if (hdr->type == SESSION_ERROR) {
 		v4l2_err(v4l2_dev, "%s: session error\n", __func__);
-	else {
-		spin_lock(&vvd->commandq.qlock);
+		ret = -ENODEV;
+		goto err;
+	}
 
-		list_for_each_entry_safe(vbuf, vbuf_tmp,
-			&vvd->pending_vbuf_list, pending_list_entry) {
+	spin_lock(&vvd->commandq.qlock);
 
-			struct virtio_video_cmd_hdr* hdr
-				= (struct virtio_video_cmd_hdr*)vbuf->buf;
+	list_for_each_entry_safe(vbuf, vbuf_tmp,
+				&vvd->pending_vbuf_list, pending_list_entry) {
 
-			if (hdr->type == msg->hdr.type) {
-				found = 1;
-				memcpy(vbuf->resp_buf,
-				       (uint8_t*)msg + vbuf->size + vbuf->data_size,
-				       vbuf->resp_size);
-				resp = (struct virtio_video_resp*)vbuf->resp_buf;
+		struct virtio_video_cmd_hdr* vbuf_hdr
+			= (struct virtio_video_cmd_hdr*)vbuf->buf;
 
-				v4l2_info(v4l2_dev,
-				          "%s: recv: cmd_type=%s, resp=%s\n",
-				          __func__,
-				          cmd_to_string(hdr->type),
-				          cmd_to_string(resp->result));
+		if (vbuf_hdr->stream_id == hdr->stream_id  &&
+		    vbuf_hdr->type == hdr->type) {
+			found = 1;
+			break;
+		}
+	}
 
-				vq_buf = kmalloc(sizeof(*vq_buf), GFP_KERNEL);
-				vq_buf->buf = vbuf;
-				list_add_tail(&vq_buf->list, &hvq->resp_list);
-				break;
-			}
+	if (found) {
+		resp = (uint8_t*)data + vbuf->size + vbuf->data_size;
+		resp_rc = ((struct virtio_video_resp *)resp)->result;
+
+		if (vbuf->resp_buf && vbuf->resp_size) {
+			resp += sizeof(struct virtio_video_resp);
+			memcpy(vbuf->resp_buf, resp, vbuf->resp_size);
 		}
 
-		spin_unlock(&vvd->commandq.qlock);
+		v4l2_info(v4l2_dev, "%s: recv: cmd_type=%s. resp=%s\n",
+		          __func__,
+		          cmd_to_string(hdr->type),
+		          cmd_to_string(resp_rc));
+
+		attach_buf_to_vq_buf(hvq, &hvq->resp_list, vbuf);
 	}
+	else {
+		v4l2_err(v4l2_dev, "%s: unable find pending vbuf stream_id=%d\n",
+		         __func__, hdr->stream_id);
+		ret = -EINVAL;
+	}
+
+	spin_unlock(&vvd->commandq.qlock);
 
 	if (found)
 		virtio_video_cmd_cb(vq);
 
-	return 0;
+err:
+	return ret;
 }
 
-static int process_msm_hab_evt_resp(struct hab_virtqueue* hvq, uint8_t* data)
+static int process_msm_hab_evt_resp(struct hab_virtqueue* hvq, void* data)
 {
 	struct virtio_video_event *evt = (struct virtio_video_event *)data;
 	struct virtqueue *vq = &hvq->vq;
@@ -271,8 +243,8 @@ static int virtio_video_hab_resp_handler(void* p)
 	struct v4l2_device *v4l2_dev = &vvd->v4l2_dev;
 	const char *vq_name = hvq->vq.name;
 	uint8_t buf[MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE] = {0};
-	int size_bytes = sizeof(buf);
-	uint8_t *msg = buf;
+	int size_bytes = 0;
+	void *msg = NULL;
 	int ret = 0;
 
 	v4l2_info(v4l2_dev, "%s %s: start\n", vq_name, __func__);
@@ -286,11 +258,15 @@ static int virtio_video_hab_resp_handler(void* p)
 				         vq_name, __func__);
 				goto err;
 			}
-		} else
+			size_bytes = sizeof(struct virtio_video_event);
+		} else {
 			msg = buf;
+			size_bytes = sizeof(buf);
+		}
 
+		memset(msg, 0, size_bytes);
 		ret = habmm_socket_recv(hvq->habmm_handle,
-		                        (void *)msg, &size_bytes, 0, 0);
+		                        msg, &size_bytes, 0, 0);
 
 		if (unlikely(ret)) {
 			if (-EINTR == ret) {
@@ -342,6 +318,38 @@ static int start_resp_handler(struct hab_virtqueue *hvq)
 	return ret;
 }
 
+bool msm_hab_virtqueue_kick(struct virtqueue *vq)
+{
+	struct hab_virtqueue * hvq = to_hab_vq(vq);
+	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
+	uint32_t habmm_handle = hvq->habmm_handle;
+	struct virtio_video_msg *msg = NULL;
+	struct virtio_video_vbuffer *vbuf = NULL;
+	unsigned long flags = 0L;
+	int ret = 0;
+
+	if (hvq->type == MSM_VIRTQ_CMD_TYPE) {
+		vbuf = unattach_buf_from_vq_buf(hvq, &hvq->vbuf_list);
+		msg = (struct virtio_video_msg *)vbuf->buf;
+
+		v4l2_info(&vvd->v4l2_dev, "%s: socket 0x%x: type %s, stream_id 0x%x, %d %d %d\n",
+		          __func__, habmm_handle, cmd_to_string(msg->hdr.type),
+		          msg->hdr.stream_id, vbuf->size, vbuf->data_size, vbuf->resp_size);
+
+		spin_unlock_irqrestore(&vvd->commandq.qlock, flags);
+
+		ret = habmm_socket_send(habmm_handle, msg, sizeof(*msg), 0);
+
+		spin_lock_irqsave(&vvd->commandq.qlock, flags);
+
+		if (ret)
+			v4l2_err(&vvd->v4l2_dev, "%s: habmm_socket_send failed %d\n",
+			         __func__, ret);
+	}
+
+	return true;
+}
+
 void msm_hab_sg_init_one(struct scatterlist *sg, const void *buf,
                          unsigned int buflen)
 {
@@ -366,7 +374,7 @@ void* msm_hab_virtqueue_detach_unused_buf(struct virtqueue* vq)
 	buf = unattach_buf_from_vq_buf(hvq, &hvq->vbuf_list);
 
 	if (!buf)
-	    buf = unattach_buf_from_vq_buf(hvq, &hvq->resp_list);
+		buf = unattach_buf_from_vq_buf(hvq, &hvq->resp_list);
 
 	if (!buf) {
 		spin_lock(&hvq->qlock);
@@ -382,14 +390,8 @@ void* msm_hab_virtqueue_detach_unused_buf(struct virtqueue* vq)
 }
 
 int msm_hab_virtqueue_add_sgs(struct virtqueue *vq, struct scatterlist *sgs[],
-			      unsigned int out_sgs, unsigned int in_sgs,
-			      void *data, gfp_t gfp)
-{
-	return 0;
-}
-
-int msm_hab_virtqueue_add_inbuf(struct virtqueue *vq, struct scatterlist sg[],
-				unsigned int num, void *data, gfp_t gfp)
+                              unsigned int out_sgs, unsigned int in_sgs,
+                              void *data, gfp_t gfp)
 {
 	struct hab_virtqueue *hvq = to_hab_vq(vq);
 	const char *name = dev_name(&vq->vdev->dev);
@@ -397,7 +399,7 @@ int msm_hab_virtqueue_add_inbuf(struct virtqueue *vq, struct scatterlist sg[],
 
 	spin_lock(&hvq->qlock);
 	vq_buf = list_first_entry_or_null(&hvq->unused_vq_buf_list,
-					 struct hab_vq_buffer, list);
+	                                  struct hab_vq_buffer, list);
 
 	if (vq_buf)
 		list_del(&vq_buf->list);
@@ -405,7 +407,7 @@ int msm_hab_virtqueue_add_inbuf(struct virtqueue *vq, struct scatterlist sg[],
 	spin_unlock(&hvq->qlock);
 
 	if (!vq_buf) {
-		if(!(vq_buf = kmalloc(sizeof(*vq_buf), GFP_KERNEL))) {
+		if (!(vq_buf = kmalloc(sizeof(*vq_buf), GFP_KERNEL))) {
 			pr_err("%s: %s out of memory\n", name, __func__);
 			goto err;
 		}
@@ -422,10 +424,17 @@ err:
 	return -ENOMEM;
 }
 
+int msm_hab_virtqueue_add_inbuf(struct virtqueue *vq, struct scatterlist sg[],
+                                unsigned int num, void *data, gfp_t gfp)
+{
+	(void)sg;
+	return msm_hab_virtqueue_add_sgs(vq, NULL, 0, num, data, gfp);
+}
+
 int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
-		     struct virtqueue *vqs[], vq_callback_t *callbacks[],
-		     const char * const names[], const bool *ctx,
-		     struct irq_affinity *desc)
+                     struct virtqueue *vqs[], vq_callback_t *callbacks[],
+                     const char * const names[], const bool *ctx,
+                     struct irq_affinity *desc)
 {
 	int ret = 0;
 	struct hab_virtqueue *hvq = NULL;
@@ -434,7 +443,7 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 	pr_info("%s: %s\n", dev_name(&vdev->dev), __func__);
 
 	for (i = 0; i < nvqs; i++) {
-		if(!(hvq = devm_kzalloc(&vdev->dev, sizeof(*hvq), GFP_KERNEL))) {
+		if (!(hvq = devm_kzalloc(&vdev->dev, sizeof(*hvq), GFP_KERNEL))) {
 			ret = -ENOMEM;
 			goto err;
 		}

@@ -111,16 +111,11 @@ void virtio_video_cmd_cb(struct virtqueue *vq)
 {
 	struct virtio_video_device *vvd = vq->vdev->priv;
 	struct virtio_video_vbuffer *vbuf;
-#ifndef CONFIG_MSM_VIRTIO_HAB
 	unsigned long flags = 0L;
-#endif
 	unsigned int len = 0;
 
-#ifdef CONFIG_MSM_VIRTIO_HAB
-	spin_lock(&vvd->commandq.qlock);
-#else
 	spin_lock_irqsave(&vvd->commandq.qlock, flags);
-#endif
+
 	while (vvd->commandq.ready) {
 
 		virtqueue_disable_cb(vq);
@@ -145,11 +140,7 @@ void virtio_video_cmd_cb(struct virtqueue *vq)
 			break;
 	}
 
-#ifndef CONFIG_MSM_VIRTIO_HAB
 	spin_unlock_irqrestore(&vvd->commandq.qlock, flags);
-#else
-	spin_unlock(&vvd->commandq.qlock);
-#endif
 
 	wake_up(&vvd->commandq.reclaim_queue);
 }
@@ -290,10 +281,6 @@ int virtio_video_queue_cmd_buffer(struct virtio_video_device *vvd,
 	int outcnt = 0, incnt = 0;
 	int ret;
 
-#ifdef CONFIG_MSM_VIRTIO_HAB
-	return virtio_video_msm_queue_cmd_buffer(vvd, vbuf);
-#endif
-
 	if (!vvd->commandq.ready)
 		return -ENODEV;
 
@@ -338,9 +325,7 @@ int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 {
 	int ret;
 	unsigned long rem;
-#ifndef VIRTIO_VIDEO_MSM
 	unsigned long flags;
-#endif
 
 	vbuf->is_sync = true;
 	init_completion(&vbuf->reclaimed);
@@ -353,12 +338,10 @@ int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 	if (rem == 0)
 		ret = -ETIMEDOUT;
 
-#ifndef VIRTIO_VIDEO_MSM
 	spin_lock_irqsave(&vvd->commandq.qlock, flags);
 	if (virtio_video_vbuf_is_pending(vvd, vbuf))
 		virtio_video_free_vbuf(vvd, vbuf);
 	spin_unlock_irqrestore(&vvd->commandq.qlock, flags);
-#endif
 
 	return ret;
 }
@@ -763,9 +746,6 @@ int virtio_video_cmd_query_capability(struct virtio_video_device *vvd,
 	int ret;
 	struct virtio_video_query_capability *req_p = NULL;
 	struct virtio_video_vbuffer *vbuf = NULL;
-#ifdef VIRTIO_VIDEO_MSM
-	struct virtio_video_resp* resp = NULL;
-#endif
 
 	req_p = virtio_video_alloc_req_resp(vvd, NULL, &vbuf, sizeof(*req_p),
 					    resp_size, resp_buf);
@@ -784,19 +764,7 @@ int virtio_video_cmd_query_capability(struct virtio_video_device *vvd,
 			 "timed out waiting for capabilities for %s\n",
 			 (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT) ?
 			 "OUTPUT" : "CAPTURE");
-#ifdef VIRTIO_VIDEO_MSM
-	else
-		v4l2_info(&vvd->v4l2_dev, "%s: sync cmd done: cmd_type is %s\n",
-		__func__, cmd_to_string(req_p->hdr.type));
 
-	resp = (struct virtio_video_resp*)resp_buf;
-	if (resp->result >= VIRTIO_VIDEO_RESP_ERR_INVALID_OPERATION)
-		ret = -EINVAL;
-	spin_lock(&vvd->commandq.qlock);
-	if (virtio_video_vbuf_is_pending(vvd, vbuf))
-		virtio_video_free_vbuf(vvd, vbuf);
-	spin_unlock(&vvd->commandq.qlock);
-#endif
 	return ret;
 }
 

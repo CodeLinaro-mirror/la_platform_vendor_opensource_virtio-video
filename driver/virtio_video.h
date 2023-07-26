@@ -70,15 +70,15 @@ struct buf_export_cache {
 	int used_count;
 };
 
-#define sg_init_one msm_hab_sg_init_one
-#define virtqueue_get_buf msm_hab_virtqueue_get_buf
+#define sg_init_one                 msm_hab_sg_init_one
+#define virtqueue_get_buf           msm_hab_virtqueue_get_buf
 #define virtqueue_detach_unused_buf msm_hab_virtqueue_detach_unused_buf
-#define virtqueue_add_sgs msm_hab_virtqueue_add_sgs
-#define virtqueue_kick(x) ((void)0)
-#define virtqueue_add_inbuf msm_hab_virtqueue_add_inbuf
-#define virtqueue_disable_cb(x) {}
-#define virtqueue_is_broken(x) (false)
-#define virtqueue_enable_cb(x) (true)
+#define virtqueue_add_sgs           msm_hab_virtqueue_add_sgs
+#define virtqueue_kick              msm_hab_virtqueue_kick
+#define virtqueue_add_inbuf         msm_hab_virtqueue_add_inbuf
+#define virtqueue_disable_cb(x)     {}
+#define virtqueue_is_broken(x)      (false)
+#define virtqueue_enable_cb(x)      (true)
 
 enum msm_vidc_port_type {
 	INPUT_PORT = 0,
