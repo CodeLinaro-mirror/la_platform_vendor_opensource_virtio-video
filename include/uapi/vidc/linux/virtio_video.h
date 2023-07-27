@@ -226,6 +226,7 @@
 	(VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0xE)
  /* Current cropping area */
 #define VIRTIO_VIDEO_SEL_TGT_CROP       0x0000
+#define VIRTIO_VIDEO_SEL_TGT_COMPOSE    0x0100
 
 /*========================================================================
  Defines structure
