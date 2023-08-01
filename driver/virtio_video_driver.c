@@ -191,7 +191,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 		v4l2_err(&vvd->v4l2_dev, "failed to alloc vbufs\n");
 		goto err_vbufs;
 	}
-#ifndef CONFIG_MSM_VIRTIO_HAB
+
 	virtio_cread(vdev, struct virtio_video_config, max_caps_length,
 		     &vvd->max_caps_len);
 	if (!vvd->max_caps_len) {
@@ -207,11 +207,6 @@ static int virtio_video_probe(struct virtio_device* vdev)
 		ret = -EINVAL;
 		goto err_config;
 	}
-#else
-	/* Set non-zero value only for addressing compilation error */
-	vvd->max_caps_len = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE;
-	vvd->max_resp_len = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE;
-#endif
 
 #ifndef CONFIG_MSM_VIRTIO_HAB
 	ret = virtio_video_alloc_events(vvd);
@@ -235,8 +230,8 @@ static int virtio_video_probe(struct virtio_device* vdev)
 err_init:
 #ifndef CONFIG_MSM_VIRTIO_HAB
 err_events:
-err_config:
 #endif
+err_config:
 	virtio_video_free_vbufs(vvd);
 err_vbufs:
 	vdev->config->del_vqs(vdev);
@@ -303,6 +298,25 @@ MODULE_LICENSE("GPL");
 
 #else
 
+static void msm_vdev_get(struct virtio_device *vdev, unsigned offset,
+			 void *buf, unsigned len)
+{
+	const static struct virtio_video_config cfg = {
+		.version = 0,
+		.max_caps_length = 2 * MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE,
+		.max_resp_length = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE,
+	};
+
+	pr_info("%s\n", __func__);
+
+	if (offset == offsetof(struct virtio_video_config, max_caps_length))
+		*(uint32_t *)buf = cfg.max_caps_length;
+	else if (offset == offsetof(struct virtio_video_config, max_resp_length))
+		*(uint32_t *)buf = cfg.max_resp_length;
+	else
+		BUG_ON(1);
+}
+
 static void msm_vdev_release(struct device *dev)
 {
 	pr_info("%s\n", __func__);
@@ -345,6 +359,7 @@ void msm_vdev_del_vqs(struct virtio_device *vdev)
 }
 
 static const struct virtio_config_ops msm_vdev_config_ops = {
+	.get                = msm_vdev_get,
 	.reset              = msm_vdev_reset,
 	.set_status         = msm_vdev_set_status,
 	.get_status         = msm_vdev_get_status,
