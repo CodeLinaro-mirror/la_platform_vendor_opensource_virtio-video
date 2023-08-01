@@ -126,9 +126,10 @@ uint32_t msm_buf_get_export_id(struct virtio_video_stream* stream,
 			}
 		}
 
-		if (unlikely(!export_id)) {
+		if (unlikely(ret) || unlikely(!export_id)) {
 			v4l2_err(vd, "%s: export failed. buf type %d fd %d sz %d", __func__,
 				 buf_type, fd, size);
+			export_id = 0;
 			goto exit;
 		}
 
