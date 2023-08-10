@@ -41,12 +41,6 @@
 			       + MAX_INLINE_CMD_SIZE		   \
 			       + MAX_INLINE_RESP_SIZE)
 
-struct done_buffer {
-	struct virtio_video_buffer *virtio_vb;
-	uint32_t flags;
-	uint64_t timestamp;
-};
-
 static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 					   struct virtio_video_event *evt);
 static void virtio_video_handle_event(struct virtio_video_device *vvd,
@@ -418,7 +412,7 @@ static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 	struct vb2_buffer *vb = NULL;
 	int plane = 0;
 	uint32_t export_id = 0;
-	static struct done_buffer buffers[MAX_PORT] = {0};
+	struct done_buffer *buffers = stream->buffers;
 	int port = 0;
 
 	v4l2_info(&vvd->v4l2_dev, "%s: %s: stream_id=%u\n", __func__,
