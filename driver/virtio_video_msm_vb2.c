@@ -8,6 +8,7 @@
 #include "virtio_video_msm_vq.h"
 #include "virtio_video_msm_debug.h"
 #include "virtio_video_msm_mem.h"
+#include "virtio_video_msm_hab.h"
 
 struct vb2_queue *msm_vidc_get_vb2q(struct virtio_video_stream* stream,
 				    uint32_t type, const char *func)
@@ -223,7 +224,8 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 {
 	int ret = 0;
 	struct virtio_video_stream *stream = NULL;
-	struct virtio_video_device* vvd = NULL;
+	struct virtio_video_device *vvd = NULL;
+	struct hab_virtqueue *hvq = NULL;
 	struct virtio_video_buffer *virtio_vb = to_virtio_vb(vb2);
 	int plane = 0;
 	__u8 v4l2_buf[sizeof(struct v4l2_buffer)
@@ -242,6 +244,8 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 
 	vvd = to_virtio_vd(stream->video_dev);
 
+	hvq = to_hab_vq(vvd->commandq.vq);
+
 	client_lock(stream, __func__);
 	inst_lock(stream, __func__);
 
@@ -249,9 +253,13 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		for (plane = 0; plane < vb2->num_planes; plane++) {
 			buf_fd = vb2->planes[plane].m.fd;
 			export_id[plane] = msm_buf_get_export_id(stream,
-								 vvd->commandq.vq->habmm_handle,
+								 hvq->habmm_handle,
 								 buf_fd, vb2->planes[plane].length,
 								 vb2->type, true);
+			if (!export_id[plane]) {
+				ret = -1;
+				goto exit;
+			}
 			v4l2_info(&vvd->v4l2_dev, "%s, export buf fd 0x%x to export_id[%d] 0x%x",
 				  __func__, buf_fd, plane, export_id[plane]);
 		}
@@ -273,8 +281,12 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		queue->buf_ops->fill_user_buffer(vb2, pb);
 
 		buf_fd = pb->m.fd;
-		export_id[0] = msm_buf_get_export_id(stream, vvd->commandq.vq->habmm_handle,
+		export_id[0] = msm_buf_get_export_id(stream, hvq->habmm_handle,
 						     buf_fd, pb->length, pb->type, true);
+		if (!export_id[0]) {
+			ret = -1;
+			goto exit;
+		}
 		pb->m.fd = export_id[0];
 		v4l2_info(&vvd->v4l2_dev, "%s: QBUF: %s: idx %d, memory %d, fd %d=%#x, "
 			  "size %d, filled %d, time-stamp %d", __func__,
@@ -287,7 +299,9 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 
 	virtio_video_pending_buf_list_add(vvd, virtio_vb);
 	ret = virtio_video_cmd_qbuf(vvd, stream, pb, virtio_vb);
+exit:
 	if (ret) {
+		vb2->state = VB2_BUF_STATE_ERROR;
 		vb2_buffer_done(vb2, VB2_BUF_STATE_ERROR);
 	}
 

@@ -17,8 +17,6 @@
 #define MAX_EXPORT_RETRY 5
 #define MAX_NUM_EXPORT_CACHE_ENTRY 64
 
-#define V4L2FE_ALIGN(x, to_align) ((((unsigned) x) + (to_align - 1)) & ~(to_align - 1))
-#define VIRTIO_VIDEO_BUF_FLAG_READONLY      0x20000000
 
 static struct buf_export_entry* get_entry_from_fd(struct list_head *fifo,
 						  uint64_t fd, uint32_t size,
@@ -103,7 +101,6 @@ uint32_t msm_buf_get_export_id(struct virtio_video_stream* stream,
 	struct v4l2_device *vd = stream->video_dev->v4l2_dev;
 	const uint32_t export_flag = HABMM_EXPIMP_FLAGS_FD;
 	int i = 0;
-	uint32_t algn_size = V4L2FE_ALIGN(size, 4096);
 	struct buf_export_entry *find_entry = NULL;
 	struct buf_export_entry *entry = NULL;
 
@@ -112,31 +109,32 @@ uint32_t msm_buf_get_export_id(struct virtio_video_stream* stream,
 		goto exit;
 	}
 
-	find_entry = get_entry_from_fd(&stream->buf_cache.export_fifo, fd, algn_size, buf_type);
+	find_entry = get_entry_from_fd(&stream->buf_cache.export_fifo, fd, size, buf_type);
 	if (find_entry) {
 		export_id = find_entry->buffer_id;
 	} else {
 		for (i = 0; i < MAX_EXPORT_RETRY && ret != -ENOMEM; i++) {
-			ret = habmm_export(habmmhandle, (void*)fd, algn_size, &export_id,
+			ret = habmm_export(habmmhandle, (void*)fd, size, &export_id,
 					   export_flag);
 			if (ret) {
 				v4l2_err(vd, "%s: export failed. retry %d rc %d",
 					 __func__, i, ret);
 			} else {
 				v4l2_info(vd, "%s: export ok, type %d fd %d export_id %d sz %d retry %d",
-					  __func__, buf_type, fd, export_id, algn_size, i);
+					  __func__, buf_type, fd, export_id, size, i);
 				break;
 			}
 		}
 
-		if (unlikely(!export_id)) {
+		if (unlikely(ret) || unlikely(!export_id)) {
 			v4l2_err(vd, "%s: export failed. buf type %d fd %d sz %d", __func__,
-				 buf_type, fd, algn_size);
-				goto exit;
+				 buf_type, fd, size);
+			export_id = 0;
+			goto exit;
 		}
 
 		if (buf_type == OUTPUT_MPLANE || buf_type == OUTPUT_META_PLANE) {
-			entry = alloc_one_export_entry(&stream->buf_cache, fd, algn_size,
+			entry = alloc_one_export_entry(&stream->buf_cache, fd, size,
 						       buf_type, export_id);
 			if (unlikely(IS_ERR(entry))) {
 				v4l2_err(vd, "alloc entry failed");
@@ -147,7 +145,7 @@ uint32_t msm_buf_get_export_id(struct virtio_video_stream* stream,
 				export_id = 0;
 			} else {
 				v4l2_info(vd, "%s: alloc entry. buf type %d fd %d export_id %d sz %d",
-					  __func__, buf_type, fd, export_id, algn_size);
+					  __func__, buf_type, fd, export_id, size);
 			}
 		}
 	}
@@ -161,7 +159,8 @@ int msm_buf_put_export_id(struct virtio_video_stream* stream, uint32_t export_id
 {
 	int ret = 0;
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
-	uint32_t habmmhandle = vvd->commandq.vq->habmm_handle;
+	struct hab_virtqueue *hvq = to_hab_vq(vvd->commandq.vq);
+	uint32_t habmmhandle = hvq->habmm_handle;
 
 	v4l2_info(&vvd->v4l2_dev, "%s: event_type=%#x, export_id=%d, flags=%#x\n",
 		  __func__, event_type, export_id, flags);

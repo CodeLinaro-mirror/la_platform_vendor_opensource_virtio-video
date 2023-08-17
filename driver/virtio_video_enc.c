@@ -26,7 +26,6 @@
 #include "virtio_video_msm_v4l2.h"
 #include "virtio_video_msm_vb2.h"
 
-#pragma GCC diagnostic ignored "-Wunused-variable"
 static int virtio_video_enc_start_streaming(struct vb2_queue *vq,
 					    unsigned int count)
 {
@@ -157,23 +156,6 @@ static const struct v4l2_ctrl_ops virtio_video_enc_ctrl_ops = {
 #endif
 };
 
-static const char* const hevc_profile[] = {
-	"Main",
-	"Main Still Picture",
-	"Main 10",
-	NULL,
-};
-
-static const char* const* msm_vidc_get_qmenu_type(u32 control_id)
-{
-	switch (control_id) {
-	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
-		return hevc_profile;
-	default:
-		return NULL;
-	}
-}
-
 int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 {
 #ifdef VIRTIO_VIDEO_MSM
@@ -211,7 +193,9 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 
 			if (ctrl_cfg.type == V4L2_CTRL_TYPE_MENU) {
 				ctrl_cfg.menu_skip_mask = ~(config->step);
-				ctrl_cfg.qmenu = msm_vidc_get_qmenu_type(config->id);
+				ctrl_cfg.qmenu = (const char * const *)(
+						 (char*)config +
+						 config->qmenu_offset);
 				ctrl_cfg.step = 0;
 			} else {
 				ctrl_cfg.step = config->step;

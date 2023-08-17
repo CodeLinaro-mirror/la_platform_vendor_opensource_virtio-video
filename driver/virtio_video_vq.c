@@ -41,12 +41,6 @@
 			       + MAX_INLINE_CMD_SIZE		   \
 			       + MAX_INLINE_RESP_SIZE)
 
-struct done_buffer {
-	struct virtio_video_buffer *virtio_vb;
-	uint32_t flags;
-	uint64_t timestamp;
-};
-
 static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 					   struct virtio_video_event *evt);
 static void virtio_video_handle_event(struct virtio_video_device *vvd,
@@ -116,11 +110,7 @@ void virtio_video_free_vbuf(struct virtio_video_device *vvd,
 
 void virtio_video_cmd_cb(struct virtqueue *vq)
 {
-#ifdef CONFIG_MSM_VIRTIO_HAB
-	struct virtio_video_device *vvd = (struct virtio_video_device *)vq->priv;
-#else
 	struct virtio_video_device *vvd = vq->vdev->priv;
-#endif
 	struct virtio_video_vbuffer *vbuf;
 #ifndef CONFIG_MSM_VIRTIO_HAB
 	unsigned long flags = 0L;
@@ -191,11 +181,7 @@ void virtio_video_process_events(struct work_struct *work)
 
 void virtio_video_event_cb(struct virtqueue *vq)
 {
-#ifdef CONFIG_MSM_VIRTIO_HAB
-	struct virtio_video_device *vvd = (struct virtio_video_device *)vq->priv;
-#else
 	struct virtio_video_device *vvd = vq->vdev->priv;
-#endif
 
 	schedule_work(&vvd->eventq.work);
 }
@@ -381,15 +367,12 @@ int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 					   struct virtio_video_event *evt)
 {
-
+#ifndef CONFIG_MSM_VIRTIO_HAB
 	int ret;
 	struct scatterlist sg;
 	struct virtqueue *vq = vvd->eventq.vq;
 
 	memset(evt, 0, sizeof(struct virtio_video_event));
-#ifndef CONFIG_MSM_VIRTIO_HAB
-	return 0;
-#else
 	sg_init_one(&sg, evt, sizeof(struct virtio_video_event));
 
 	ret = virtqueue_add_inbuf(vq, &sg, 1, evt, GFP_KERNEL);
@@ -399,9 +382,10 @@ static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 	}
 
 	virtqueue_kick(vq);
-
-	return 0;
+#else
+	kfree(evt);
 #endif
+	return 0;
 }
 
 static void virtio_video_buf_done_per_port(struct done_buffer *buffers, int port)
@@ -428,7 +412,7 @@ static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 	struct vb2_buffer *vb = NULL;
 	int plane = 0;
 	uint32_t export_id = 0;
-	static struct done_buffer buffers[MAX_PORT] = {0};
+	struct done_buffer *buffers = stream->buffers;
 	int port = 0;
 
 	v4l2_info(&vvd->v4l2_dev, "%s: %s: stream_id=%u\n", __func__,

@@ -25,9 +25,7 @@ msm_virtio_video-objs := \
 	driver/virtio_video_msm_v4l2.o \
 	driver/virtio_video_msm_vb2.o \
 	driver/virtio_video_msm_vq.o \
-	driver/virtio_video_msm_hab.o \
-	driver/virtio_video_msm_driver.o \
-
+	driver/virtio_video_msm_hab.o
 
 obj-m += msm_virtio_video.o
 
