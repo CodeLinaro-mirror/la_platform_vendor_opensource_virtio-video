@@ -27,7 +27,6 @@
 #include "virtio_video_msm_debug.h"
 #endif
 #include "virtio_video_msm_mem.h"
-#include "vidc/media/v4l2_vidc_extensions.h"
 
 #ifdef VIRTIO_VIDEO_MSM
 #define MAX_INLINE_CMD_SIZE   512
@@ -424,23 +423,21 @@ static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 								sizeof(struct v4l2_buffer));
 		export_id = v4l2_buf->m.planes[0].m.fd;
 		for (plane = 0; plane < v4l2_buf->length; plane++) {
-			v4l2_info(&vvd->v4l2_dev, "%s: %s, num_planes: %d, plane: %d, "
-					"fd: %#x, data_offset:%#x, length:%#x, bytesused:%#x",
-					__func__,
-					event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
-					v4l2_buf->length, plane, v4l2_buf->m.planes[plane].m.fd,
-					v4l2_buf->m.planes[plane].data_offset,
-					v4l2_buf->m.planes[plane].length,
-					v4l2_buf->m.planes[plane].bytesused);
+			v4l2_info(&vvd->v4l2_dev, "%s: %s, type %d, plane: %d, fd: %#x, length:%#x, bytesused:%#x",
+				  __func__, event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
+				  v4l2_buf->type, plane, v4l2_buf->m.planes[plane].m.fd,
+				  v4l2_buf->m.planes[plane].length,
+				  v4l2_buf->m.planes[plane].bytesused);
 		}
 	} else {
 		export_id = v4l2_buf->m.fd;
+		v4l2_info(&vvd->v4l2_dev, "%s: %s, type %d, fd: %#x, length %#x, bytesused:%#x",
+			  __func__, event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
+			  v4l2_buf->type, v4l2_buf->m.fd, v4l2_buf->length, v4l2_buf->bytesused);
 	}
 
 	spin_lock(&vvd->pending_buf_list_lock);
 	list_for_each_entry(entry, &vvd->pending_buf_list, list) {
-		v4l2_info(&vvd->v4l2_dev, "%s: loop looking, resource_id=%d, "
-				"export_id = %d\n", __func__, entry->resource_id, export_id);
 		if (entry->resource_id == export_id){
 			virtio_vb = entry;
 			break;

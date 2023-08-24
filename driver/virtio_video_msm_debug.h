@@ -13,7 +13,6 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include "virtio_video.h"
-#include "vidc/media/v4l2_vidc_extensions.h"
 
 void print_vb2_buffer(const char *str, struct virtio_video_stream *inst,
 		struct vb2_buffer *vb2);
