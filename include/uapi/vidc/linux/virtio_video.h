@@ -90,6 +90,8 @@
 	virtio_video_fourcc('V', 'P', '9', '0') /* VP9 */
 #define VIRTIO_VIDEO_PIX_FMT_HEVC \
 	virtio_video_fourcc('H', 'E', 'V', 'C') /* for HEVC stream */
+#define VIRTIO_VIDEO_MSM_PIX_FMT_HEIC \
+	virtio_video_fourcc('H', 'E', 'I', 'C') /* for HEIC stream */
 #define VIRTIO_VIDEO_MSM_PIX_FMT_AV1 \
 	virtio_video_fourcc('A', 'V', '1', '0') /* AV1 */
 #define VIRTIO_VIDEO_CTRL_CLASS_USER        0x00980000    /* Old-style 'user' controls */
@@ -585,14 +587,7 @@ enum virtio_video_mpeg_video_hevc_tier {
 enum virtio_video_mpeg_video_bitrate_mode {
 	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_VBR = 0,
 	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CBR = 1,
-};
-
-enum virtio_video_mpeg_vidc_video_bitrate_mode {
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CBR_VFR =
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CBR + 1,
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_MBR,
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_MBR_VFR,
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CQ,
+	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CQ  = 2,
 };
 
 enum virtio_video_mpeg_vidc_video_stream_format {
