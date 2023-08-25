@@ -606,29 +606,6 @@ enum virtio_video_mpeg_video_h264_entropy_mode {
 	VIRTIO_VIDEO_MPEG_VIDEO_H264_ENTROPY_MODE_CABAC = 1,
 };
 
-/*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
-struct virtio_video_queryctrl {
-	__u32             id;
-	__u32             type;    /* enum virtio_video_ctrl_type */
-	__u8              name[32];    /* Whatever */
-	__s32             minimum;    /* Note signedness */
-	__s32             maximum;
-	__s32             step;
-	__s32             default_value;
-	__u32             flags;
-	__u32             padding[2];
-};
-
-struct virtio_video_querymenu {
-	__u32        id;
-	__u32        index;
-	union {
-		__u8    name[32];    /* Whatever */
-		__s64    value;
-	};
-	__u32        padding;
-} __attribute__((packed));
-
 struct virtio_video_selection {
 	__u32                        type;
 	__u32                        target;
@@ -1052,8 +1029,6 @@ enum virtio_video_sub_cmd_type
 	UNSUBSCRIBE_EVENT,
 	QBUF,
 	REQBUFS,
-	QUERYCTRL,
-	QUERYMENU,
 	G_CTRL,
 	S_CTRL,
 	G_PARAM,

@@ -45,12 +45,6 @@ int virtio_video_cmd_querybuf(struct virtio_video_device* vvd,
 int virtio_video_cmd_querycap(struct virtio_video_device* vvd,
 			      struct virtio_video_stream* stream,
 			      struct v4l2_capability* cap);
-int virtio_video_cmd_queryctrl(struct virtio_video_device* vvd,
-			       struct virtio_video_stream* stream,
-			       struct v4l2_queryctrl* ctrl);
-int virtio_video_cmd_querymenu(struct virtio_video_device* vvd,
-			       struct virtio_video_stream* stream,
-			       struct v4l2_querymenu* qmenu);
 int virtio_video_cmd_reqbufs(struct virtio_video_device* vvd,
 			     struct virtio_video_stream* stream,
 			     struct v4l2_requestbuffers* b);
