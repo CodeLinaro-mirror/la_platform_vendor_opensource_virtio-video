@@ -2,7 +2,8 @@
 
 #ifeq ($(CONFIG_MSM_VIRTIO_VIDEO), y)
 LINUXINCLUDE    += -I${VIDEO_ROOT}/include/uapi \
-                   -I${KERNEL_ROOT}/include
+                   -I${KERNEL_ROOT}/include \
+                   -I${VIDEO_ROOT}/driver
 
 USERINCLUDE     += -I${VIDEO_ROOT}/include/uapi
 

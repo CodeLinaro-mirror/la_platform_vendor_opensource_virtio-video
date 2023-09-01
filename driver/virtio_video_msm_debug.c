@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
+#define CREATE_TRACE_POINTS
 #include "virtio_video_msm_debug.h"
 #include "virtio_video.h"
 
@@ -155,6 +156,18 @@ const char *codec_cmd_name(uint32_t cmd)
 		return "PAUSE";
 	case V4L2_DEC_CMD_RESUME:
 		return "RESUME";
+	}
+
+	return "UNKNOWN";
+}
+
+const char *buffer_event_name(uint32_t event)
+{
+	switch (event) {
+	case VIRTIO_VIDEO_EVENT_FBD:
+		return "FBD";
+	case VIRTIO_VIDEO_EVENT_EBD:
+		return "EBD";
 	}
 
 	return "UNKNOWN";

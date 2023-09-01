@@ -30,6 +30,7 @@
 #include "virtio_video_msm_v4l2.h"
 #include "virtio_video_msm_vb2.h"
 #include "virtio_video_msm_mem.h"
+#include "virtio_video_msm_debug.h"
 
 static const struct vb2_mem_ops msm_vb2_mem_ops = {
 	.attach_dmabuf = msm_vb2_attach_dmabuf,
@@ -999,6 +1000,8 @@ static int virtio_video_device_open(struct file *file)
 	format = VIRTIO_VIDEO_FORMAT_H264;
 #endif
 	virtio_video_stream_id_get(vvd, stream, &stream_id);
+	trace_msm_virtio_video_device_open("START", stream_id);
+
 	ret = virtio_video_cmd_stream_create(vvd, stream_id, format, name);
 	if (ret) {
 		v4l2_err(&vvd->v4l2_dev, "failed to create stream\n");
@@ -1065,6 +1068,7 @@ static int virtio_video_device_open(struct file *file)
 			goto err_init_ctrls;
 		}
 	}
+	trace_msm_virtio_video_device_open("END", stream_id);
 	return 0;
 
 err_init_ctrls:
@@ -1089,6 +1093,8 @@ static int virtio_video_device_release(struct file *file)
 	struct video_device *video_dev = video_devdata(file);
 	struct virtio_video_device *vvd = video_drvdata(file);
 
+	trace_msm_virtio_video_device_release("START", stream->stream_id);
+
 	mutex_lock(video_dev->lock);
 
 	v4l2_fh_del(&stream->fh);
@@ -1112,6 +1118,8 @@ static int virtio_video_device_release(struct file *file)
 	virtio_video_clear_device_busy(vvd, NULL);
 
 	mutex_unlock(video_dev->lock);
+
+	trace_msm_virtio_video_device_release("END", stream->stream_id);
 
 	return 0;
 }
