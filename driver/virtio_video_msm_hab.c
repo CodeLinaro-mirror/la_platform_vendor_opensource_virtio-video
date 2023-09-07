@@ -98,12 +98,12 @@ int virtio_video_msm_queue_cmd_buffer(struct virtio_video_device* vvd,
 	          __func__, hvq->habmm_handle, cmd_to_string(msg.hdr.type),
 	          msg.hdr.stream_id);
 
+	spin_unlock(&vvd->commandq.qlock);
+
 	ret = habmm_socket_send(hvq->habmm_handle, &msg, sizeof(msg), 0);
 	if (ret)
 		v4l2_err(v4l2_dev, "%s: habmm_socket_send failed %d\n",
 		         __func__, ret);
-
-	spin_unlock(&vvd->commandq.qlock);
 
 	return ret;
 }
