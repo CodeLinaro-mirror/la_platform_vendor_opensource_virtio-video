@@ -1048,7 +1048,6 @@ enum virtio_video_queue_type {
 struct virtio_video_query_capability {
 	struct virtio_video_cmd_hdr hdr;
 	__le32 queue_type; /* One of VIRTIO_VIDEO_QUEUE_TYPE_* types */
-	__le32 device_type;
 };
 
 enum virtio_video_planes_layout_flag {
@@ -1118,7 +1117,6 @@ struct virtio_video_stream_create {
 	__le32 in_mem_type; /* One of VIRTIO_VIDEO_MEM_TYPE_* types */
 	__le32 out_mem_type; /* One of VIRTIO_VIDEO_MEM_TYPE_* types */
 	__le32 coded_format; /* One of VIRTIO_VIDEO_FORMAT_* types */
-	__le32 device_type;  /* virtio_video_device_type types */
 	__u8 tag[64];
 };
 
