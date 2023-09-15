@@ -415,6 +415,11 @@ static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 			  v4l2_buf->type, v4l2_buf->m.fd, v4l2_buf->length, v4l2_buf->bytesused);
 	}
 
+	trace_msm_virtio_video_buffer_callback(stream_id,
+					       buffer_event_name(event_type),
+					       export_id, v4l2_buf->index,
+					       v4l2_buf->type, v4l2_buf->flags);
+
 	spin_lock(&vvd->pending_buf_list_lock);
 	list_for_each_entry(entry, &vvd->pending_buf_list, list) {
 		if (entry->resource_id == export_id){
