@@ -570,9 +570,7 @@ int virtio_video_cmd_stream_create(struct virtio_video_device *vvd,
 	req_p->in_mem_type = cpu_to_le32(VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES);
 	req_p->out_mem_type = cpu_to_le32(VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES);
 	req_p->coded_format = cpu_to_le32(format);
-#ifdef VIRTIO_VIDEO_MSM
-	req_p->device_type = cpu_to_le32(vvd->type);
-#else
+#ifndef VIRTIO_VIDEO_MSM
 	if (strscpy(req_p->tag, tag, sizeof(req_p->tag) - 1) < 0)
 		v4l2_err(&vvd->v4l2_dev, "failed to copy stream tag\n");
 	req_p->tag[sizeof(req_p->tag) - 1] = 0;
@@ -758,9 +756,6 @@ int virtio_video_cmd_query_capability(struct virtio_video_device *vvd,
 		return PTR_ERR(req_p);
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_QUERY_CAPABILITY);
-#ifdef VIRTIO_VIDEO_MSM
-	req_p->device_type = cpu_to_le32(vvd->type);
-#endif
 	req_p->queue_type = cpu_to_le32(queue_type);
 
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
