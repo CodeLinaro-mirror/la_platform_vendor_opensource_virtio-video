@@ -29,6 +29,7 @@ struct hab_virtqueue {
 	uint32_t habmm_handle;
 	struct list_head vbuf_list;
 	struct list_head resp_list;
+	struct list_head unused_vq_buf_list;
 	struct task_struct* resp_thread;
 };
 
@@ -37,11 +38,13 @@ static inline struct hab_virtqueue *to_hab_vq(struct virtqueue *_vq)
 	return container_of(_vq, struct hab_virtqueue, vq);
 }
 
+void msm_hab_sg_init_one(struct scatterlist *sg, const void *buf, unsigned int buflen);
 int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		     struct virtqueue *vqs[], vq_callback_t *callbacks[],
 		     const char * const names[], const bool *ctx,
 		     struct irq_affinity *desc);
 void msm_hab_del_vqs(struct virtio_device *vdev);
+void msm_hab_start(struct virtio_device *vdev);
 
 int msm_hab_virtqueue_add_inbuf(struct virtqueue *vq,
 				struct scatterlist sg[], unsigned int num,

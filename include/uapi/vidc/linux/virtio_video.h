@@ -82,16 +82,18 @@
 #define VIRTIO_VIDEO_PIX_FMT_VIDC_P010 \
 	virtio_video_fourcc('P', '0', '1', '0')
  /* compressed formats */
-#define VIRTIO_VIDEO_MSM_PIX_FMT_H264 \
+#define VIRTIO_VIDEO_PIX_FMT_H264 \
 	virtio_video_fourcc('H', '2', '6', '4') /* H264 with start codes */
-#define VIRTIO_VIDEO_MSM_PIX_FMT_MPEG2 \
+#define VIRTIO_VIDEO_PIX_FMT_MPEG2 \
 	virtio_video_fourcc('M', 'P', 'G', '2') /* MPEG-2 ES     */
-#define VIRTIO_VIDEO_MSM_PIX_FMT_MPEG4 \
-	virtio_video_fourcc('M', 'P', 'G', '4') /* MPEG-4 part 2 ES */
-#define VIRTIO_VIDEO_MSM_PIX_FMT_VP9 \
+#define VIRTIO_VIDEO_PIX_FMT_VP9 \
 	virtio_video_fourcc('V', 'P', '9', '0') /* VP9 */
-#define VIRTIO_VIDEO_MSM_PIX_FMT_HEVC \
+#define VIRTIO_VIDEO_PIX_FMT_HEVC \
 	virtio_video_fourcc('H', 'E', 'V', 'C') /* for HEVC stream */
+#define VIRTIO_VIDEO_MSM_PIX_FMT_HEIC \
+	virtio_video_fourcc('H', 'E', 'I', 'C') /* for HEIC stream */
+#define VIRTIO_VIDEO_MSM_PIX_FMT_AV1 \
+	virtio_video_fourcc('A', 'V', '1', '0') /* AV1 */
 #define VIRTIO_VIDEO_CTRL_CLASS_USER        0x00980000    /* Old-style 'user' controls */
 #define VIRTIO_VIDEO_CTRL_CLASS_MPEG        0x00990000    /* MPEG-compression controls */
 #define VIRTIO_VIDEO_CID_MPEG_BASE (VIRTIO_VIDEO_CTRL_CLASS_MPEG | 0x900)
@@ -173,10 +175,6 @@
 	(VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE+0x3)
 #define VIRTIO_VIDEO_MPEG_MSM_VIDC_DISABLE 0
 #define VIRTIO_VIDEO_MPEG_MSM_VIDC_ENABLE 1
-#define VIRTIO_VIDEO_PIX_FMT_H264 virtio_video_fourcc('H', '2', '6', '4')
-#define VIRTIO_VIDEO_PIX_FMT_HEVC virtio_video_fourcc('H', 'E', 'V', 'C')
-#define VIRTIO_VIDEO_PIX_FMT_VP9 virtio_video_fourcc('V', 'P', '9', '0')
-#define VIRTIO_VIDEO_PIX_FMT_MPEG2 virtio_video_fourcc('M', 'P', 'G', '2')
 #define VIRTIO_VIDEO_CID_MPEG_VIDC_VIDEO_DISABLE_TIMESTAMP_REORDER \
 	(VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x88)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_H264_LEVEL            (VIRTIO_VIDEO_CID_MPEG_BASE+0x167)
@@ -184,6 +182,9 @@
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_HEVC_LEVEL        (VIRTIO_VIDEO_CID_MPEG_BASE + 0x268)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_MPEG2_PROFILE        (VIRTIO_VIDEO_CID_MPEG_BASE+0x10F)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_MPEG2_LEVEL            (VIRTIO_VIDEO_CID_MPEG_BASE+0x10E)
+#define VIRTIO_VIDEO_CID_MPEG_VIDC_AV1_PROFILE     (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x31)
+#define VIRTIO_VIDEO_CID_MPEG_VIDC_AV1_LEVEL       (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x32)
+#define VIRTIO_VIDEO_CID_MPEG_VIDC_AV1D_FILM_GRAIN_PRESENT  (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x35)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_VP9_PROFILE            (VIRTIO_VIDEO_CID_MPEG_BASE+0x200)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_VP9_LEVEL            (VIRTIO_VIDEO_CID_MPEG_BASE+0x201)
 #define VIRTIO_VIDEO_CID_MPEG_VIDC_VIDEO_VP9_LEVEL \
@@ -553,6 +554,31 @@ enum virtio_video_mpeg_vidc_video_mpeg2_level {
 	VIRTIO_VIDEO_MPEG_VIDC_VIDEO_MPEG2_LEVEL_3 = 3,
 };
 
+enum virtio_video_mpeg_vidc_av1_profile {
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_PROFILE_MAIN            = 0,
+};
+
+enum virtio_video_mpeg_vidc_av1_level {
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_2_0  = 0,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_2_1  = 1,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_2_2  = 2,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_2_3  = 3,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_3_0  = 4,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_3_1  = 5,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_3_2  = 6,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_3_3  = 7,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_4_0  = 8,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_4_1  = 9,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_4_2  = 10,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_4_3  = 11,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_5_0  = 12,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_5_1  = 13,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_5_2  = 14,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_5_3  = 15,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_6_0  = 16,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_6_1  = 17,
+};
+
 enum virtio_video_mpeg_video_hevc_tier {
 	VIRTIO_VIDEO_MPEG_VIDEO_HEVC_TIER_MAIN = 0,
 	VIRTIO_VIDEO_MPEG_VIDEO_HEVC_TIER_HIGH = 1,
@@ -561,14 +587,7 @@ enum virtio_video_mpeg_video_hevc_tier {
 enum virtio_video_mpeg_video_bitrate_mode {
 	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_VBR = 0,
 	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CBR = 1,
-};
-
-enum virtio_video_mpeg_vidc_video_bitrate_mode {
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CBR_VFR =
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CBR + 1,
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_MBR,
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_MBR_VFR,
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CQ,
+	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CQ  = 2,
 };
 
 enum virtio_video_mpeg_vidc_video_stream_format {
@@ -586,29 +605,6 @@ enum virtio_video_mpeg_video_h264_entropy_mode {
 	VIRTIO_VIDEO_MPEG_VIDEO_H264_ENTROPY_MODE_CAVLC = 0,
 	VIRTIO_VIDEO_MPEG_VIDEO_H264_ENTROPY_MODE_CABAC = 1,
 };
-
-/*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
-struct virtio_video_queryctrl {
-	__u32             id;
-	__u32             type;    /* enum virtio_video_ctrl_type */
-	__u8              name[32];    /* Whatever */
-	__s32             minimum;    /* Note signedness */
-	__s32             maximum;
-	__s32             step;
-	__s32             default_value;
-	__u32             flags;
-	__u32             padding[2];
-};
-
-struct virtio_video_querymenu {
-	__u32        id;
-	__u32        index;
-	union {
-		__u8    name[32];    /* Whatever */
-		__s64    value;
-	};
-	__u32        padding;
-} __attribute__((packed));
 
 struct virtio_video_selection {
 	__u32                        type;
@@ -1033,8 +1029,6 @@ enum virtio_video_sub_cmd_type
 	UNSUBSCRIBE_EVENT,
 	QBUF,
 	REQBUFS,
-	QUERYCTRL,
-	QUERYMENU,
 	G_CTRL,
 	S_CTRL,
 	G_PARAM,

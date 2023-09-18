@@ -191,14 +191,12 @@ static int virtio_video_probe(struct virtio_device* vdev)
 		goto err_config;
 	}
 
-#ifndef CONFIG_MSM_VIRTIO_HAB
 	ret = virtio_video_alloc_events(vvd);
 	if (ret)
 		goto err_events;
-	if (!once) {
-		virtio_device_ready(vdev);
-	}
-#endif
+
+	virtio_device_ready(vdev);
+
 	vvd->commandq.ready = true;
 	vvd->eventq.ready = true;
 
@@ -211,9 +209,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	return 0;
 
 err_init:
-#ifndef CONFIG_MSM_VIRTIO_HAB
 err_events:
-#endif
 err_config:
 	virtio_video_free_vbufs(vvd);
 err_vbufs:
@@ -230,7 +226,7 @@ static void virtio_video_remove(struct virtio_device *vdev)
 {
 	struct virtio_video_device *vvd = vdev->priv;
 
-	pr_info("%s %s\n", __func__, dev_name(&vdev->dev));
+	pr_info("%s: %s\n", dev_name(&vdev->dev), __func__);
 
 	virtio_video_device_deinit(vvd);
 	virtio_video_free_vbufs(vvd);
@@ -285,41 +281,47 @@ static void msm_vdev_get(struct virtio_device *vdev, unsigned offset,
 		.max_caps_length = 2 * MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE,
 		.max_resp_length = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE,
 	};
+	const char *dev_n = dev_name(&vdev->dev);
 
-	pr_info("%s\n", __func__);
+	pr_info("%s: %s offset=%x\n", dev_n, __func__, offset);
 
 	if (offset == offsetof(struct virtio_video_config, max_caps_length))
 		*(uint32_t *)buf = cfg.max_caps_length;
 	else if (offset == offsetof(struct virtio_video_config, max_resp_length))
 		*(uint32_t *)buf = cfg.max_resp_length;
 	else
-		BUG_ON(1);
+		pr_err("%s: %s unsupported\n", dev_n, __func__);
 }
 
 static void msm_vdev_release(struct device *dev)
 {
-	pr_info("%s\n", __func__);
+	pr_info("%s: %s\n", dev_name(dev), __func__);
 }
 
-static void msm_vdev_reset(struct virtio_device *dev)
+static void msm_vdev_reset(struct virtio_device *vdev)
 {
-	pr_info("%s: virtio_device is being reset!\n", __func__);
+	pr_info("%s: %s\n", dev_name(&vdev->dev), __func__);
 }
 
-static void msm_vdev_set_status(struct virtio_device *dev, uint8_t status)
+static void msm_vdev_set_status(struct virtio_device *vdev, uint8_t status)
 {
-	pr_info("%s: setting status %d\n", __func__, status);
+	pr_info("%s: %s: setting status %x\n", dev_name(&vdev->dev), __func__,
+	        status);
+
+	if (status & VIRTIO_CONFIG_S_DRIVER_OK)
+		msm_hab_start(vdev);
 }
 
-static uint8_t msm_vdev_get_status(struct virtio_device *dev)
+static uint8_t msm_vdev_get_status(struct virtio_device *vdev)
 {
-	pr_info("%s: getting status\n", __func__);
+	pr_info("%s: %s: getting status\n", dev_name(&vdev->dev), __func__);
 
 	return 0;
 }
+
 static u64 msm_vdev_get_features(struct virtio_device *vdev)
 {
-	pr_info("%s: \n", __func__);
+	pr_info("%s: %s\n", dev_name(&vdev->dev), __func__);
 
 	return VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES|
 	       VIRTIO_VIDEO_F_RESOURCE_NON_CONTIG;
@@ -327,7 +329,7 @@ static u64 msm_vdev_get_features(struct virtio_device *vdev)
 
 static int msm_vdev_finalize_features(struct virtio_device *vdev)
 {
-	pr_info("%s: \n", __func__);
+	pr_info("%s: %s\n", dev_name(&vdev->dev), __func__);
 
 	return 0;
 }
@@ -418,7 +420,7 @@ err:
 
 static void __exit msm_virtio_video_exit(void)
 {
-	pr_info("%s\n", __func__);
+	pr_info("virtio-video: %s\n", __func__);
 
 	unregister_virtio_device(vdec);
 	unregister_virtio_device(venc);

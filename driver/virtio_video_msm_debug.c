@@ -127,10 +127,6 @@ const char *cmd_to_string(uint32_t cmd_type)
 		return "QBUF";
 	case REQBUFS:
 		return "REQBUFS";
-	case QUERYCTRL:
-		return "QUERYCTRL";
-	case QUERYMENU:
-		return "QUERYMENU";
 	case G_CTRL:
 		return "G_CTRL";
 	case S_CTRL:

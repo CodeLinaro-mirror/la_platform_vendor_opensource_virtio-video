@@ -222,22 +222,6 @@ int virtio_video_cmd_querycap(struct virtio_video_device* vvd,
 		(void *)cap, sizeof(*cap), NULL);
 }
 
-int virtio_video_cmd_queryctrl(struct virtio_video_device* vvd,
-	struct virtio_video_stream* stream, struct v4l2_queryctrl* ctrl)
-{
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
-		VIRTIO_VIDEO_CMD_QUERY_CONTROL, QUERYCTRL,
-		(void *)ctrl, sizeof(*ctrl), NULL);
-}
-
-int virtio_video_cmd_querymenu(struct virtio_video_device* vvd,
-	struct virtio_video_stream* stream, struct v4l2_querymenu* qmenu)
-{
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
-					     VIRTIO_VIDEO_CMD_GET_PARAMS, QUERYMENU,
-					     (void *)qmenu, sizeof(*qmenu), NULL);
-}
-
 int virtio_video_cmd_reqbufs(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_requestbuffers* buf)
 {

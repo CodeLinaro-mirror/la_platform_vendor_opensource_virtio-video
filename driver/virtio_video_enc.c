@@ -720,7 +720,6 @@ static const struct v4l2_ioctl_ops virtio_video_msm_enc_ioctl_ops = {
 	.vidioc_dqbuf = msm_v4l2_dqbuf,
 	.vidioc_streamon = msm_v4l2_streamon,
 	.vidioc_streamoff = msm_v4l2_streamoff,
-	.vidioc_querymenu = msm_v4l2_querymenu,
 	.vidioc_subscribe_event = msm_v4l2_subscribe_event,
 	.vidioc_unsubscribe_event = msm_v4l2_unsubscribe_event,
 	.vidioc_try_encoder_cmd = msm_v4l2_try_encoder_cmd,
