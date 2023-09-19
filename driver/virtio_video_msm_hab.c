@@ -24,7 +24,6 @@ static int attach_buf_to_vq_buf(struct hab_virtqueue *hvq,
                                  struct list_head *ls, void *data)
 {
 	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
-	struct v4l2_device *v4l2_dev = &vvd->v4l2_dev;
 	struct hab_vq_buffer *vq_buf = NULL;
 	int ret = 0;
 
@@ -36,7 +35,7 @@ static int attach_buf_to_vq_buf(struct hab_virtqueue *hvq,
 		vq_buf->buf = data;
 		list_add_tail(&vq_buf->list, ls);
 	} else {
-		v4l2_err(v4l2_dev, "%s: no available vq_buf\n", __func__);
+		vpr_e(vvd2str(vvd), "%s: no available vq_buf\n", __func__);
 		ret = -ENOENT;
 	}
 
@@ -71,17 +70,16 @@ static int virtio_video_msm_hab_open(struct hab_virtqueue *hvq)
 {
 	int ret = 0;
 	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
-	struct v4l2_device *v4l2_dev = &vvd->v4l2_dev;
 	int mmid = 0;
 
 	mmid = (vvd->type == VIRTIO_VIDEO_DEVICE_DECODER) ? MM_VID : MM_VID_2;
 
-	v4l2_info(v4l2_dev, "%s: %s mmid=%d\n", __func__, hvq->vq.name, mmid);
+	vpr_h(vvd2str(vvd), "%s: %s mmid=%d\n", __func__, hvq->vq.name, mmid);
 
 	ret = habmm_socket_open(&hvq->habmm_handle, mmid, 0, 0);
 	if (ret) {
-		v4l2_err(v4l2_dev, "%s: %s failed %d\n",
-		         __func__, hvq->vq.name, ret);
+		vpr_e(vvd2str(vvd), "%s: %s failed %d\n",
+		      __func__, hvq->vq.name, ret);
 		goto err;
 	}
 
@@ -90,8 +88,8 @@ static int virtio_video_msm_hab_open(struct hab_virtqueue *hvq)
 		goto err_start_handler;
 	}
 
-	v4l2_info(v4l2_dev, "%s: %s mmid=%d done, socket 0x%x\n",
-	          __func__, hvq->vq.name, mmid, hvq->habmm_handle);
+	vpr_h(vvd2str(vvd), "%s: %s mmid=%d done, socket 0x%x\n",
+	      __func__, hvq->vq.name, mmid, hvq->habmm_handle);
 
 	return 0;
 
@@ -106,26 +104,25 @@ static void virtio_video_msm_hab_close(struct hab_virtqueue* hvq)
 {
 	int ret = 0;
 	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
-	struct v4l2_device *v4l2_dev = &vvd->v4l2_dev;
 
 	if (hvq->type == MSM_VIRTQ_CMD_TYPE && hvq->habmm_handle) {
 		ret = habmm_socket_close(hvq->habmm_handle);
 		if (ret)
-			v4l2_err(v4l2_dev, "%s, habmm cmd socket close failed %d\n",
-			         __func__, ret);
+			vpr_e(vvd2str(vvd), "%s, habmm cmd socket close failed %d\n",
+			      __func__, ret);
 		stop_cmd_resp_handler(hvq);
 	}
 
 	if (hvq->type == MSM_VIRTQ_EVT_TYPE && hvq->habmm_handle) {
 		ret = habmm_socket_close(hvq->habmm_handle);
 		if (ret)
-			v4l2_err(v4l2_dev, "%s: habmm event socket close failed %d\n",
-			         __func__, ret);
+			vpr_e(vvd2str(vvd), "%s: habmm event socket close failed %d\n",
+			      __func__, ret);
 		stop_event_handler(hvq);
 	}
 
-	v4l2_info(v4l2_dev, "%s: %s socket=0x%x done\n", __func__,
-	          hvq->vq.name, hvq->habmm_handle);
+	vpr_h(vvd2str(vvd), "%s: %s socket=0x%x done\n", __func__,
+	      hvq->vq.name, hvq->habmm_handle);
 
 	hvq->habmm_handle = 0;
 }
@@ -159,14 +156,13 @@ static int process_msm_hab_cmd_resp(struct hab_virtqueue* hvq, void* data)
 	struct virtio_video_vbuffer *vbuf = NULL, *vbuf_tmp = NULL;
 	struct virtqueue *vq = &hvq->vq;
 	struct virtio_video_device* vvd = hvq->vq.vdev->priv;
-	struct v4l2_device *v4l2_dev = &vvd->v4l2_dev;
 	struct virtio_video_cmd_hdr *hdr = (struct virtio_video_cmd_hdr *)data;
 	void *resp = NULL;
 	int ret = 0;
 	int resp_rc = 0;
 
 	if (hdr->type == SESSION_ERROR) {
-		v4l2_err(v4l2_dev, "%s: session error\n", __func__);
+		vpr_e(vvd2str(vvd), "%s: session error\n", __func__);
 		ret = -ENODEV;
 		goto err;
 	}
@@ -195,16 +191,16 @@ static int process_msm_hab_cmd_resp(struct hab_virtqueue* hvq, void* data)
 			memcpy(vbuf->resp_buf, resp, vbuf->resp_size);
 		}
 
-		v4l2_info(v4l2_dev, "%s: recv: cmd_type=%s. resp=%s\n",
-		          __func__,
-		          cmd_to_string(hdr->type),
-		          cmd_to_string(resp_rc));
+		vpr_h(vvd2str(vvd), "%s: recv: cmd_type=%s. resp=%s\n",
+		      __func__,
+		      cmd_to_string(hdr->type),
+		      cmd_to_string(resp_rc));
 
 		attach_buf_to_vq_buf(hvq, &hvq->resp_list, vbuf);
 	}
 	else {
-		v4l2_err(v4l2_dev, "%s: unable find pending vbuf stream_id=%d\n",
-		         __func__, hdr->stream_id);
+		vpr_e(vvd2str(vvd), "%s: unable find pending vbuf stream_id=%d\n",
+		      __func__, hdr->stream_id);
 		ret = -EINVAL;
 	}
 
@@ -222,11 +218,10 @@ static int process_msm_hab_evt_resp(struct hab_virtqueue* hvq, void* data)
 	struct virtio_video_event *evt = (struct virtio_video_event *)data;
 	struct virtqueue *vq = &hvq->vq;
 	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
-	struct v4l2_device *v4l2_dev = &vvd->v4l2_dev;
 	int ret = 0;
 
-	v4l2_info(v4l2_dev, "%s: recv: event type %#x, stream id %d\n",
-	          __func__, evt->event_type, evt->stream_id);
+	vpr_h(vvd2str(vvd), "%s: recv: event type %#x, stream id %d\n",
+	      __func__, evt->event_type, evt->stream_id);
 
 	ret = attach_buf_to_vq_buf(hvq, &hvq->resp_list, evt);
 
@@ -240,22 +235,21 @@ static int virtio_video_hab_resp_handler(void* p)
 {
 	struct hab_virtqueue* hvq = p;
 	struct virtio_video_device* vvd = hvq->vq.vdev->priv;
-	struct v4l2_device *v4l2_dev = &vvd->v4l2_dev;
 	const char *vq_name = hvq->vq.name;
 	uint8_t buf[MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE] = {0};
 	int size_bytes = 0;
 	void *msg = NULL;
 	int ret = 0;
 
-	v4l2_info(v4l2_dev, "%s %s: start\n", vq_name, __func__);
+	vpr_h(vvd2str(vvd), "%s %s: start\n", vq_name, __func__);
 
 	while (!kthread_should_stop()) {
 
 		if (hvq->type == MSM_VIRTQ_EVT_TYPE) {
 			msg = unattach_buf_from_vq_buf(hvq, &hvq->vbuf_list);
 			if (unlikely(!msg)) {
-				v4l2_err(v4l2_dev, "%s %s: unable get event buffer\n",
-				         vq_name, __func__);
+				vpr_e(vvd2str(vvd), "%s %s: unable get event buffer\n",
+				      vq_name, __func__);
 				goto err;
 			}
 			size_bytes = sizeof(struct virtio_video_event);
@@ -273,13 +267,13 @@ static int virtio_video_hab_resp_handler(void* p)
 				continue;
 			}
 			else if (-ENODEV == ret) {
-				v4l2_info(v4l2_dev, "%s %s: socket 0x%x closed\n",
-				          vq_name, __func__, hvq->habmm_handle);
+				vpr_h(vvd2str(vvd), "%s %s: socket 0x%x closed\n",
+				      vq_name, __func__, hvq->habmm_handle);
 				goto exit;
 			}
 			else {
-				v4l2_err(v4l2_dev, "%s %s: socket recv failed: rc=%d\n",
-				         vq_name, __func__, ret);
+				vpr_e(vvd2str(vvd), "%s %s: socket recv failed: rc=%d\n",
+				      vq_name, __func__, ret);
 				goto err;
 			}
 		}
@@ -296,7 +290,7 @@ static int virtio_video_hab_resp_handler(void* p)
 exit:
 	return 0;
 err:
-	v4l2_err(v4l2_dev, "%s %s: exited. error %d\n", vq_name, __func__, ret);
+	vpr_e(vvd2str(vvd), "%s %s: exited. error %d\n", vq_name, __func__, ret);
 	return ret;
 }
 
@@ -304,14 +298,13 @@ static int start_resp_handler(struct hab_virtqueue *hvq)
 {
 	int ret = 0;
 	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
-	struct v4l2_device *v4l2_dev = &vvd->v4l2_dev;
 
 	hvq->resp_thread = kthread_create(virtio_video_hab_resp_handler,
 	                                  hvq, "vvid_rsp_%s", hvq->vq.name);
 
 	if (IS_ERR(hvq->resp_thread)) {
-		v4l2_err(v4l2_dev, "failed to create %s handler thread\n",
-			 hvq->vq.name);
+		vpr_e(vvd2str(vvd), "failed to create %s handler thread\n",
+		      hvq->vq.name);
 		ret = PTR_ERR(hvq->resp_thread);
 	}
 
@@ -332,9 +325,9 @@ bool msm_hab_virtqueue_kick(struct virtqueue *vq)
 		vbuf = unattach_buf_from_vq_buf(hvq, &hvq->vbuf_list);
 		msg = (struct virtio_video_msg *)vbuf->buf;
 
-		v4l2_info(&vvd->v4l2_dev, "%s: socket 0x%x: type %s, stream_id 0x%x, %d %d %d\n",
-		          __func__, habmm_handle, cmd_to_string(msg->hdr.type),
-		          msg->hdr.stream_id, vbuf->size, vbuf->data_size, vbuf->resp_size);
+		vpr_h(vvd2str(vvd), "%s: socket 0x%x: type %s, stream_id 0x%x, %d %d %d\n",
+		      __func__, habmm_handle, cmd_to_string(msg->hdr.type),
+		      msg->hdr.stream_id, vbuf->size, vbuf->data_size, vbuf->resp_size);
 
 		spin_unlock_irqrestore(&vvd->commandq.qlock, flags);
 
@@ -343,8 +336,8 @@ bool msm_hab_virtqueue_kick(struct virtqueue *vq)
 		spin_lock_irqsave(&vvd->commandq.qlock, flags);
 
 		if (ret)
-			v4l2_err(&vvd->v4l2_dev, "%s: habmm_socket_send failed %d\n",
-			         __func__, ret);
+			vpr_e(vvd2str(vvd), "%s: habmm_socket_send failed %d\n",
+			      __func__, ret);
 	}
 
 	return true;

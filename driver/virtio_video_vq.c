@@ -358,7 +358,7 @@ static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 
 	ret = virtqueue_add_inbuf(vq, &sg, 1, evt, GFP_KERNEL);
 	if (ret) {
-		v4l2_err(&vvd->v4l2_dev, "failed to queue event buffer\n");
+		vpr_e(vvd2str(vvd), "failed to queue event buffer\n");
 		return ret;
 	}
 
@@ -393,8 +393,8 @@ static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 	struct done_buffer *buffers = stream->buffers;
 	int port = 0;
 
-	v4l2_info(&vvd->v4l2_dev, "%s: %s: stream_id=%u\n", __func__,
-		event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD", stream_id);
+	vpr_h(stream2str(stream), "%s: %s: stream_id=%u\n", __func__,
+	      event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD", stream_id);
 	v4l2_buf = (struct v4l2_buffer*)evt->payload;
 
 	if (V4L2_TYPE_IS_MULTIPLANAR(v4l2_buf->type)) {
@@ -402,17 +402,17 @@ static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 								sizeof(struct v4l2_buffer));
 		export_id = v4l2_buf->m.planes[0].m.fd;
 		for (plane = 0; plane < v4l2_buf->length; plane++) {
-			v4l2_info(&vvd->v4l2_dev, "%s: %s, type %d, plane: %d, fd: %#x, length:%#x, bytesused:%#x",
-				  __func__, event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
-				  v4l2_buf->type, plane, v4l2_buf->m.planes[plane].m.fd,
-				  v4l2_buf->m.planes[plane].length,
-				  v4l2_buf->m.planes[plane].bytesused);
+			vpr_h(stream2str(stream), "%s: %s, type %d, plane: %d, fd: %#x, length:%#x, bytesused:%#x",
+			      __func__, event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
+			      v4l2_buf->type, plane, v4l2_buf->m.planes[plane].m.fd,
+			      v4l2_buf->m.planes[plane].length,
+			      v4l2_buf->m.planes[plane].bytesused);
 		}
 	} else {
 		export_id = v4l2_buf->m.fd;
-		v4l2_info(&vvd->v4l2_dev, "%s: %s, type %d, fd: %#x, length %#x, bytesused:%#x",
-			  __func__, event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
-			  v4l2_buf->type, v4l2_buf->m.fd, v4l2_buf->length, v4l2_buf->bytesused);
+		vpr_h(stream2str(stream), "%s: %s, type %d, fd: %#x, length %#x, bytesused:%#x",
+		      __func__, event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
+		      v4l2_buf->type, v4l2_buf->m.fd, v4l2_buf->length, v4l2_buf->bytesused);
 	}
 
 	trace_msm_virtio_video_buffer_callback(stream_id,
@@ -430,10 +430,10 @@ static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 	spin_unlock(&vvd->pending_buf_list_lock);
 
 	if (!virtio_vb) {
-		v4l2_err(&vvd->v4l2_dev, "%s: %s, stream_id=%u, vbuf not found\n",
-			__func__,
-			event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
-			stream_id);
+		vpr_e(stream2str(stream), "%s: %s, stream_id=%u, vbuf not found\n",
+		      __func__,
+		      event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
+		      stream_id);
 	} else {
 		virtio_video_pending_buf_list_del(vvd, virtio_vb);
 
@@ -447,8 +447,8 @@ static void  virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 			vb->planes[0].bytesused = v4l2_buf->bytesused;
 		}
 
-		v4l2_info(&vvd->v4l2_dev, "%s: payload: index %d, type %d, flag %#x",
-			  __func__, v4l2_buf->index, v4l2_buf->type, v4l2_buf->flags);
+		vpr_h(stream2str(stream), "%s: payload: index %d, type %d, flag %#x",
+		      __func__, v4l2_buf->index, v4l2_buf->type, v4l2_buf->flags);
 
 		port = v4l2_type_to_driver_port(stream, v4l2_buf->type, __func__);
 		buffers[port].virtio_vb = virtio_vb;
@@ -482,8 +482,8 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 
 	stream = idr_find(&vvd->stream_idr, stream_id);
 	if (!stream) {
-		v4l2_warn(&vvd->v4l2_dev, "%s: stream_id=%u not found for event\n",
-			__func__, stream_id);
+		vpr_h(stream2str(stream), "%s: stream_id=%u not found for event\n",
+		      __func__, stream_id);
 		goto unlock;
 	}
 
@@ -495,8 +495,8 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 		virtio_video_handle_buf_done(stream, evt);
 		break;
 	case VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED:
-		v4l2_info(&vvd->v4l2_dev, "%s: stream_id=%u: resolution change event\n",
-			  __func__, stream_id);
+		vpr_h(stream2str(stream), "%s: stream_id=%u: resolution change event\n",
+		      __func__, stream_id);
 #ifndef VIRTIO_VIDEO_MSM
 		virtio_video_cmd_get_params(vvd, stream,
 					   VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
@@ -509,14 +509,14 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 		}
 		break;
 	case VIRTIO_VIDEO_EVENT_ERROR:
-		v4l2_err(&vvd->v4l2_dev, "%s: stream_id=%i: error event\n", __func__,
-			 stream_id);
+		vpr_e(stream2str(stream), "%s: stream_id=%i: error event\n", __func__,
+		      stream_id);
 		virtio_video_state_update(stream, STREAM_STATE_ERROR);
 		virtio_video_handle_error(stream);
 		break;
 	default:
-		v4l2_warn(&vvd->v4l2_dev, "stream_id=%i: unknown event\n",
-			  stream_id);
+		vpr_h(stream2str(stream), "stream_id=%i: unknown event\n",
+		      stream_id);
 		break;
 	}
 
@@ -535,7 +535,7 @@ int virtio_video_alloc_events(struct virtio_video_device *vvd)
 
 	evts = kzalloc(num * sizeof(struct virtio_video_event), GFP_KERNEL);
 	if (!evts) {
-		v4l2_err(&vvd->v4l2_dev, "failed to alloc event buffers!!!\n");
+		vpr_e(vvd2str(vvd), "failed to alloc event buffers!!!\n");
 		return -ENOMEM;
 	}
 	vvd->evts = evts;
@@ -543,8 +543,7 @@ int virtio_video_alloc_events(struct virtio_video_device *vvd)
 	for (i = 0; i < num; i++) {
 		ret = virtio_video_queue_event_buffer(vvd, &evts[i]);
 		if (ret) {
-			v4l2_err(&vvd->v4l2_dev,
-				 "failed to queue event buffer\n");
+			vpr_e(vvd2str(vvd), "failed to queue event buffer\n");
 			return ret;
 		}
 	}
@@ -572,7 +571,7 @@ int virtio_video_cmd_stream_create(struct virtio_video_device *vvd,
 	req_p->coded_format = cpu_to_le32(format);
 #ifndef VIRTIO_VIDEO_MSM
 	if (strscpy(req_p->tag, tag, sizeof(req_p->tag) - 1) < 0)
-		v4l2_err(&vvd->v4l2_dev, "failed to copy stream tag\n");
+		vpr_e(vvd2str(vvd), "failed to copy stream tag\n");
 	req_p->tag[sizeof(req_p->tag) - 1] = 0;
 #endif
 	return virtio_video_queue_cmd_buffer(vvd, vbuf);
@@ -653,10 +652,10 @@ int virtio_video_cmd_queue_detach_resources(struct virtio_video_device *vvd,
 
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 	if (ret == -ETIMEDOUT)
-		v4l2_err(&vvd->v4l2_dev,
-			 "timed out waiting for resource destruction for %s\n",
-			 (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT) ?
-			 "OUTPUT" : "CAPTURE");
+		vpr_e(stream2str(stream),
+		      "timed out waiting for resource destruction for %s\n",
+		      (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT) ?
+		      "OUTPUT" : "CAPTURE");
 	return ret;
 }
 
@@ -734,10 +733,10 @@ int virtio_video_cmd_queue_clear(struct virtio_video_device *vvd,
 
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 	if (ret == -ETIMEDOUT)
-		v4l2_err(&vvd->v4l2_dev,
-			 "timed out waiting for %s queue clear\n",
-			 (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT) ?
-			 "OUTPUT" : "CAPTURE");
+		vpr_e(stream2str(stream),
+		      "timed out waiting for %s queue clear\n",
+		      (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT) ?
+		      "OUTPUT" : "CAPTURE");
 	return ret;
 }
 
@@ -760,10 +759,9 @@ int virtio_video_cmd_query_capability(struct virtio_video_device *vvd,
 
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 	if (ret == -ETIMEDOUT)
-		v4l2_err(&vvd->v4l2_dev,
-			 "timed out waiting for capabilities for %s\n",
-			 (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT) ?
-			 "OUTPUT" : "CAPTURE");
+		vpr_e(vvd2str(vvd), "timed out waiting for capabilities for %s\n",
+		      (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT) ?
+		      "OUTPUT" : "CAPTURE");
 
 	return ret;
 }
@@ -795,8 +793,7 @@ int virtio_video_query_control_level(struct virtio_video_device *vvd,
 
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 	if (ret == -ETIMEDOUT)
-		v4l2_err(&vvd->v4l2_dev,
-			 "timed out waiting for level query\n");
+		vpr_e(vvd2str(vvd), "timed out waiting for level query\n");
 	return ret;
 }
 
@@ -827,8 +824,7 @@ int virtio_video_query_control_profile(struct virtio_video_device *vvd,
 
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 	if (ret == -ETIMEDOUT)
-		v4l2_err(&vvd->v4l2_dev,
-			 "timed out waiting for profile query\n");
+		vpr_e(vvd2str(vvd), "timed out waiting for profile query\n");
 	return ret;
 }
 
@@ -904,8 +900,7 @@ int virtio_video_cmd_get_params(struct virtio_video_device *vvd,
 
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 	if (ret == -ETIMEDOUT)
-		v4l2_err(&vvd->v4l2_dev,
-			 "timed out waiting for get_params\n");
+		vpr_e(vvd2str(vvd), "timed out waiting for get_params\n");
 	return ret;
 }
 
@@ -1041,8 +1036,7 @@ int virtio_video_cmd_get_control(struct virtio_video_device *vvd,
 
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 	if (ret == -ETIMEDOUT)
-		v4l2_err(&vvd->v4l2_dev,
-			 "timed out waiting for get_control\n");
+		vpr_e(vvd2str(vvd), "timed out waiting for get_control\n");
 	return ret;
 }
 

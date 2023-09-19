@@ -25,6 +25,7 @@
 #include "virtio_video.h"
 #include "virtio_video_msm_v4l2.h"
 #include "virtio_video_msm_vb2.h"
+#include "virtio_video_msm_debug.h"
 
 static int virtio_video_dec_start_streaming(struct vb2_queue *vq,
 					    unsigned int count)
@@ -130,13 +131,13 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 		memset(&ctrl_cfg, 0, sizeof(ctrl_cfg));
 		config = entry->config;
 
-		v4l2_info(&vvd->v4l2_dev,"%s: add ctrl, id=%#x, type=%#x, flags=%#x, max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n",
-			  __func__, config->id, config->type, config->flags, config->max,
-			  config->min, config->step, config->def,
-			  (char*)config + config->name_offset, config->is_private);
+		vpr_h(stream2str(stream),"%s: add ctrl, id=%#x, type=%#x, flags=%#x, max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n",
+		      __func__, config->id, config->type, config->flags, config->max,
+		      config->min, config->step, config->def,
+		      (char*)config + config->name_offset, config->is_private);
 
 		if (is_priv_ctrl(config->id)) {
-			v4l2_info(&vvd->v4l2_dev,"%s: add private ctrl", __func__);
+			vpr_h(stream2str(stream),"%s: add private ctrl", __func__);
 			ctrl_cfg.ops = &virtio_video_dec_ctrl_ops;
 			ctrl_cfg.id = config->id,
 			ctrl_cfg.name = (char*)config + config->name_offset;
@@ -158,7 +159,7 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 
 			ctrl = v4l2_ctrl_new_custom(&stream->ctrl_handler, &ctrl_cfg, NULL);
 		} else {
-			v4l2_info(&vvd->v4l2_dev,"%s: add std ctrl", __func__);
+			vpr_h(stream2str(stream),"%s: add std ctrl", __func__);
 
 			if (config->type == V4L2_CTRL_TYPE_MENU) {
 				ctrl = v4l2_ctrl_new_std_menu(&stream->ctrl_handler,
@@ -178,10 +179,10 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 		}
 
 		if (stream->ctrl_handler.error) {
-			v4l2_err(&vvd->v4l2_dev,"%s: failed to add ctrl, id=%#x, type=%#x, flags=%#x, max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n",
-				 __func__, config->id, config->type, config->flags,
-				 config->max, config->min, config->step, config->def,
-				 (char*)config + config->name_offset, config->is_private);
+			vpr_e(stream2str(stream),"%s: failed to add ctrl, id=%#x, type=%#x, flags=%#x, max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n",
+			      __func__, config->id, config->type, config->flags,
+			      config->max, config->min, config->step, config->def,
+			      (char*)config + config->name_offset, config->is_private);
 
 			return stream->ctrl_handler.error;
 		}
@@ -323,7 +324,6 @@ static int virtio_video_try_decoder_cmd(struct file *file, void *fh,
 					struct v4l2_decoder_cmd *cmd)
 {
 	struct virtio_video_stream *stream = file2stream(file);
-	struct virtio_video_device *vvd = video_drvdata(file);
 
 	if (virtio_video_state(stream) == STREAM_STATE_ERROR)
 		return -EIO;
@@ -335,8 +335,8 @@ static int virtio_video_try_decoder_cmd(struct file *file, void *fh,
 	case V4L2_DEC_CMD_STOP:
 	case V4L2_DEC_CMD_START:
 		if (cmd->flags != 0) {
-			v4l2_err(&vvd->v4l2_dev, "flags=%u are not supported",
-				 cmd->flags);
+			vpr_e(stream2str(stream), "flags=%u are not supported",
+			      cmd->flags);
 			return -EINVAL;
 		}
 		break;
@@ -384,7 +384,7 @@ static int virtio_video_decoder_cmd(struct file *file, void *fh,
 
 		ret = virtio_video_cmd_stream_drain(vvd, stream->stream_id);
 		if (ret) {
-			v4l2_err(&vvd->v4l2_dev, "failed to drain stream\n");
+			vpr_e(stream2str(stream), "failed to drain stream\n");
 			return ret;
 		}
 

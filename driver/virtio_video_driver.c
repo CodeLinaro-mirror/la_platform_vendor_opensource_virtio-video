@@ -26,6 +26,7 @@
 #endif
 
 #include "virtio_video.h"
+#include "virtio_video_msm_debug.h"
 
 #ifdef CONFIG_MSM_VIRTIO_HAB
 #include <linux/habmm.h>
@@ -35,8 +36,9 @@ extern struct virtio_device * virthab_get_vdev(int32_t mmid);
 
 #define NUM_VIDEO_DEVICE 3
 
-static unsigned int debug;
+unsigned int debug = VPR_ERR;
 module_param(debug, uint, 0644);
+MODULE_PARM_DESC(debug, "Set debug logmask");
 
 static unsigned int use_dma_mem;
 module_param(use_dma_mem, uint, 0644);
@@ -162,7 +164,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 
 	ret = virtio_find_vqs(vdev, 2, vqs, callbacks, names, NULL);
 	if (ret) {
-		v4l2_err(&vvd->v4l2_dev, "failed to find virt queues\n");
+		vpr_e(vvd2str(vvd), "failed to find virt queues\n");
 		goto err_vqs;
 	}
 
@@ -171,14 +173,14 @@ static int virtio_video_probe(struct virtio_device* vdev)
 
 	ret = virtio_video_alloc_vbufs(vvd);
 	if (ret) {
-		v4l2_err(&vvd->v4l2_dev, "failed to alloc vbufs\n");
+		vpr_e(vvd2str(vvd), "failed to alloc vbufs\n");
 		goto err_vbufs;
 	}
 
 	virtio_cread(vdev, struct virtio_video_config, max_caps_length,
 		     &vvd->max_caps_len);
 	if (!vvd->max_caps_len) {
-		v4l2_err(&vvd->v4l2_dev, "max_caps_len is zero\n");
+		vpr_e(vvd2str(vvd), "max_caps_len is zero\n");
 		ret = -EINVAL;
 		goto err_config;
 	}
@@ -186,7 +188,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	virtio_cread(vdev, struct virtio_video_config, max_resp_length,
 		     &vvd->max_resp_len);
 	if (!vvd->max_resp_len) {
-		v4l2_err(&vvd->v4l2_dev, "max_resp_len is zero\n");
+		vpr_e(vvd2str(vvd), "max_resp_len is zero\n");
 		ret = -EINVAL;
 		goto err_config;
 	}
@@ -202,7 +204,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 
 	ret = virtio_video_device_init(vvd);
 	if (ret) {
-		v4l2_err(&vvd->v4l2_dev,"failed to init virtio video\n");
+		vpr_e(vvd2str(vvd), "failed to init virtio video\n");
 		goto err_init;
 	}
 
