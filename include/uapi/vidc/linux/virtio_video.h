@@ -55,6 +55,24 @@
 #define VIRTIO_VIDEO_F_VENDOR                               2
 #define VIRTIO_VIDEO_MAX_PLANES                             8
 
+/* colorspace defines */
+#define VIRTIO_VIDEO_COLORSPACE_VIDC_GENERIC_FILM           101
+#define VIRTIO_VIDEO_COLORSPACE_VIDC_EG431                  102
+#define VIRTIO_VIDEO_COLORSPACE_VIDC_EBU_TECH               103
+
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_BT470_SYSTEM_M          201
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_BT470_SYSTEM_BG         202
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_BT601_525_OR_625        203
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_LINEAR                  204
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_XVYCC                   205
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_BT1361                  206
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_BT2020                  207
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_ST428                   208
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_HLG                     209
+
+#define VIRTIO_VIDEO_YCBCR_VIDC_SRGB_OR_SMPTE_ST428         241
+#define VIRTIO_VIDEO_YCBCR_VIDC_FCC47_73_682                242
+
 /*  Four-character-code (FOURCC) */
 #define virtio_video_fourcc(a, b, c, d)\
 	((__u32)(a) | ((__u32)(b) << 8) | ((__u32)(c) << 16) | ((__u32)(d) << 24))
@@ -363,7 +381,14 @@ struct virtio_video_pix_format_mplane {
 	__u32                                   colorspace;
 	struct virtio_video_plane_pix_format    plane_fmt[VIRTIO_VIDEO_MAX_PLANES];
 	__u8                                    num_planes;
-	__u8                                    padding[11];
+	__u8                                    flags;
+	 union {
+		__u8                                ycbcr_enc;
+		__u8                                hsv_enc;
+	};
+	__u8                                    quantization;
+	__u8                                    xfer_func;
+	__u8                                    padding[7];
 } __attribute__((packed));
 
 /**
@@ -395,6 +420,45 @@ struct virtio_video_data_format {
 		struct virtio_video_meta_format          meta;    /*VIRTIO_VIDEO_BUF_TYPE_META_CAPTURE */
 		__u8                                     raw_data[200];                   /* user-defined */
 		} fmt;
+};
+
+enum virtio_video_colorspace {
+    VIRTIO_VIDEO_COLORSPACE_DEFAULT             = 0,
+    VIRTIO_VIDEO_COLORSPACE_SMPTE170M           = 1,
+    VIRTIO_VIDEO_COLORSPACE_SMPTE240M           = 2,
+    VIRTIO_VIDEO_COLORSPACE_REC709              = 3,
+    VIRTIO_VIDEO_COLORSPACE_BT878               = 4,
+    VIRTIO_VIDEO_COLORSPACE_470_SYSTEM_M        = 5,
+    VIRTIO_VIDEO_COLORSPACE_470_SYSTEM_BG       = 6,
+    VIRTIO_VIDEO_COLORSPACE_JPEG                = 7,
+    VIRTIO_VIDEO_COLORSPACE_SRGB                = 8,
+    VIRTIO_VIDEO_COLORSPACE_OPRGB               = 9,
+    VIRTIO_VIDEO_COLORSPACE_BT2020              = 10,
+    VIRTIO_VIDEO_COLORSPACE_RAW                 = 11,
+    VIRTIO_VIDEO_COLORSPACE_DCI_P3              = 12,
+};
+
+enum virtio_video_xfer_func {
+    VIRTIO_VIDEO_XFER_FUNC_DEFAULT              = 0,
+    VIRTIO_VIDEO_XFER_FUNC_709                  = 1,
+    VIRTIO_VIDEO_XFER_FUNC_SRGB                 = 2,
+    VIRTIO_VIDEO_XFER_FUNC_OPRGB                = 3,
+    VIRTIO_VIDEO_XFER_FUNC_SMPTE240M            = 4,
+    VIRTIO_VIDEO_XFER_FUNC_NONE                 = 5,
+    VIRTIO_VIDEO_XFER_FUNC_DCI_P3               = 6,
+    VIRTIO_VIDEO_XFER_FUNC_SMPTE2084            = 7,
+};
+
+enum virtio_video_ycbcr_encoding {
+    VIRTIO_VIDEO_YCBCR_ENC_DEFAULT              = 0,
+    VIRTIO_VIDEO_YCBCR_ENC_601                  = 1,
+    VIRTIO_VIDEO_YCBCR_ENC_709                  = 2,
+    VIRTIO_VIDEO_YCBCR_ENC_XV601                = 3,
+    VIRTIO_VIDEO_YCBCR_ENC_XV709                = 4,
+    VIRTIO_VIDEO_YCBCR_ENC_SYCC                 = 5,
+    VIRTIO_VIDEO_YCBCR_ENC_BT2020               = 6,
+    VIRTIO_VIDEO_YCBCR_ENC_BT2020_CONST_LUM     = 7,
+    VIRTIO_VIDEO_YCBCR_ENC_SMPTE240M            = 8,
 };
 
 /*
