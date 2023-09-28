@@ -11,7 +11,7 @@ void put_inst(struct virtio_video_stream *stream)
 {
 
 	if (!stream || !stream->video_dev) {
-		pr_err("%s: invalid params\n", __func__);
+		vpr_e(stream2str(stream), "%s: invalid params\n", __func__);
 		return;
 	}
 }

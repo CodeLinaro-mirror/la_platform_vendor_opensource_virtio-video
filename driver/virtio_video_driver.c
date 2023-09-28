@@ -228,7 +228,7 @@ static void virtio_video_remove(struct virtio_device *vdev)
 {
 	struct virtio_video_device *vvd = vdev->priv;
 
-	pr_info("%s: %s\n", dev_name(&vdev->dev), __func__);
+	vpr_h(vvd2str(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
 
 	virtio_video_device_deinit(vvd);
 	virtio_video_free_vbufs(vvd);
@@ -278,37 +278,45 @@ MODULE_LICENSE("GPL");
 static void msm_vdev_get(struct virtio_device *vdev, unsigned offset,
 			 void *buf, unsigned len)
 {
-	const static struct virtio_video_config cfg = {
-		.version = 0,
-		.max_caps_length = 2 * MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE,
-		.max_resp_length = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE,
-	};
+	struct virtio_video_config cfg = {0};
 	const char *dev_n = dev_name(&vdev->dev);
+	struct virtio_video_device *vvd = vdev->priv;
 
-	pr_info("%s: %s offset=%x\n", dev_n, __func__, offset);
+	vpr_h(vvd2str(vvd), "%s: %s offset=%x\n", dev_n, __func__, offset);
 
+	cfg = msm_hab_get_config(vdev);
 	if (offset == offsetof(struct virtio_video_config, max_caps_length))
 		*(uint32_t *)buf = cfg.max_caps_length;
 	else if (offset == offsetof(struct virtio_video_config, max_resp_length))
 		*(uint32_t *)buf = cfg.max_resp_length;
 	else
-		pr_err("%s: %s unsupported\n", dev_n, __func__);
+		vpr_e(vvd2str(vvd), "%s: %s unsupported\n", dev_n, __func__);
 }
 
 static void msm_vdev_release(struct device *dev)
 {
-	pr_info("%s: %s\n", dev_name(dev), __func__);
+	struct virtio_device *vdev = container_of(dev, struct virtio_device, dev);
+	struct virtio_video_device *vvd = vdev->priv;
+
+	vpr_h(vvd2str(vvd), "%s: %s\n", dev_name(dev), __func__);
 }
 
 static void msm_vdev_reset(struct virtio_device *vdev)
 {
-	pr_info("%s: %s\n", dev_name(&vdev->dev), __func__);
+	struct virtio_video_device *vvd = vdev->priv;
+
+	if (msm_hab_vdev_init(vdev))
+		vpr_e(vvd2str(vvd), "%s: failed for video%d", __func__, vdev->id.device);
+	else
+		vpr_h(vvd2str(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
 }
 
 static void msm_vdev_set_status(struct virtio_device *vdev, uint8_t status)
 {
-	pr_info("%s: %s: setting status %x\n", dev_name(&vdev->dev), __func__,
-	        status);
+	struct virtio_video_device *vvd = vdev->priv;
+
+	vpr_h(vvd2str(vvd), "%s: %s: setting status %x\n", dev_name(&vdev->dev), __func__,
+	      status);
 
 	if (status & VIRTIO_CONFIG_S_DRIVER_OK)
 		msm_hab_start(vdev);
@@ -316,24 +324,34 @@ static void msm_vdev_set_status(struct virtio_device *vdev, uint8_t status)
 
 static uint8_t msm_vdev_get_status(struct virtio_device *vdev)
 {
-	pr_info("%s: %s: getting status\n", dev_name(&vdev->dev), __func__);
+	struct virtio_video_device *vvd = vdev->priv;
+
+	vpr_h(vvd2str(vvd), "%s: %s: getting status\n", dev_name(&vdev->dev), __func__);
 
 	return 0;
 }
 
-static u64 msm_vdev_get_features(struct virtio_device *vdev)
+static uint64_t msm_vdev_get_features(struct virtio_device *vdev)
 {
-	pr_info("%s: %s\n", dev_name(&vdev->dev), __func__);
+	struct virtio_video_device *vvd = vdev->priv;
 
-	return VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES|
-	       VIRTIO_VIDEO_F_RESOURCE_NON_CONTIG;
+	vpr_h(vvd2str(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
+
+	return msm_hab_get_features(vdev);
 }
 
 static int msm_vdev_finalize_features(struct virtio_device *vdev)
 {
-	pr_info("%s: %s\n", dev_name(&vdev->dev), __func__);
+	int ret = 0;
+	struct virtio_video_device *vvd = vdev->priv;
 
-	return 0;
+	vpr_h(vvd2str(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
+
+	ret = msm_hab_set_features(vdev);
+	if (ret)
+		vpr_e(vvd2str(vvd), "%s: failed for video%d, ret %d", __func__, vdev->id.device, ret);
+
+	return ret;
 }
 
 static const struct virtio_config_ops msm_vdev_config_ops = {
@@ -354,17 +372,18 @@ static int __init msm_virtio_video_init(void)
 {
 	int ret = 0;
 	struct virtio_device* vdev = NULL;
+	struct virtio_video_device *vvd = NULL;
 
 	vdev = virthab_get_vdev(MM_VID);
 	if (!vdev) {
-		pr_err("failed to get vdev for video\n");
+		vpr_e(vvd2str(vvd), "failed to get vdev for video\n");
 		ret = -ENODEV;
 		goto err;
 	}
 
 	ret = register_virtio_driver(&virtio_video_driver);
 	if (ret) {
-		pr_err("%s: virtio video driver registration failed\n", __func__);
+		vpr_e(vvd2str(vvd), "%s: virtio video driver registration failed\n", __func__);
 		goto err;
 	}
 
@@ -375,11 +394,11 @@ static int __init msm_virtio_video_init(void)
 		vdec->id.vendor = VIRTIO_DEV_ANY_ID;
 		vdec->dev.parent = &vdev->dev;
 		vdec->dev.release = msm_vdev_release;
-		pr_info("%s: registering virtio device for video decoder\n", __func__);
+		vpr_h(vvd2str(vvd), "%s: registering virtio device for video decoder\n", __func__);
 		ret = register_virtio_device(vdec);
 		if (ret) {
 			put_device(&vdec->dev);
-			pr_err("%s: virtio device for decoder registration failed\n", __func__);
+			vpr_e(vvd2str(vvd), "%s: virtio device for decoder registration failed\n", __func__);
 			goto err_dec;
 		}
 	} else {
@@ -394,11 +413,11 @@ static int __init msm_virtio_video_init(void)
 		venc->id.vendor = VIRTIO_DEV_ANY_ID;
 		venc->dev.parent = &vdev->dev;
 		venc->dev.release = msm_vdev_release;
-		pr_info("%s: registering virtio device for video encoder\n", __func__);
+		vpr_h(vvd2str(vvd), "%s: registering virtio device for video encoder\n", __func__);
 		ret = register_virtio_device(venc);
 		if (ret) {
 			put_device(&venc->dev);
-			pr_err("%s: virtio device for encoder registration failed\n", __func__);
+			vpr_e(vvd2str(vvd), "%s: virtio device for encoder registration failed\n", __func__);
 			goto err_enc;
 		}
 	} else {
@@ -422,7 +441,9 @@ err:
 
 static void __exit msm_virtio_video_exit(void)
 {
-	pr_info("virtio-video: %s\n", __func__);
+	struct virtio_video_device *vvd = NULL;
+
+	vpr_h(vvd2str(vvd), "virtio-video: %s\n", __func__);
 
 	unregister_virtio_device(vdec);
 	unregister_virtio_device(venc);
