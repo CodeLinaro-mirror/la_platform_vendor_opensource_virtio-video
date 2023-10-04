@@ -457,6 +457,9 @@ static void __exit msm_virtio_video_exit(void)
 module_init(msm_virtio_video_init);
 module_exit(msm_virtio_video_exit);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+MODULE_IMPORT_NS(DMA_BUF);
+#endif
 MODULE_DESCRIPTION("MSM VirtIO-video driver");
 MODULE_LICENSE("GPL");
 #endif

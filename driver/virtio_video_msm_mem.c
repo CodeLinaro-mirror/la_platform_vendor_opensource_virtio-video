@@ -59,7 +59,7 @@ static struct buf_export_entry* alloc_one_export_entry(struct buf_export_cache* 
 	uint64_t inode = 0;
 
 	if (cache->used_count >= MAX_NUM_EXPORT_CACHE_ENTRY) {
-		vpr_e(vvd2str(vvd), "%s: export cache is full", __func__, fd);
+		vpr_e(vvd2str(vvd), "%s: export cache is full, fd=%#x", __func__, fd);
 		goto exit;
 	}
 
