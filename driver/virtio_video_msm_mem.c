@@ -126,9 +126,10 @@ uint32_t msm_buf_get_export_id(struct virtio_video_stream* stream,
 			}
 		}
 
-		if (unlikely(!export_id)) {
+		if (unlikely(ret) || unlikely(!export_id)) {
 			v4l2_err(vd, "%s: export failed. buf type %d fd %d sz %d", __func__,
 				 buf_type, fd, size);
+			export_id = 0;
 			goto exit;
 		}
 
@@ -158,7 +159,8 @@ int msm_buf_put_export_id(struct virtio_video_stream* stream, uint32_t export_id
 {
 	int ret = 0;
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
-	uint32_t habmmhandle = vvd->commandq.vq->habmm_handle;
+	struct hab_virtqueue *hvq = to_hab_vq(vvd->commandq.vq);
+	uint32_t habmmhandle = hvq->habmm_handle;
 
 	v4l2_info(&vvd->v4l2_dev, "%s: event_type=%#x, export_id=%d, flags=%#x\n",
 		  __func__, event_type, export_id, flags);

@@ -55,6 +55,24 @@
 #define VIRTIO_VIDEO_F_VENDOR                               2
 #define VIRTIO_VIDEO_MAX_PLANES                             8
 
+/* colorspace defines */
+#define VIRTIO_VIDEO_COLORSPACE_VIDC_GENERIC_FILM           101
+#define VIRTIO_VIDEO_COLORSPACE_VIDC_EG431                  102
+#define VIRTIO_VIDEO_COLORSPACE_VIDC_EBU_TECH               103
+
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_BT470_SYSTEM_M          201
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_BT470_SYSTEM_BG         202
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_BT601_525_OR_625        203
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_LINEAR                  204
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_XVYCC                   205
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_BT1361                  206
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_BT2020                  207
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_ST428                   208
+#define VIRTIO_VIDEO_XFER_FUNC_VIDC_HLG                     209
+
+#define VIRTIO_VIDEO_YCBCR_VIDC_SRGB_OR_SMPTE_ST428         241
+#define VIRTIO_VIDEO_YCBCR_VIDC_FCC47_73_682                242
+
 /*  Four-character-code (FOURCC) */
 #define virtio_video_fourcc(a, b, c, d)\
 	((__u32)(a) | ((__u32)(b) << 8) | ((__u32)(c) << 16) | ((__u32)(d) << 24))
@@ -82,16 +100,18 @@
 #define VIRTIO_VIDEO_PIX_FMT_VIDC_P010 \
 	virtio_video_fourcc('P', '0', '1', '0')
  /* compressed formats */
-#define VIRTIO_VIDEO_MSM_PIX_FMT_H264 \
+#define VIRTIO_VIDEO_PIX_FMT_H264 \
 	virtio_video_fourcc('H', '2', '6', '4') /* H264 with start codes */
-#define VIRTIO_VIDEO_MSM_PIX_FMT_MPEG2 \
+#define VIRTIO_VIDEO_PIX_FMT_MPEG2 \
 	virtio_video_fourcc('M', 'P', 'G', '2') /* MPEG-2 ES     */
-#define VIRTIO_VIDEO_MSM_PIX_FMT_MPEG4 \
-	virtio_video_fourcc('M', 'P', 'G', '4') /* MPEG-4 part 2 ES */
-#define VIRTIO_VIDEO_MSM_PIX_FMT_VP9 \
+#define VIRTIO_VIDEO_PIX_FMT_VP9 \
 	virtio_video_fourcc('V', 'P', '9', '0') /* VP9 */
-#define VIRTIO_VIDEO_MSM_PIX_FMT_HEVC \
+#define VIRTIO_VIDEO_PIX_FMT_HEVC \
 	virtio_video_fourcc('H', 'E', 'V', 'C') /* for HEVC stream */
+#define VIRTIO_VIDEO_MSM_PIX_FMT_HEIC \
+	virtio_video_fourcc('H', 'E', 'I', 'C') /* for HEIC stream */
+#define VIRTIO_VIDEO_MSM_PIX_FMT_AV1 \
+	virtio_video_fourcc('A', 'V', '1', '0') /* AV1 */
 #define VIRTIO_VIDEO_CTRL_CLASS_USER        0x00980000    /* Old-style 'user' controls */
 #define VIRTIO_VIDEO_CTRL_CLASS_MPEG        0x00990000    /* MPEG-compression controls */
 #define VIRTIO_VIDEO_CID_MPEG_BASE (VIRTIO_VIDEO_CTRL_CLASS_MPEG | 0x900)
@@ -108,6 +128,8 @@
 	(VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0xD)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_VIDC_INTRA_REFRESH_TYPE \
 	(VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0xC)
+#define VIRTIO_VIDEO_CID_MPEG_VIDC_VIDEO_BLUR_TYPES (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x10)
+#define VIRTIO_VIDEO_CID_MPEG_VIDC_VIDEO_BLUR_RESOLUTION (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x11)
 #define VIRTIO_VIDEO_CID_MPEG_VIDC_VENC_COMPLEXITY           (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0xA7)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_VBV_DELAY (VIRTIO_VIDEO_CID_MPEG_BASE + 0xE1)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_LTR_COUNT (VIRTIO_VIDEO_CID_MPEG_BASE + 0xE8)
@@ -157,6 +179,7 @@
 #define VIRTIO_VIDEO_CID_MPEG_VIDC_METADATA_SEI_CONTENT_LIGHT_LEVEL   (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x1B)
 #define VIRTIO_VIDEO_CID_MPEG_VIDC_METADATA_HDR10PLUS   (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x1C)
 #define VIRTIO_VIDEO_CID_MPEG_VIDC_METADATA_BUFFER_TAG   (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x1E)
+#define VIRTIO_VIDEO_CID_MPEG_VIDC_METADATA_TRANSCODE_STAT_INFO   (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x27)
 #define VIRTIO_VIDEO_CID_MPEG_VIDC_METADATA_SEQ_HEADER_NAL       (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x14)
 #define VIRTIO_VIDEO_CID_MPEG_VIDC_METADATA_SUBFRAME_OUTPUT      (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x1F)
 #define VIRTIO_VIDEO_CID_MPEG_VIDC_VIDEO_FRAME_RATE (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x8)
@@ -173,10 +196,6 @@
 	(VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE+0x3)
 #define VIRTIO_VIDEO_MPEG_MSM_VIDC_DISABLE 0
 #define VIRTIO_VIDEO_MPEG_MSM_VIDC_ENABLE 1
-#define VIRTIO_VIDEO_PIX_FMT_H264 virtio_video_fourcc('H', '2', '6', '4')
-#define VIRTIO_VIDEO_PIX_FMT_HEVC virtio_video_fourcc('H', 'E', 'V', 'C')
-#define VIRTIO_VIDEO_PIX_FMT_VP9 virtio_video_fourcc('V', 'P', '9', '0')
-#define VIRTIO_VIDEO_PIX_FMT_MPEG2 virtio_video_fourcc('M', 'P', 'G', '2')
 #define VIRTIO_VIDEO_CID_MPEG_VIDC_VIDEO_DISABLE_TIMESTAMP_REORDER \
 	(VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x88)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_H264_LEVEL            (VIRTIO_VIDEO_CID_MPEG_BASE+0x167)
@@ -184,6 +203,9 @@
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_HEVC_LEVEL        (VIRTIO_VIDEO_CID_MPEG_BASE + 0x268)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_MPEG2_PROFILE        (VIRTIO_VIDEO_CID_MPEG_BASE+0x10F)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_MPEG2_LEVEL            (VIRTIO_VIDEO_CID_MPEG_BASE+0x10E)
+#define VIRTIO_VIDEO_CID_MPEG_VIDC_AV1_PROFILE     (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x31)
+#define VIRTIO_VIDEO_CID_MPEG_VIDC_AV1_LEVEL       (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x32)
+#define VIRTIO_VIDEO_CID_MPEG_VIDC_AV1D_FILM_GRAIN_PRESENT  (VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0x35)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_VP9_PROFILE            (VIRTIO_VIDEO_CID_MPEG_BASE+0x200)
 #define VIRTIO_VIDEO_CID_MPEG_VIDEO_VP9_LEVEL            (VIRTIO_VIDEO_CID_MPEG_BASE+0x201)
 #define VIRTIO_VIDEO_CID_MPEG_VIDC_VIDEO_VP9_LEVEL \
@@ -226,6 +248,7 @@
 	(VIRTIO_VIDEO_CID_MPEG_MSM_VIDC_BASE + 0xE)
  /* Current cropping area */
 #define VIRTIO_VIDEO_SEL_TGT_CROP       0x0000
+#define VIRTIO_VIDEO_SEL_TGT_COMPOSE    0x0100
 
 /*========================================================================
  Defines structure
@@ -359,7 +382,14 @@ struct virtio_video_pix_format_mplane {
 	__u32                                   colorspace;
 	struct virtio_video_plane_pix_format    plane_fmt[VIRTIO_VIDEO_MAX_PLANES];
 	__u8                                    num_planes;
-	__u8                                    padding[11];
+	__u8                                    flags;
+	 union {
+		__u8                                ycbcr_enc;
+		__u8                                hsv_enc;
+	};
+	__u8                                    quantization;
+	__u8                                    xfer_func;
+	__u8                                    padding[7];
 } __attribute__((packed));
 
 /**
@@ -391,6 +421,45 @@ struct virtio_video_data_format {
 		struct virtio_video_meta_format          meta;    /*VIRTIO_VIDEO_BUF_TYPE_META_CAPTURE */
 		__u8                                     raw_data[200];                   /* user-defined */
 		} fmt;
+};
+
+enum virtio_video_colorspace {
+    VIRTIO_VIDEO_COLORSPACE_DEFAULT             = 0,
+    VIRTIO_VIDEO_COLORSPACE_SMPTE170M           = 1,
+    VIRTIO_VIDEO_COLORSPACE_SMPTE240M           = 2,
+    VIRTIO_VIDEO_COLORSPACE_REC709              = 3,
+    VIRTIO_VIDEO_COLORSPACE_BT878               = 4,
+    VIRTIO_VIDEO_COLORSPACE_470_SYSTEM_M        = 5,
+    VIRTIO_VIDEO_COLORSPACE_470_SYSTEM_BG       = 6,
+    VIRTIO_VIDEO_COLORSPACE_JPEG                = 7,
+    VIRTIO_VIDEO_COLORSPACE_SRGB                = 8,
+    VIRTIO_VIDEO_COLORSPACE_OPRGB               = 9,
+    VIRTIO_VIDEO_COLORSPACE_BT2020              = 10,
+    VIRTIO_VIDEO_COLORSPACE_RAW                 = 11,
+    VIRTIO_VIDEO_COLORSPACE_DCI_P3              = 12,
+};
+
+enum virtio_video_xfer_func {
+    VIRTIO_VIDEO_XFER_FUNC_DEFAULT              = 0,
+    VIRTIO_VIDEO_XFER_FUNC_709                  = 1,
+    VIRTIO_VIDEO_XFER_FUNC_SRGB                 = 2,
+    VIRTIO_VIDEO_XFER_FUNC_OPRGB                = 3,
+    VIRTIO_VIDEO_XFER_FUNC_SMPTE240M            = 4,
+    VIRTIO_VIDEO_XFER_FUNC_NONE                 = 5,
+    VIRTIO_VIDEO_XFER_FUNC_DCI_P3               = 6,
+    VIRTIO_VIDEO_XFER_FUNC_SMPTE2084            = 7,
+};
+
+enum virtio_video_ycbcr_encoding {
+    VIRTIO_VIDEO_YCBCR_ENC_DEFAULT              = 0,
+    VIRTIO_VIDEO_YCBCR_ENC_601                  = 1,
+    VIRTIO_VIDEO_YCBCR_ENC_709                  = 2,
+    VIRTIO_VIDEO_YCBCR_ENC_XV601                = 3,
+    VIRTIO_VIDEO_YCBCR_ENC_XV709                = 4,
+    VIRTIO_VIDEO_YCBCR_ENC_SYCC                 = 5,
+    VIRTIO_VIDEO_YCBCR_ENC_BT2020               = 6,
+    VIRTIO_VIDEO_YCBCR_ENC_BT2020_CONST_LUM     = 7,
+    VIRTIO_VIDEO_YCBCR_ENC_SMPTE240M            = 8,
 };
 
 /*
@@ -552,6 +621,31 @@ enum virtio_video_mpeg_vidc_video_mpeg2_level {
 	VIRTIO_VIDEO_MPEG_VIDC_VIDEO_MPEG2_LEVEL_3 = 3,
 };
 
+enum virtio_video_mpeg_vidc_av1_profile {
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_PROFILE_MAIN            = 0,
+};
+
+enum virtio_video_mpeg_vidc_av1_level {
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_2_0  = 0,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_2_1  = 1,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_2_2  = 2,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_2_3  = 3,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_3_0  = 4,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_3_1  = 5,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_3_2  = 6,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_3_3  = 7,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_4_0  = 8,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_4_1  = 9,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_4_2  = 10,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_4_3  = 11,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_5_0  = 12,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_5_1  = 13,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_5_2  = 14,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_5_3  = 15,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_6_0  = 16,
+	VIRTIO_VIDEO_MPEG_VIDC_AV1_LEVEL_6_1  = 17,
+};
+
 enum virtio_video_mpeg_video_hevc_tier {
 	VIRTIO_VIDEO_MPEG_VIDEO_HEVC_TIER_MAIN = 0,
 	VIRTIO_VIDEO_MPEG_VIDEO_HEVC_TIER_HIGH = 1,
@@ -560,14 +654,7 @@ enum virtio_video_mpeg_video_hevc_tier {
 enum virtio_video_mpeg_video_bitrate_mode {
 	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_VBR = 0,
 	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CBR = 1,
-};
-
-enum virtio_video_mpeg_vidc_video_bitrate_mode {
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CBR_VFR =
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CBR + 1,
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_MBR,
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_MBR_VFR,
-	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CQ,
+	VIRTIO_VIDEO_MPEG_VIDEO_BITRATE_MODE_CQ  = 2,
 };
 
 enum virtio_video_mpeg_vidc_video_stream_format {
@@ -585,29 +672,6 @@ enum virtio_video_mpeg_video_h264_entropy_mode {
 	VIRTIO_VIDEO_MPEG_VIDEO_H264_ENTROPY_MODE_CAVLC = 0,
 	VIRTIO_VIDEO_MPEG_VIDEO_H264_ENTROPY_MODE_CABAC = 1,
 };
-
-/*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
-struct virtio_video_queryctrl {
-	__u32             id;
-	__u32             type;    /* enum virtio_video_ctrl_type */
-	__u8              name[32];    /* Whatever */
-	__s32             minimum;    /* Note signedness */
-	__s32             maximum;
-	__s32             step;
-	__s32             default_value;
-	__u32             flags;
-	__u32             padding[2];
-};
-
-struct virtio_video_querymenu {
-	__u32        id;
-	__u32        index;
-	union {
-		__u8    name[32];    /* Whatever */
-		__s64    value;
-	};
-	__u32        padding;
-} __attribute__((packed));
 
 struct virtio_video_selection {
 	__u32                        type;
@@ -1032,8 +1096,6 @@ enum virtio_video_sub_cmd_type
 	UNSUBSCRIBE_EVENT,
 	QBUF,
 	REQBUFS,
-	QUERYCTRL,
-	QUERYMENU,
 	G_CTRL,
 	S_CTRL,
 	G_PARAM,
@@ -1053,7 +1115,6 @@ enum virtio_video_queue_type {
 struct virtio_video_query_capability {
 	struct virtio_video_cmd_hdr hdr;
 	__le32 queue_type; /* One of VIRTIO_VIDEO_QUEUE_TYPE_* types */
-	__le32 device_type;
 };
 
 enum virtio_video_planes_layout_flag {
@@ -1123,7 +1184,6 @@ struct virtio_video_stream_create {
 	__le32 in_mem_type; /* One of VIRTIO_VIDEO_MEM_TYPE_* types */
 	__le32 out_mem_type; /* One of VIRTIO_VIDEO_MEM_TYPE_* types */
 	__le32 coded_format; /* One of VIRTIO_VIDEO_FORMAT_* types */
-	__le32 device_type;  /* virtio_video_device_type types */
 	__u8 tag[64];
 };
 

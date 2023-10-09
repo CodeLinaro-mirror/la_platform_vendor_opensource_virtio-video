@@ -2,7 +2,8 @@
 
 #ifeq ($(CONFIG_MSM_VIRTIO_VIDEO), y)
 LINUXINCLUDE    += -I${VIDEO_ROOT}/include/uapi \
-                   -I${KERNEL_ROOT}/include
+                   -I${KERNEL_ROOT}/include \
+                   -I${VIDEO_ROOT}/driver
 
 USERINCLUDE     += -I${VIDEO_ROOT}/include/uapi
 
@@ -25,9 +26,7 @@ msm_virtio_video-objs := \
 	driver/virtio_video_msm_v4l2.o \
 	driver/virtio_video_msm_vb2.o \
 	driver/virtio_video_msm_vq.o \
-	driver/virtio_video_msm_hab.o \
-	driver/virtio_video_msm_driver.o \
-
+	driver/virtio_video_msm_hab.o
 
 obj-m += msm_virtio_video.o
 

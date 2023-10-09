@@ -566,6 +566,9 @@ int msm_v4l2_qbuf(struct file *file, void *fh,
 	}
 
 	ret = vb2_qbuf(queue, vdev->v4l2_dev->mdev, buf);
+	if (!ret)
+		trace_msm_virtio_video_qbuf(stream->stream_id, v4l2_type_name(buf->type),
+					    buf->index, buf->flags);
 
 exit:
 	put_inst(stream);
@@ -610,6 +613,8 @@ int msm_v4l2_dqbuf(struct file *file, void *fh,
 		v4l2_err(&vvd->v4l2_dev, "%s: failed with %d\n", __func__, ret);
 		goto unlock;
 	}
+	trace_msm_virtio_video_dqbuf(stream->stream_id, v4l2_type_name(buf->type),
+				     buf->index, buf->flags);
 
 unlock:
 	inst_unlock(stream, __func__);
@@ -903,56 +908,6 @@ int msm_v4l2_enum_frameintervals(struct file *file, void *fh,
 	else
 		v4l2_info(&vvd->v4l2_dev, "%s: index=%d, pixel_format=%#x, type=%d",
 			  __func__, fival->index, fival->pixel_format, fival->type);
-
-	return ret;
-}
-
-int msm_v4l2_queryctrl(struct file *file, void *fh,
-		       struct v4l2_queryctrl *ctrl)
-{
-	struct virtio_video_stream *stream = file2stream(file);
-	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
-	int ret = 0;
-
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
-	ret = virtio_video_cmd_queryctrl(vvd, stream, ctrl);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
-
-	if (ret)
-		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
-	else
-		v4l2_info(&vvd->v4l2_dev, "%s: id=%d, type=%d\n",
-			  __func__, ctrl->id, ctrl->type);
-
-	return ret;
-}
-
-int msm_v4l2_querymenu(struct file *file, void *fh,
-		       struct v4l2_querymenu *qmenu)
-{
-	struct virtio_video_stream *stream = file2stream(file);
-	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
-	int ret = 0;
-
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
-	ret = virtio_video_cmd_querymenu(vvd, stream, qmenu);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
-
-	if (ret)
-		v4l2_err(&vvd->v4l2_dev, "%s: failed", __func__);
-	else
-		v4l2_info(&vvd->v4l2_dev, "%s: id=%#x, index=%d\n",
-			  __func__, qmenu->id, qmenu->index);
 
 	return ret;
 }
