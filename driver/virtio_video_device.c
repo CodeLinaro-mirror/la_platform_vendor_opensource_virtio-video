@@ -1058,7 +1058,7 @@ static int virtio_video_device_open(struct file *file)
 		video_dev->queue = &vvd->vb2_output_queue;
 	}
 #ifdef VIRTIO_VIDEO_MSM
-	msm_export_cache_init(&stream->buf_cache);
+	msm_export_cache_init(stream);
 #endif
 
 	file->private_data = &stream->fh;
@@ -1113,7 +1113,7 @@ static int virtio_video_device_release(struct file *file)
 	virtio_video_cmd_stream_destroy(vvd, stream->stream_id);
 	virtio_video_stream_id_put(vvd, stream->stream_id);
 #ifdef VIRTIO_VIDEO_MSM
-	msm_export_cache_destroy(&stream->buf_cache);
+	msm_export_cache_destroy(stream);
 #endif
 	kfree(stream);
 

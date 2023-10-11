@@ -184,11 +184,8 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 	stream = queue->drv_priv;
 	vvd = to_virtio_vd(stream->video_dev);
 
-	if (queue->type == INPUT_META_PLANE || queue->type == OUTPUT_META_PLANE) {
-		vpr_h(stream2str(stream), "%s: nothing to stop on %s\n",
-		      __func__, v4l2_type_name(queue->type));
-		goto exit;
-	}
+	if (queue->type == INPUT_META_PLANE || queue->type == OUTPUT_META_PLANE)
+		goto wait;
 
 	if (!is_decode_session(vvd) && !is_encode_session(vvd)) {
 		vpr_e(stream2str(stream), "%s: invalid session %d\n",
@@ -208,14 +205,17 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 	if (ret) {
 		vpr_e(stream2str(stream), "%s: streamoff %s failed %d\n",
 		      __func__, v4l2_type_name(queue->type), ret);
-	} else {
-		vpr_h(stream2str(stream), "%s: waiting %s buffer done\n", __func__,
-		      v4l2_type_name(queue->type));
-		vb2_wait_for_all_buffers(queue);
-		vpr_h(stream2str(stream), "%s: all %s buffer done\n", __func__,
-		      v4l2_type_name(queue->type));
+		goto exit;
 	}
 
+wait:
+	ret = vb2_wait_for_all_buffers(queue);
+	if (ret)
+		vpr_e(stream2str(stream), "%s: failed for waitting %s buffer done %d\n",
+			__func__, v4l2_type_name(queue->type), ret);
+	else
+		vpr_h(stream2str(stream), "%s: all %s buffer done\n", __func__,
+			v4l2_type_name(queue->type));
 exit:
 	return;
 }
@@ -252,10 +252,9 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 	if (queue->is_multiplanar) {
 		for (plane = 0; plane < vb2->num_planes; plane++) {
 			buf_fd = vb2->planes[plane].m.fd;
-			export_id[plane] = msm_buf_get_export_id(stream,
-								 hvq->habmm_handle,
-								 buf_fd, vb2->planes[plane].length,
-								 vb2->type, true);
+			export_id[plane] = msm_buf_get_export_id(stream, buf_fd,
+								 vb2->planes[plane].length,
+								 vb2->type);
 			if (!export_id[plane]) {
 				ret = -1;
 				goto exit;
@@ -281,8 +280,7 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		queue->buf_ops->fill_user_buffer(vb2, pb);
 
 		buf_fd = pb->m.fd;
-		export_id[0] = msm_buf_get_export_id(stream, hvq->habmm_handle,
-						     buf_fd, pb->length, pb->type, true);
+		export_id[0] = msm_buf_get_export_id(stream, buf_fd, pb->length, pb->type);
 		if (!export_id[0]) {
 			ret = -1;
 			goto exit;

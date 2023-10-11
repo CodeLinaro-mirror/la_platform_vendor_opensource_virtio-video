@@ -62,7 +62,7 @@ struct buf_export_entry {
 	struct list_head list;
 	uint64_t inode;
 	uint32_t size;
-	uint32_t buffer_id;
+	uint32_t export_id;
 	enum virtio_video_queue_type buf_type;
 };
 
@@ -386,10 +386,6 @@ void virtio_video_state_update(struct virtio_video_stream *stream,
 int virtio_video_alloc_vbufs(struct virtio_video_device *vvd);
 void virtio_video_free_vbufs(struct virtio_video_device *vvd);
 int virtio_video_alloc_events(struct virtio_video_device *vvd);
-bool virtio_video_vbuf_is_pending(struct virtio_video_device *vvd,
-			    struct virtio_video_vbuffer *vbuf);
-void virtio_video_free_vbuf(struct virtio_video_device *vvd,
-		      struct virtio_video_vbuffer *vbuf);
 
 int virtio_video_device_init(struct virtio_video_device *vvd);
 void virtio_video_device_deinit(struct virtio_video_device *vvd);

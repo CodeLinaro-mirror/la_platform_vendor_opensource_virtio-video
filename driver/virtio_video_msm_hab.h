@@ -44,6 +44,13 @@ static inline struct hab_virtqueue *to_hab_vq(struct virtqueue *_vq)
 	return container_of(_vq, struct hab_virtqueue, vq);
 }
 
+static inline uint32_t get_habmm_handle(struct virtio_video_stream *stream)
+{
+	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
+	struct hab_virtqueue *hvq = to_hab_vq(vvd->commandq.vq);
+	return hvq->habmm_handle;
+}
+
 int msm_hab_vdev_init(struct virtio_device *vdev);
 uint64_t msm_hab_get_features(struct virtio_device *vdev);
 int msm_hab_set_features(struct virtio_device *vdev);
