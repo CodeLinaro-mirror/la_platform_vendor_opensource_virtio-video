@@ -142,6 +142,7 @@ DEFINE_EVENT(virtio_video_buffer_callback_events, msm_virtio_video_buffer_callba
 
 #define VPR_DBG_LABEL "virtio-video"
 #define VPR_DBG_STR   "core"
+#define VPR_TAG VPR_DBG_LABEL" : "VPR_DBG_STR
 
 extern unsigned int debug;
 
