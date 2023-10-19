@@ -320,6 +320,7 @@ retry:
 
 	return ret;
 }
+
 int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 				   struct virtio_video_vbuffer *vbuf)
 {
@@ -393,8 +394,6 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 	struct done_buffer *buffers = stream->buffers;
 	int port = 0;
 
-	vpr_h(stream2str(stream), "%s: %s: stream_id=%u\n", __func__,
-	      event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD", stream_id);
 	v4l2_buf = (struct v4l2_buffer*)evt->payload;
 
 	if (V4L2_TYPE_IS_MULTIPLANAR(v4l2_buf->type)) {
@@ -403,7 +402,7 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 		export_id = v4l2_buf->m.planes[0].m.fd;
 		for (plane = 0; plane < v4l2_buf->length; plane++) {
 			vpr_h(stream2str(stream), "%s: %s, type %d, plane: %d, fd: %#x, length:%#x, bytesused:%#x",
-			      __func__, event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
+			      __func__, event2str(event_type),
 			      v4l2_buf->type, plane, v4l2_buf->m.planes[plane].m.fd,
 			      v4l2_buf->m.planes[plane].length,
 			      v4l2_buf->m.planes[plane].bytesused);
@@ -411,12 +410,12 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 	} else {
 		export_id = v4l2_buf->m.fd;
 		vpr_h(stream2str(stream), "%s: %s, type %d, fd: %#x, length %#x, bytesused:%#x",
-		      __func__, event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
+		      __func__, event2str(event_type),
 		      v4l2_buf->type, v4l2_buf->m.fd, v4l2_buf->length, v4l2_buf->bytesused);
 	}
 
 	trace_msm_virtio_video_buffer_callback(stream_id,
-					       buffer_event_name(event_type),
+					       event2str(event_type),
 					       export_id, v4l2_buf->index,
 					       v4l2_buf->type, v4l2_buf->flags);
 
@@ -431,9 +430,7 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 
 	if (!virtio_vb) {
 		vpr_e(stream2str(stream), "%s: %s, stream_id=%u, vbuf not found\n",
-		      __func__,
-		      event_type == VIRTIO_VIDEO_EVENT_FBD ? "FBD" : "EBD",
-		      stream_id);
+		      __func__, event2str(event_type), stream_id);
 	} else {
 		virtio_video_pending_buf_list_del(vvd, virtio_vb);
 
@@ -447,19 +444,16 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 			vb->planes[0].bytesused = v4l2_buf->bytesused;
 		}
 
-		vpr_h(stream2str(stream), "%s: payload: index %d, type %d, flag %#x",
-		      __func__, v4l2_buf->index, v4l2_buf->type, v4l2_buf->flags);
+		vpr_h(stream2str(stream), "%s: %s, index %d, type %d, export_id=%d, flags=%#x\n",
+		      __func__, event2str(event_type), v4l2_buf->index, v4l2_buf->type, export_id, v4l2_buf->flags);
 
 		port = v4l2_type_to_driver_port(stream, v4l2_buf->type, __func__);
 		buffers[port].virtio_vb = virtio_vb;
 		buffers[port].flags = v4l2_buf->flags;
 		buffers[port].timestamp = v4l2_buffer_get_timestamp(v4l2_buf);
 
-		if (event_type == VIRTIO_VIDEO_EVENT_EBD) {
-			vpr_h(stream2str(stream), "%s: event_type=%#x, export_id=%d, flags=%#x\n",
-			      __func__, event_type, export_id, v4l2_buf->flags);
+		if (event_type == VIRTIO_VIDEO_EVENT_EBD)
 			msm_buf_put_export_id(stream, export_id);
-		}
 
 		if (buffers[INPUT_PORT].virtio_vb && buffers[INPUT_META_PORT].virtio_vb) {
 			virtio_video_buf_done_per_port(buffers, INPUT_META_PORT);

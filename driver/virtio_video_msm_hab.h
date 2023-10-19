@@ -17,6 +17,11 @@
 #define spin_unlock_irqrestore(a, b)   {spin_unlock(a); b = 0;}
 #endif
 
+struct hab_list {
+	struct list_head list;
+	int32_t count;
+};
+
 struct hab_vq_buffer {
 	void* buf;
 	struct list_head list;
@@ -33,9 +38,9 @@ struct hab_virtqueue {
 	enum hab_virtqueue_type type;
 	spinlock_t qlock;
 	uint32_t habmm_handle;
-	struct list_head vbuf_list;
-	struct list_head resp_list;
-	struct list_head unused_vq_buf_list;
+	struct hab_list vbuf_list;
+	struct hab_list resp_list;
+	struct hab_list unused_vq_buf_list;
 	struct task_struct* resp_thread;
 };
 
