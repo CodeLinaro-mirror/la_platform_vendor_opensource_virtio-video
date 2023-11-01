@@ -21,6 +21,8 @@
 #define EVENTQ 1
 #define FEATURE_BYTES 8
 
+#define MAX_RETRY_FOR_GET_EVT_BUF 100
+
 struct virtio_video_initial_data {
 	uint64_t features;
 	struct virtio_video_config configs;
@@ -255,16 +257,25 @@ static int virtio_video_hab_resp_handler(void* p)
 	int size_bytes = 0;
 	void *msg = NULL;
 	int ret = 0;
+	int retry = 0;
 
 	vpr_h(vvd2str(vvd), "%s %s: start\n", vq_name, __func__);
 
 	while (!kthread_should_stop()) {
 
 		if (hvq->type == MSM_VIRTQ_EVT_TYPE) {
+			retry = MAX_RETRY_FOR_GET_EVT_BUF;
+			while (list_empty(&hvq->vbuf_list) && retry > 0) {
+				vpr_e(vvd2str(vvd), "%s: no avail event buf, retry cnt down: %d\n",
+				      __func__, retry);
+				usleep_range(20, 100);
+				retry--;
+			}
 			msg = unattach_buf_from_vq_buf(hvq, &hvq->vbuf_list);
 			if (unlikely(!msg)) {
-				vpr_e(vvd2str(vvd), "%s %s: unable get event buffer\n",
+				vpr_e(vvd2str(vvd), "%s %s: unable get event buf\n",
 				      vq_name, __func__);
+				ret = -ENOENT;
 				goto err;
 			}
 			size_bytes = sizeof(struct virtio_video_event);

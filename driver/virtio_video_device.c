@@ -969,6 +969,8 @@ static int virtio_video_device_open(struct file *file)
 	struct video_device *video_dev = video_devdata(file);
 	struct virtio_video_device *vvd = video_drvdata(file);
 
+	vpr_h(VPR_TAG, "commit tip: \"%s\"\n", VIDEO_COMPILE_TIP);
+
 	ret = virtio_video_set_device_busy(vvd);
 	if (ret) {
 		vpr_e(vvd2str(vvd), "device already in use.\n");

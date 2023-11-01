@@ -20,6 +20,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include "virtio_video.h"
+#include "video_generated.h"
 
 DECLARE_EVENT_CLASS(msm_virtio_video_inst,
 
