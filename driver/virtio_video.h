@@ -45,6 +45,8 @@
 #define OUTPUT_MPLANE V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE
 #define INPUT_META_PLANE V4L2_BUF_TYPE_META_OUTPUT
 #define OUTPUT_META_PLANE V4L2_BUF_TYPE_META_CAPTURE
+#define INVALID_CLIENT_ID -1
+#define INVALID_CODEC -1
 
 #ifdef V4L2_CTRL_CLASS_CODEC
 #define IS_PRIV_CTRL(idx) ( \
@@ -60,7 +62,7 @@ struct buf_export_entry {
 	struct list_head list;
 	uint64_t inode;
 	uint32_t size;
-	uint32_t buffer_id;
+	uint32_t export_id;
 	enum virtio_video_queue_type buf_type;
 };
 
@@ -70,15 +72,15 @@ struct buf_export_cache {
 	int used_count;
 };
 
-#define sg_init_one msm_hab_sg_init_one
-#define virtqueue_get_buf msm_hab_virtqueue_get_buf
+#define sg_init_one                 msm_hab_sg_init_one
+#define virtqueue_get_buf           msm_hab_virtqueue_get_buf
 #define virtqueue_detach_unused_buf msm_hab_virtqueue_detach_unused_buf
-#define virtqueue_add_sgs msm_hab_virtqueue_add_sgs
-#define virtqueue_kick(x) ((void)0)
-#define virtqueue_add_inbuf msm_hab_virtqueue_add_inbuf
-#define virtqueue_disable_cb(x) {}
-#define virtqueue_is_broken(x) (false)
-#define virtqueue_enable_cb(x) (true)
+#define virtqueue_add_sgs           msm_hab_virtqueue_add_sgs
+#define virtqueue_kick              msm_hab_virtqueue_kick
+#define virtqueue_add_inbuf         msm_hab_virtqueue_add_inbuf
+#define virtqueue_disable_cb(x)     {}
+#define virtqueue_is_broken(x)      (false)
+#define virtqueue_enable_cb(x)      (true)
 
 enum msm_vidc_port_type {
 	INPUT_PORT = 0,
@@ -224,6 +226,10 @@ struct virtio_video_stream {
 	struct buf_export_cache buf_cache;
 	bool enable_eos_event;
 	struct done_buffer buffers[MAX_PORT];
+	uint32_t client_id;
+	uint32_t codec;
+	uint32_t domain;
+	uint8_t debug_str[24];
 #endif
 };
 
@@ -380,10 +386,6 @@ void virtio_video_state_update(struct virtio_video_stream *stream,
 int virtio_video_alloc_vbufs(struct virtio_video_device *vvd);
 void virtio_video_free_vbufs(struct virtio_video_device *vvd);
 int virtio_video_alloc_events(struct virtio_video_device *vvd);
-bool virtio_video_vbuf_is_pending(struct virtio_video_device *vvd,
-			    struct virtio_video_vbuffer *vbuf);
-void virtio_video_free_vbuf(struct virtio_video_device *vvd,
-		      struct virtio_video_vbuffer *vbuf);
 
 int virtio_video_device_init(struct virtio_video_device *vvd);
 void virtio_video_device_deinit(struct virtio_video_device *vvd);
@@ -594,6 +596,7 @@ int virtio_video_pending_buf_list_del(struct virtio_video_device* vvd,
 
 bool is_priv_ctrl(u32 id);
 
+int msm_virtio_video_update_debug_str(struct virtio_video_stream *inst);
 #endif
 
 #endif /* _VIRTIO_VIDEO_H */

@@ -294,15 +294,16 @@ void virtio_video_pix_fmt_mp2sp(const struct v4l2_pix_format_mplane *pix_mp,
 int msm_vmem_alloc(unsigned long size, void **mem, const char *msg)
 {
 	int rc = 0;
+	struct virtio_video_device *vvd = NULL;
 
 	if (*mem) {
-		pr_err("%s: error: double alloc\n", msg);
+		vpr_e(vvd2str(vvd), "%s: error: double alloc\n", msg);
 		rc = -EINVAL;
 	}
 
 	*mem = vzalloc(size);
 	if (!*mem) {
-		pr_err("allocation failed for %s\n", msg);
+		vpr_e(vvd2str(vvd), "allocation failed for %s\n", msg);
 		rc = -ENOMEM;
 	}
 
@@ -321,7 +322,6 @@ int v4l2_type_to_driver_port(struct virtio_video_stream *stream, u32 type,
 	const char *func)
 {
 	int port = -EINVAL;
-	struct virtio_video_device* vvd = to_virtio_vd(stream->video_dev);
 
 	if (type == INPUT_MPLANE) {
 		port = INPUT_PORT;
@@ -332,8 +332,8 @@ int v4l2_type_to_driver_port(struct virtio_video_stream *stream, u32 type,
 	} else if (type == OUTPUT_META_PLANE) {
 		port = OUTPUT_META_PORT;
 	} else {
-		v4l2_err(&vvd->v4l2_dev, "%s: port not found for v4l2 type %d\n",
-			func, type);
+		vpr_e(stream2str(stream), "%s: port not found for v4l2 type %d\n",
+		      func, type);
 		port = -EINVAL;
 	}
 
