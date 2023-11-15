@@ -44,6 +44,10 @@ static inline struct hab_virtqueue *to_hab_vq(struct virtqueue *_vq)
 	return container_of(_vq, struct hab_virtqueue, vq);
 }
 
+int msm_hab_vdev_init(struct virtio_device *vdev);
+uint64_t msm_hab_get_features(struct virtio_device *vdev);
+int msm_hab_set_features(struct virtio_device *vdev);
+struct virtio_video_config msm_hab_get_config(struct virtio_device *vdev);
 bool msm_hab_virtqueue_kick(struct virtqueue *vq);
 void msm_hab_sg_init_one(struct scatterlist *sg, const void *buf, unsigned int buflen);
 int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,

@@ -17,7 +17,7 @@ struct vb2_queue *msm_vidc_get_vb2q(struct virtio_video_stream* stream,
 	struct virtio_video_device* vvd = NULL;
 
 	if (!stream) {
-		pr_err("%s: invalid stream\n", func);
+		vpr_e(vvd2str(vvd), "%s: invalid stream\n", func);
 		goto exit;
 	}
 
@@ -32,8 +32,8 @@ struct vb2_queue *msm_vidc_get_vb2q(struct virtio_video_stream* stream,
 	} else if (type == OUTPUT_META_PLANE) {
 		queue = stream->bufq[OUTPUT_META_PORT].vb2q;
 	} else {
-		v4l2_err(&vvd->v4l2_dev, "%s: invalid buffer type %d\n",
-			__func__, type);
+		vpr_e(stream2str(stream), "%s: invalid buffer type %d\n",
+		      __func__, type);
 	}
 
 exit:
@@ -71,16 +71,16 @@ int msm_vidc_queue_setup(struct vb2_queue *queue,
 	struct v4l2_format format = {0};
 
 	if (!queue || !num_buffers || !num_planes || !sizes) {
-		pr_err("%s: invalid params: queue %pK, num_buffers %pK, num_planes %pK"
-			"sizes %pK\n", __func__, queue, num_buffers, num_planes, sizes);
+		vpr_e(vvd2str(vvd), "%s: invalid params: queue %pK, num_buffers %pK, num_planes %pK"
+		      "sizes %pK\n", __func__, queue, num_buffers, num_planes, sizes);
 		ret = -EINVAL;
 		goto exit;
 	}
 
 	stream = queue->drv_priv;
 	if (!stream || !stream->video_dev) {
-		pr_err("%s: invalid params: stream %pk, video_dev %pK\n", __func__,
-			stream, stream->video_dev);
+		vpr_e(vvd2str(vvd), "%s: invalid params: stream %pk, video_dev %pK\n", __func__,
+		      stream, stream->video_dev);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -88,8 +88,8 @@ int msm_vidc_queue_setup(struct vb2_queue *queue,
 	vvd = to_virtio_vd(stream->video_dev);
 	port = v4l2_type_to_driver_port(stream, queue->type, __func__);
 	if (port < 0) {
-		v4l2_err(&vvd->v4l2_dev, "%s: port not found for v4l2 type %d\n",
-			__func__, queue->type);
+		vpr_e(stream2str(stream), "%s: port not found for v4l2 type %d\n",
+		      __func__, queue->type);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -97,7 +97,7 @@ int msm_vidc_queue_setup(struct vb2_queue *queue,
 	format.type = queue->type;
 	ret = virtio_video_cmd_g_fmt(vvd, stream, &format);
 	if (ret) {
-		v4l2_err(&vvd->v4l2_dev, "%s: g_fmt failed.\n", __func__);
+		vpr_e(stream2str(stream), "%s: g_fmt failed.\n", __func__);
 		goto exit;
 	}
 
@@ -105,17 +105,17 @@ int msm_vidc_queue_setup(struct vb2_queue *queue,
 		*num_planes = format.fmt.pix_mp.num_planes;
 		for (plane = 0; plane < *num_planes; plane++) {
 			sizes[plane] = format.fmt.pix_mp.plane_fmt[plane].sizeimage;
-			v4l2_info(&vvd->v4l2_dev, "%s: plane %d: size is %d.\n",
-			__func__, plane, sizes[plane]);
+			vpr_h(stream2str(stream), "%s: plane %d: size is %d.\n",
+			      __func__, plane, sizes[plane]);
 		}
 	}
 	else if (port == INPUT_META_PORT || port == OUTPUT_META_PORT) {
 		*num_planes = 1;
 		sizes[0] = format.fmt.meta.buffersize;
 	}
-	v4l2_info(&vvd->v4l2_dev, "%s: type %s, num_buffers %d, "
-		"*num_planes %d, sizes[0] %d\n", __func__, v4l2_type_name(queue->type),
-		*num_buffers, *num_planes, sizes[0]);
+	vpr_h(stream2str(stream), "%s: type %s, num_buffers %d, "
+	      "*num_planes %d, sizes[0] %d\n", __func__, v4l2_type_name(queue->type),
+	      *num_buffers, *num_planes, sizes[0]);
 
 exit:
 	return ret;
@@ -128,8 +128,8 @@ int msm_vidc_start_streaming(struct vb2_queue *queue, unsigned int count)
 	struct virtio_video_device* vvd = NULL;
 
 	if (!queue || !queue->drv_priv) {
-		pr_err("%s: invalid input, queue %pK, stream %pK\n", __func__,
-			queue, queue->drv_priv);
+		vpr_e(vvd2str(vvd), "%s: invalid input, queue %pK, stream %pK\n", __func__,
+		      queue, queue->drv_priv);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -141,23 +141,23 @@ int msm_vidc_start_streaming(struct vb2_queue *queue, unsigned int count)
 	inst_lock(stream, __func__);
 
 	if (queue->type == INPUT_META_PLANE || queue->type == OUTPUT_META_PLANE) {
-		v4l2_info(&vvd->v4l2_dev, "%s: nothing to start on %s\n",
-			__func__, v4l2_type_name(queue->type));
+		vpr_h(stream2str(stream), "%s: nothing to start on %s\n",
+		      __func__, v4l2_type_name(queue->type));
 		ret = 0;
 		goto unlock;
 	}
 
 	if (!is_decode_session(vvd) && !is_encode_session(vvd)) {
-		v4l2_err(&vvd->v4l2_dev, "%s: invalid session %d\n",
-			__func__, vvd->type);
+		vpr_e(stream2str(stream), "%s: invalid session %d\n",
+		      __func__, vvd->type);
 		ret = -EINVAL;
 		goto unlock;
 	}
 
 	ret = virtio_video_cmd_streamon(vvd, stream, queue->type);
 	if (ret) {
-		v4l2_err(&vvd->v4l2_dev, "%s: streamon %s failed\n",
-			__func__, v4l2_type_name(queue->type));
+		vpr_e(stream2str(stream), "%s: streamon %s failed\n",
+		      __func__, v4l2_type_name(queue->type));
 	}
 
 unlock:
@@ -176,8 +176,8 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 	struct virtio_video_device* vvd = NULL;
 
 	if (!queue || !queue->drv_priv) {
-		pr_err("%s: invalid input, queue %pK, stream %pK\n", __func__,
-			queue, queue->drv_priv);
+		vpr_e(vvd2str(vvd), "%s: invalid input, queue %pK, stream %pK\n", __func__,
+		      queue, queue->drv_priv);
 		return;
 	}
 
@@ -185,14 +185,14 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 	vvd = to_virtio_vd(stream->video_dev);
 
 	if (queue->type == INPUT_META_PLANE || queue->type == OUTPUT_META_PLANE) {
-		v4l2_info(&vvd->v4l2_dev, "%s: nothing to stop on %s\n",
-			__func__, v4l2_type_name(queue->type));
+		vpr_h(stream2str(stream), "%s: nothing to stop on %s\n",
+		      __func__, v4l2_type_name(queue->type));
 		goto exit;
 	}
 
 	if (!is_decode_session(vvd) && !is_encode_session(vvd)) {
-		v4l2_err(&vvd->v4l2_dev, "%s: invalid session %d\n",
-			__func__, vvd->type);
+		vpr_e(stream2str(stream), "%s: invalid session %d\n",
+		      __func__, vvd->type);
 		goto exit;
 	}
 
@@ -206,14 +206,14 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 	put_inst(stream);
 
 	if (ret) {
-		v4l2_err(&vvd->v4l2_dev, "%s: streamoff %s failed %d\n",
-			__func__, v4l2_type_name(queue->type), ret);
+		vpr_e(stream2str(stream), "%s: streamoff %s failed %d\n",
+		      __func__, v4l2_type_name(queue->type), ret);
 	} else {
-		v4l2_info(&vvd->v4l2_dev, "%s: waiting %s buffer done\n", __func__,
-			  v4l2_type_name(queue->type));
+		vpr_h(stream2str(stream), "%s: waiting %s buffer done\n", __func__,
+		      v4l2_type_name(queue->type));
 		vb2_wait_for_all_buffers(queue);
-		v4l2_info(&vvd->v4l2_dev, "%s: all %s buffer done\n", __func__,
-			  v4l2_type_name(queue->type));
+		vpr_h(stream2str(stream), "%s: all %s buffer done\n", __func__,
+		      v4l2_type_name(queue->type));
 	}
 
 exit:
@@ -238,7 +238,7 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 	stream = vb2_get_drv_priv(vb2->vb2_queue);
 
 	if (!stream) {
-		pr_err("%s: invalid stream\n", __func__);
+		vpr_e(vvd2str(vvd), "%s: invalid stream\n", __func__);
 		return;
 	}
 
@@ -260,8 +260,8 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 				ret = -1;
 				goto exit;
 			}
-			v4l2_info(&vvd->v4l2_dev, "%s, export buf fd 0x%x to export_id[%d] 0x%x",
-				  __func__, buf_fd, plane, export_id[plane]);
+			vpr_h(stream2str(stream), "%s, export buf fd 0x%x to export_id[%d] 0x%x",
+			      __func__, buf_fd, plane, export_id[plane]);
 		}
 
 		pb->m.planes = (struct v4l2_plane *)(v4l2_buf + sizeof(struct v4l2_buffer));
@@ -269,13 +269,13 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 
 		for (plane = 0; plane < vb2->num_planes; plane++) {
 			pb->m.planes[plane].m.fd = export_id[plane];
-			v4l2_info(&vvd->v4l2_dev, "%s: QBUF: %s: idx %d, memory %d, fd %d=%#x, "
-				  "size %d, filled %d, offset %d time-stamp %d", __func__,
-				  v4l2_type_name(pb->type), pb->index, pb->memory,
-				  pb->m.planes[plane].m.fd, pb->m.planes[plane].m.fd,
-				  pb->m.planes[plane].length,
-				  pb->m.planes[plane].bytesused,
-				  pb->m.planes[plane].data_offset, pb->timestamp);
+			vpr_h(stream2str(stream), "%s: QBUF: %s: idx %d, memory %d, fd %d=%#x, "
+			      "size %d, filled %d, offset %d time-stamp %d", __func__,
+			      v4l2_type_name(pb->type), pb->index, pb->memory,
+			      pb->m.planes[plane].m.fd, pb->m.planes[plane].m.fd,
+			      pb->m.planes[plane].length,
+			      pb->m.planes[plane].bytesused,
+			      pb->m.planes[plane].data_offset, pb->timestamp);
 		}
 	} else {
 		queue->buf_ops->fill_user_buffer(vb2, pb);
@@ -288,10 +288,10 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 			goto exit;
 		}
 		pb->m.fd = export_id[0];
-		v4l2_info(&vvd->v4l2_dev, "%s: QBUF: %s: idx %d, memory %d, fd %d=%#x, "
-			  "size %d, filled %d, time-stamp %d", __func__,
-			  v4l2_type_name(pb->type), pb->index, pb->memory,
-			  pb->m.fd, pb->m.fd, pb->length, pb->bytesused, pb->timestamp);
+		vpr_h(stream2str(stream), "%s: QBUF: %s: idx %d, memory %d, fd %d=%#x, "
+		      "size %d, filled %d, time-stamp %d", __func__,
+		      v4l2_type_name(pb->type), pb->index, pb->memory,
+		      pb->m.fd, pb->m.fd, pb->length, pb->bytesused, pb->timestamp);
 	}
 
 	virtio_vb->queued = true;
@@ -326,10 +326,9 @@ int msm_vidc_buf_out_validate(struct vb2_buffer *vb2)
 void msm_vidc_buf_request_complete(struct vb2_buffer *vb2)
 {
 	struct virtio_video_stream *stream = vb2_get_drv_priv(vb2->vb2_queue);
-	struct virtio_video_device* vvd = to_virtio_vd(stream->video_dev);
 
-	v4l2_info(&vvd->v4l2_dev,  "%s: vb2 type %d, index %d\n",
-		  __func__, vb2->type, vb2->index);
+	vpr_h(stream2str(stream),  "%s: vb2 type %d, index %d\n",
+	      __func__, vb2->type, vb2->index);
 	v4l2_ctrl_request_complete(vb2->req_obj.req, &stream->ctrl_handler);
 }
 
@@ -341,8 +340,8 @@ int vb2q_init(struct virtio_video_stream *stream,
 	struct virtio_video_device* vvd = NULL;
 
 	if (!stream || !queue || !stream->video_dev) {
-		pr_err("%s: invalid params: stream %pK, queue %pK, video_dev %pK\n",
-			__func__, stream, queue, stream->video_dev);
+		vpr_e(vvd2str(vvd), "%s: invalid params: stream %pK, queue %pK, video_dev %pK\n",
+		      __func__, stream, queue, stream->video_dev);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -360,8 +359,8 @@ int vb2q_init(struct virtio_video_stream *stream,
 
 	ret = vb2_queue_init(queue);
 	if (ret)
-		v4l2_err(&vvd->v4l2_dev, "%s: vb2_queue_init failed for type %d\n",
-			__func__, type);
+		vpr_e(stream2str(stream), "%s: vb2_queue_init failed for type %d\n",
+		      __func__, type);
 
 exit:
 	return ret;

@@ -11,7 +11,7 @@ void put_inst(struct virtio_video_stream *stream)
 {
 
 	if (!stream || !stream->video_dev) {
-		pr_err("%s: invalid params\n", __func__);
+		vpr_e(stream2str(stream), "%s: invalid params\n", __func__);
 		return;
 	}
 }
@@ -171,4 +171,35 @@ const char *buffer_event_name(uint32_t event)
 	}
 
 	return "UNKNOWN";
+}
+
+#define DEBUG_INFO_MAX_LEN 255
+char *vvd2str(struct virtio_video_device *vvd)
+{
+	static char debug_info[DEBUG_INFO_MAX_LEN] = "";
+
+	if (vvd != NULL) {
+		snprintf(debug_info, DEBUG_INFO_MAX_LEN, "%s : %s",
+			 vvd->v4l2_dev.name, VPR_DBG_STR);
+	} else {
+		snprintf(debug_info, DEBUG_INFO_MAX_LEN, "%s : %s",
+			 VPR_DBG_LABEL, VPR_DBG_STR);
+	}
+
+	return debug_info;
+}
+
+char *stream2str(struct virtio_video_stream *stream)
+{
+	static char debug_info[DEBUG_INFO_MAX_LEN] = "";
+
+	if (stream != NULL) {
+		snprintf(debug_info, DEBUG_INFO_MAX_LEN, "%s : %s",
+			 stream->video_dev->v4l2_dev->name, stream->debug_str);
+	} else {
+		snprintf(debug_info, DEBUG_INFO_MAX_LEN, "%s : %s",
+			 VPR_DBG_LABEL, VPR_DBG_STR);
+	}
+
+	return debug_info;
 }

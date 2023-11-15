@@ -45,6 +45,8 @@
 #define OUTPUT_MPLANE V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE
 #define INPUT_META_PLANE V4L2_BUF_TYPE_META_OUTPUT
 #define OUTPUT_META_PLANE V4L2_BUF_TYPE_META_CAPTURE
+#define INVALID_CLIENT_ID -1
+#define INVALID_CODEC -1
 
 #ifdef V4L2_CTRL_CLASS_CODEC
 #define IS_PRIV_CTRL(idx) ( \
@@ -224,6 +226,10 @@ struct virtio_video_stream {
 	struct buf_export_cache buf_cache;
 	bool enable_eos_event;
 	struct done_buffer buffers[MAX_PORT];
+	uint32_t client_id;
+	uint32_t codec;
+	uint32_t domain;
+	uint8_t debug_str[24];
 #endif
 };
 
@@ -594,6 +600,7 @@ int virtio_video_pending_buf_list_del(struct virtio_video_device* vvd,
 
 bool is_priv_ctrl(u32 id);
 
+int msm_virtio_video_update_debug_str(struct virtio_video_stream *inst);
 #endif
 
 #endif /* _VIRTIO_VIDEO_H */
