@@ -246,8 +246,8 @@ static int process_msm_hab_evt_resp(struct hab_virtqueue* hvq, void* data)
 	char *stream_str = stream_id2str(vvd, evt->stream_id);
 	int ret = 0;
 
-	vpr_h(stream_str, "%s: recv: event type %#x, stream id %d, resp_list cnt=%d\n",
-	      __func__, evt->event_type, evt->stream_id, hvq->resp_list.count);
+	vpr_h(stream_str, "%s: recv: %s, stream id %d, resp_list cnt=%d\n",
+	      __func__, event2str(evt->event_type), evt->stream_id, hvq->resp_list.count);
 
 	ret = attach_buf_to_vq_buf(hvq, &hvq->resp_list, evt);
 
@@ -349,10 +349,8 @@ static int start_resp_handler(struct hab_virtqueue *hvq)
 {
 	int ret = 0;
 	struct virtio_video_device *vvd = NULL;
-	char *qname = (hvq->type == MSM_VIRTQ_CMD_TYPE)? "cmdq":"evtq";
-
 	hvq->resp_thread = kthread_create(virtio_video_hab_resp_handler,
-	                                  hvq, "vvid_rsp_%s", qname);
+	                                  hvq, "vvid_rsp_%x", hvq);
 
 	if (IS_ERR(hvq->resp_thread)) {
 		vpr_e(vvd2str(vvd), "%s: failed\n", __func__);

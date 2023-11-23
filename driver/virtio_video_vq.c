@@ -414,10 +414,12 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 		      v4l2_buf->type, v4l2_buf->m.fd, v4l2_buf->length, v4l2_buf->bytesused);
 	}
 
-	trace_msm_virtio_video_buffer_callback(stream_id,
-					       event2str(event_type),
-					       export_id, v4l2_buf->index,
-					       v4l2_buf->type, v4l2_buf->flags);
+	if (event_type == VIRTIO_VIDEO_EVENT_EBD)
+		trace_virt_vid_evt_ebd(stream_id, export_id, v4l2_buf->index,
+		                       v4l2_buf->type, v4l2_buf->flags);
+	else
+		trace_virt_vid_evt_fbd(stream_id, export_id, v4l2_buf->index,
+		                       v4l2_buf->type, v4l2_buf->flags);
 
 	spin_lock(&vvd->pending_buf_list_lock);
 	list_for_each_entry(entry, &vvd->pending_buf_list, list) {
@@ -444,7 +446,7 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 			vb->planes[0].bytesused = v4l2_buf->bytesused;
 		}
 
-		vpr_h(stream2str(stream), "%s: %s, index %d, type %d, export_id=%d, flags=%#x\n",
+		vpr_h(stream2str(stream), "%s: %s, index=%d, type=%d, export_id=%d, flags=%#x\n",
 		      __func__, event2str(event_type), v4l2_buf->index, v4l2_buf->type, export_id, v4l2_buf->flags);
 
 		port = v4l2_type_to_driver_port(stream, v4l2_buf->type, __func__);
@@ -505,15 +507,17 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 						  STREAM_STATE_DYNAMIC_RES_CHANGE);
 			wake_up(&vvd->wq);
 		}
+		trace_virt_vid_evt_rch(stream_id, 0, 0, 0, 0);
 		break;
 	case VIRTIO_VIDEO_EVENT_ERROR:
-		vpr_e(stream2str(stream), "%s: stream_id=%i: error event\n", __func__,
+		vpr_e(stream2str(stream), "%s: stream_id=%u: error event\n", __func__,
 		      stream_id);
 		virtio_video_state_update(stream, STREAM_STATE_ERROR);
 		virtio_video_handle_error(stream);
+		trace_virt_vid_evt_err(stream_id, 0, 0, 0, 0);
 		break;
 	default:
-		vpr_h(stream2str(stream), "stream_id=%i: unknown event\n",
+		vpr_h(stream2str(stream), "stream_id=%u: unknown event\n",
 		      stream_id);
 		break;
 	}

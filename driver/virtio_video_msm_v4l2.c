@@ -576,8 +576,8 @@ int msm_v4l2_qbuf(struct file *file, void *fh,
 
 	ret = vb2_qbuf(queue, vdev->v4l2_dev->mdev, buf);
 	if (!ret)
-		trace_msm_virtio_video_qbuf(stream->stream_id, v4l2_type_name(buf->type),
-					    buf->index, buf->flags);
+		trace_virt_vid_qbuf(stream->stream_id, buf->type,
+					        buf->index, buf->flags);
 
 exit:
 	put_inst(stream);
@@ -621,8 +621,9 @@ int msm_v4l2_dqbuf(struct file *file, void *fh,
 		vpr_e(stream2str(stream), "%s: failed with %d\n", __func__, ret);
 		goto unlock;
 	}
-	trace_msm_virtio_video_dqbuf(stream->stream_id, v4l2_type_name(buf->type),
-				     buf->index, buf->flags);
+
+	trace_virt_vid_dqbuf(stream->stream_id, buf->type,
+				         buf->index, buf->flags);
 
 unlock:
 	inst_unlock(stream, __func__);

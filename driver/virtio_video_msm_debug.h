@@ -22,28 +22,26 @@
 #include "virtio_video.h"
 #include "video_generated.h"
 
-DECLARE_EVENT_CLASS(msm_virtio_video_inst,
-	TP_PROTO(char *dummy, int id),
-	TP_ARGS(dummy, id),
+DECLARE_EVENT_CLASS(virtio_video_inst,
+	TP_PROTO(int id),
+	TP_ARGS(id),
 	TP_STRUCT__entry(
-		__field(char *, dummy)
 		__field(int, id)
 	),
 	TP_fast_assign(
-		__entry->dummy = dummy;
 		__entry->id = id;
 	),
-	TP_printk("%d: %s", __entry->id, __entry->dummy)
+	TP_printk("[%d]", __entry->id)
 );
 
-DEFINE_EVENT(msm_virtio_video_inst, msm_virtio_video_device_open,
-	TP_PROTO(char *dummy, int id),
-	TP_ARGS(dummy, id)
+DEFINE_EVENT(virtio_video_inst, virt_vid_device_open,
+	TP_PROTO(int id),
+	TP_ARGS(id)
 );
 
-DEFINE_EVENT(msm_virtio_video_inst, msm_virtio_video_device_release,
-	TP_PROTO(char *dummy, int id),
-	TP_ARGS(dummy, id)
+DEFINE_EVENT(virtio_video_inst, virt_vid_device_release,
+	TP_PROTO(int id),
+	TP_ARGS(id)
 );
 
 DECLARE_EVENT_CLASS(list_cnt,
@@ -94,11 +92,11 @@ DEFINE_EVENT(list_cnt, hab_cmd_add_vqbuf,
 );
 
 DECLARE_EVENT_CLASS(virtio_video_buffer_queue_events,
-	TP_PROTO(int id, const char *type, int index, int flags),
+	TP_PROTO(int id, int type, int index, int flags),
 	TP_ARGS(id, type, index, flags),
 	TP_STRUCT__entry(
 		__field(int, id)
-		__field(const char *, type)
+		__field(int, type)
 		__field(int, index)
 		__field(int, flags)
 	),
@@ -109,48 +107,61 @@ DECLARE_EVENT_CLASS(virtio_video_buffer_queue_events,
 		__entry->flags = flags;
 	),
 	TP_printk(
-		"%d: %s: idx %2d flags %#x",
+		"[%d] %d: idx %2d flags %#x",
 		__entry->id, __entry->type, __entry->index, __entry->flags)
 );
 
-DEFINE_EVENT(virtio_video_buffer_queue_events, msm_virtio_video_qbuf,
-	TP_PROTO(int id, const char *type, int index, int flags),
+DEFINE_EVENT(virtio_video_buffer_queue_events, virt_vid_qbuf,
+	TP_PROTO(int id, int type, int index, int flags),
 	TP_ARGS(id, type, index, flags)
 );
 
-DEFINE_EVENT(virtio_video_buffer_queue_events, msm_virtio_video_dqbuf,
-	TP_PROTO(int id, const char *type, int index, int flags),
+DEFINE_EVENT(virtio_video_buffer_queue_events, virt_vid_dqbuf,
+	TP_PROTO(int id, int type, int index, int flags),
 	TP_ARGS(id, type, index, flags)
 );
 
 DECLARE_EVENT_CLASS(virtio_video_buffer_callback_events,
-	TP_PROTO(int id, const char *op, int fd, int index, int type, int flags),
-	TP_ARGS(id, op, fd, index, type, flags),
+	TP_PROTO(int stream_id, int fd, int index, int type, int flags),
+	TP_ARGS(stream_id, fd, index, type, flags),
 	TP_STRUCT__entry(
-		__field(int, id)
-		__field(const char *, op)
+		__field(int, stream_id)
 		__field(int, fd)
 		__field(int, index)
 		__field(int, type)
 		__field(int, flags)
 	),
 	TP_fast_assign(
-		__entry->id = id;
-		__entry->op = op;
+		__entry->stream_id = stream_id;
 		__entry->fd = fd;
 		__entry->index = index;
 		__entry->type = type;
 		__entry->flags = flags;
 	),
 	TP_printk(
-		"%d: %s: fd %#x idx %2d type %2d flags %#x",
-		__entry->id, __entry->op, __entry->fd, __entry->index,
+		"[%d] fd %#x idx %2d type %2d flags %#x",
+		__entry->stream_id, __entry->fd, __entry->index,
 		__entry->type, __entry->flags)
 );
 
-DEFINE_EVENT(virtio_video_buffer_callback_events, msm_virtio_video_buffer_callback,
-	TP_PROTO(int id, const char *op, int fd, int index, int type, int flags),
-	TP_ARGS(id, op, fd, index, type, flags)
+DEFINE_EVENT(virtio_video_buffer_callback_events, virt_vid_evt_ebd,
+	TP_PROTO(int stream_id, int fd, int index, int type, int flags),
+	TP_ARGS(stream_id, fd, index, type, flags)
+);
+
+DEFINE_EVENT(virtio_video_buffer_callback_events, virt_vid_evt_fbd,
+	TP_PROTO(int stream_id, int fd, int index, int type, int flags),
+	TP_ARGS(stream_id, fd, index, type, flags)
+);
+
+DEFINE_EVENT(virtio_video_buffer_callback_events, virt_vid_evt_rch,
+	TP_PROTO(int stream_id, int fd, int index, int type, int flags),
+	TP_ARGS(stream_id, fd, index, type, flags)
+);
+
+DEFINE_EVENT(virtio_video_buffer_callback_events, virt_vid_evt_err,
+	TP_PROTO(int stream_id, int fd, int index, int type, int flags),
+	TP_ARGS(stream_id, fd, index, type, flags)
 );
 
 #endif //_VIRTIO_VIDEO_TRACE_
