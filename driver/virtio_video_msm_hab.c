@@ -39,6 +39,18 @@ static int start_resp_handler(struct hab_virtqueue *hvq);
 static void stop_cmd_resp_handler(struct hab_virtqueue* hvq);
 static void stop_event_handler(struct hab_virtqueue* hvq);
 
+#define hvq_event_lock() \
+{\
+	if (hvq->type == MSM_VIRTQ_EVT_TYPE) \
+		spin_lock(&hvq->qlock); \
+}
+
+#define hvq_event_unlock() \
+{\
+	if (hvq->type == MSM_VIRTQ_EVT_TYPE) \
+		spin_unlock(&hvq->qlock); \
+}
+
 static int attach_buf_to_vq_buf(struct hab_virtqueue *hvq,
                                 struct hab_list *ls, void *data)
 {
@@ -46,7 +58,7 @@ static int attach_buf_to_vq_buf(struct hab_virtqueue *hvq,
 	struct hab_vq_buffer *vq_buf = NULL;
 	int ret = 0;
 
-	spin_lock(&hvq->qlock);
+	hvq_event_lock();
 	vq_buf = list_first_entry_or_null(&hvq->unused_vq_buf_list.list,
 	                                  struct hab_vq_buffer, list);
 	if (vq_buf) {
@@ -62,7 +74,7 @@ static int attach_buf_to_vq_buf(struct hab_virtqueue *hvq,
 		ret = -ENOENT;
 	}
 
-	spin_unlock(&hvq->qlock);
+	hvq_event_unlock();
 
 	return ret;
 }
@@ -73,7 +85,7 @@ static void* unattach_buf_from_vq_buf(struct hab_virtqueue *hvq,
 	struct hab_vq_buffer *vq_buf = NULL;
 	void *data = NULL;
 
-	spin_lock(&hvq->qlock);
+	hvq_event_lock();
 
 	vq_buf = list_first_entry_or_null(&ls->list, struct hab_vq_buffer, list);
 
@@ -87,7 +99,7 @@ static void* unattach_buf_from_vq_buf(struct hab_virtqueue *hvq,
 		vq_buf->buf = NULL;
 	}
 
-	spin_unlock(&hvq->qlock);
+	hvq_event_unlock();
 
 	return data;
 }
@@ -342,6 +354,7 @@ exit:
 	return 0;
 err:
 	vpr_e(vvd2str(vvd), "%s %s: exited. error %d\n", vq_name, __func__, ret);
+	msm_hab_del_vqs(hvq->vq.vdev);
 	return ret;
 }
 
@@ -532,14 +545,14 @@ void* msm_hab_virtqueue_detach_unused_buf(struct virtqueue* vq)
 		buf = unattach_buf_from_vq_buf(hvq, &hvq->resp_list);
 
 	if (!buf) {
-		spin_lock(&hvq->qlock);
+		hvq_event_lock();
 		list_for_each_entry_safe(vq_buf, tmp,
 		                         &hvq->unused_vq_buf_list.list, list) {
 			list_del(&vq_buf->list);
 			hvq->unused_vq_buf_list.count--;
 			kfree(vq_buf);
 		}
-		spin_unlock(&hvq->qlock);
+		hvq_event_unlock();
 	}
 
 	return buf;
@@ -554,7 +567,7 @@ int msm_hab_virtqueue_add_sgs(struct virtqueue *vq, struct scatterlist *sgs[],
 	struct hab_vq_buffer *vq_buf = NULL;
 	struct virtio_video_device *vvd = vq->vdev->priv;
 
-	spin_lock(&hvq->qlock);
+	hvq_event_lock();
 	vq_buf = list_first_entry_or_null(&hvq->unused_vq_buf_list.list,
 	                                  struct hab_vq_buffer, list);
 
@@ -562,8 +575,7 @@ int msm_hab_virtqueue_add_sgs(struct virtqueue *vq, struct scatterlist *sgs[],
 		list_del(&vq_buf->list);
 		hvq->unused_vq_buf_list.count--;
 	}
-
-	spin_unlock(&hvq->qlock);
+	hvq_event_unlock();
 
 	if (!vq_buf) {
 		if (!(vq_buf = kmalloc(sizeof(*vq_buf), GFP_KERNEL))) {
@@ -575,10 +587,10 @@ int msm_hab_virtqueue_add_sgs(struct virtqueue *vq, struct scatterlist *sgs[],
 
 	vq_buf->buf = data;
 
-	spin_lock(&hvq->qlock);
+	hvq_event_lock();
 	list_add_tail(&vq_buf->list, &hvq->vbuf_list.list);
 	hvq->vbuf_list.count++;
-	spin_unlock(&hvq->qlock);
+	hvq_event_unlock();
 
 	vpr_h(vvd2str(vvd), "%s %s, vbuf_list count=%d\n",
 	      vq->name, __func__, hvq->vbuf_list.count);
@@ -626,7 +638,6 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		hvq->vq.name = names[i];
 		hvq->vq.vdev = vdev;
 		hvq->vq.num_free = DEFAULT_VQ_NUM;
-		spin_lock_init(&hvq->qlock);
 		INIT_LIST_HEAD(&hvq->vbuf_list.list);
 		INIT_LIST_HEAD(&hvq->resp_list.list);
 		INIT_LIST_HEAD(&hvq->unused_vq_buf_list.list);
@@ -636,9 +647,10 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 
 		if (!strcmp(names[i], "commandq"))
 			hvq->type = MSM_VIRTQ_CMD_TYPE;
-		else
+		else {
 			hvq->type = MSM_VIRTQ_EVT_TYPE;
-
+			spin_lock_init(&hvq->qlock);
+		}
 		vqs[i] = &hvq->vq;
 
 		spin_lock(&vdev->vqs_list_lock);

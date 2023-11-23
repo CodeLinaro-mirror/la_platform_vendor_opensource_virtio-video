@@ -380,7 +380,7 @@ static void virtio_video_buf_done_per_port(struct done_buffer *buffers, int port
 }
 
 static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
-					 struct virtio_video_event *evt)
+                                         struct virtio_video_event *evt)
 {
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	uint32_t stream_id = evt->stream_id;
@@ -472,22 +472,22 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 }
 
 static void virtio_video_handle_event(struct virtio_video_device *vvd,
-				      struct virtio_video_event *evt)
+                                      struct virtio_video_event *evt)
 {
 	struct virtio_video_stream *stream = NULL;
 	uint32_t stream_id = evt->stream_id;
+
+#ifndef VIRTIO_VIDEO_MSM
 	struct video_device *vd = &vvd->video_dev;
 
 	mutex_lock(vd->lock);
-
+#endif
 	stream = idr_find(&vvd->stream_idr, stream_id);
 	if (!stream) {
 		vpr_h(stream2str(stream), "%s: stream_id=%u not found for event\n",
 		      __func__, stream_id);
 		goto unlock;
 	}
-
-	inst_lock(stream, __func__);
 
 	switch (le32_to_cpu(evt->event_type)) {
 	case VIRTIO_VIDEO_EVENT_FBD:
@@ -522,10 +522,11 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 		break;
 	}
 
-	inst_unlock(stream, __func__);
-
 unlock:
+#ifndef VIRTIO_VIDEO_MSM
 	mutex_unlock(vd->lock);
+#endif
+	return;
 }
 
 int virtio_video_alloc_events(struct virtio_video_device *vvd)
