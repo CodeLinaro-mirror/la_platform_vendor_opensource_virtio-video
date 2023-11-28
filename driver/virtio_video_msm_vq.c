@@ -9,11 +9,11 @@
 #include <linux/videodev2.h>
 
 static int virtio_video_v4l2_to_hab(struct virtio_video_device* vvd,
-				    uint32_t stream_id,
-				    enum virtio_video_cmd_type cmd_type,
-				    enum virtio_video_sub_cmd_type sub_cmd_type,
-				    void* payload, size_t size,
-				    void* priv, bool sync)
+                                    struct virtio_video_stream* stream,
+                                    enum virtio_video_cmd_type cmd_type,
+                                    enum virtio_video_sub_cmd_type sub_cmd_type,
+                                    void* payload, size_t size,
+                                    void* priv, bool sync)
 {
 	int ret = 0;
 	struct virtio_video_stream_ioctl_cmd* req_p;
@@ -30,7 +30,7 @@ static int virtio_video_v4l2_to_hab(struct virtio_video_device* vvd,
 	}
 
 	req_p->hdr.cmd_type = cmd_type;
-	req_p->hdr.stream_id = stream_id;
+	req_p->hdr.stream_id = stream->stream_id;
 	req_p->hdr.sub_cmd_type = sub_cmd_type;
 
 	memcpy(req_p->payload, payload, size);
@@ -45,12 +45,12 @@ static int virtio_video_v4l2_to_hab(struct virtio_video_device* vvd,
 		ret = virtio_video_queue_cmd_buffer(vvd, vbuf);
 
 	if (ret)
-		vpr_e(vvd2str(vvd), "%s: %s cmd failed. %s-%s ret %d",
+		vpr_e(stream2str(stream), "%s: %s cmd failed. %s-%s ret %d",
 		      __func__, sync ? "sync" : "async",
 		      cmd_to_string(cmd_type),
 		      cmd_to_string(sub_cmd_type), ret);
 	else
-		vpr_h(vvd2str(vvd), "%s: %s cmd done: %s-%s\n",
+		vpr_h(stream2str(stream), "%s: %s cmd done: %s-%s\n",
 		      __func__, sync? "sync" : "async",
 		      cmd_to_string(cmd_type),
 		      cmd_to_string(sub_cmd_type));
@@ -60,23 +60,23 @@ err:
 }
 
 static int virtio_video_v4l2_to_hab_async(struct virtio_video_device* vvd,
-					  uint32_t stream_id,
+					  struct virtio_video_stream* stream,
 					  enum virtio_video_cmd_type cmd_type,
 					  enum virtio_video_sub_cmd_type sub_cmd_type,
 					  void* payload, size_t size, void* priv)
 {
 
-	return virtio_video_v4l2_to_hab(vvd, stream_id, cmd_type, sub_cmd_type,
+	return virtio_video_v4l2_to_hab(vvd, stream, cmd_type, sub_cmd_type,
 					payload, size, priv, false);
 }
 
 static int virtio_video_v4l2_to_hab_sync(struct virtio_video_device* vvd,
-					 uint32_t stream_id,
+					 struct virtio_video_stream* stream,
 					 enum virtio_video_cmd_type cmd_type,
 					 enum virtio_video_sub_cmd_type sub_cmd_type,
 					 void* payload, size_t size, void* priv)
 {
-	return virtio_video_v4l2_to_hab(vvd, stream_id, cmd_type, sub_cmd_type,
+	return virtio_video_v4l2_to_hab(vvd, stream, cmd_type, sub_cmd_type,
 					payload, size, priv, true);
 }
 
@@ -86,7 +86,7 @@ int virtio_video_cmd_enum_fmt(struct virtio_video_device* vvd,
 {
 	int ret = 0;
 
-	ret = virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	ret = virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_GET_PARAMS, ENUM_FMT,
 					     (void *)fmtdesc, sizeof(*fmtdesc), NULL);
 
@@ -99,7 +99,7 @@ int virtio_video_cmd_enum_fmt(struct virtio_video_device* vvd,
 int virtio_video_cmd_enum_frameintervals(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_frmivalenum* fival)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_GET_PARAMS, ENUM_FRAMEINTERVALS,
 					     (void *)fival, sizeof(*fival), NULL);
 }
@@ -107,7 +107,7 @@ int virtio_video_cmd_enum_frameintervals(struct virtio_video_device* vvd,
 int virtio_video_cmd_enum_framesizes(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_frmsizeenum* fsize)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_GET_PARAMS, ENUM_FRAMESIZES,
 					     (void *)fsize, sizeof(*fsize), NULL);
 }
@@ -115,7 +115,7 @@ int virtio_video_cmd_enum_framesizes(struct virtio_video_device* vvd,
 int virtio_video_cmd_g_fmt(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_format* format)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_GET_PARAMS, G_FMT,
 					     (void *)format, sizeof(*format), NULL);
 }
@@ -123,7 +123,7 @@ int virtio_video_cmd_g_fmt(struct virtio_video_device* vvd,
 int virtio_video_cmd_s_fmt(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_format* format)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_SET_PARAMS, S_FMT,
 					     (void *)format, sizeof(*format), NULL);
 }
@@ -131,7 +131,7 @@ int virtio_video_cmd_s_fmt(struct virtio_video_device* vvd,
 int virtio_video_cmd_g_parm(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_streamparm* parm)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_GET_PARAMS, G_PARAM,
 					     (void *)parm, sizeof(*parm), NULL);
 }
@@ -139,7 +139,7 @@ int virtio_video_cmd_g_parm(struct virtio_video_device* vvd,
 int virtio_video_cmd_s_parm(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_streamparm* parm)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_SET_PARAMS, S_PARAM,
 					     (void *)parm, sizeof(*parm), NULL);
 }
@@ -147,7 +147,7 @@ int virtio_video_cmd_s_parm(struct virtio_video_device* vvd,
 int virtio_video_cmd_g_ctrl(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_control* control)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_GET_CONTROL, G_CTRL,
 					     (void *)control, sizeof(*control), NULL);
 }
@@ -155,7 +155,7 @@ int virtio_video_cmd_g_ctrl(struct virtio_video_device* vvd,
 int virtio_video_cmd_s_ctrl(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_control* control)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_SET_CONTROL, S_CTRL,
 					     (void *)control, sizeof(*control), NULL);
 }
@@ -163,7 +163,7 @@ int virtio_video_cmd_s_ctrl(struct virtio_video_device* vvd,
 int virtio_video_cmd_g_selection(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_selection* sel)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_GET_PARAMS, G_SELECTION,
 					     (void *)sel, sizeof(*sel), NULL);
 }
@@ -171,7 +171,7 @@ int virtio_video_cmd_g_selection(struct virtio_video_device* vvd,
 int virtio_video_cmd_s_selection(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_selection* sel)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_SET_PARAMS, S_SELECTION,
 					     (void *)sel, sizeof(*sel), NULL);
 }
@@ -187,7 +187,7 @@ int virtio_video_cmd_qbuf(struct virtio_video_device* vvd,
 	else
 		size = sizeof(*buf);
 
-	ret = virtio_video_v4l2_to_hab_async(vvd, stream->stream_id,
+	ret = virtio_video_v4l2_to_hab_async(vvd, stream,
 					     VIRTIO_VIDEO_CMD_RESOURCE_QUEUE, QBUF,
 					     (void *)buf, size, priv);
 
@@ -205,15 +205,15 @@ int virtio_video_cmd_querybuf(struct virtio_video_device* vvd,
 int virtio_video_cmd_querycap(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_capability* cap)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
-		VIRTIO_VIDEO_CMD_GET_PARAMS, QUERYCAP,
-		(void *)cap, sizeof(*cap), NULL);
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
+	                     VIRTIO_VIDEO_CMD_GET_PARAMS, QUERYCAP,
+	                     (void *)cap, sizeof(*cap), NULL);
 }
 
 int virtio_video_cmd_reqbufs(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_requestbuffers* buf)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_GET_PARAMS, REQBUFS,
 					     (void *)buf, sizeof(*buf), NULL);
 }
@@ -221,7 +221,7 @@ int virtio_video_cmd_reqbufs(struct virtio_video_device* vvd,
 int virtio_video_cmd_subscribe_event(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, const struct v4l2_event_subscription* sub)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_SET_PARAMS, SUBSCRIBE_EVENT,
 					     (void *)sub, sizeof(*sub), NULL);
 }
@@ -229,7 +229,7 @@ int virtio_video_cmd_subscribe_event(struct virtio_video_device* vvd,
 int virtio_video_cmd_unsubscribe_event(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, const struct v4l2_event_subscription* sub)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_SET_PARAMS, UNSUBSCRIBE_EVENT,
 					     (void *)sub, sizeof(*sub), NULL);
 }
@@ -237,7 +237,7 @@ int virtio_video_cmd_unsubscribe_event(struct virtio_video_device* vvd,
 int virtio_video_cmd_streamon(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, enum v4l2_buf_type type)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_STREAMON, 0,
 					     (void *)&type, sizeof(type), NULL);
 }
@@ -245,7 +245,7 @@ int virtio_video_cmd_streamon(struct virtio_video_device* vvd,
 int virtio_video_cmd_streamoff(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, enum v4l2_buf_type type)
 {
-	return virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	return virtio_video_v4l2_to_hab_sync(vvd, stream,
 					     VIRTIO_VIDEO_CMD_STREAMOFF, 0,
 					     (void *)&type, sizeof(type), NULL);
 }
@@ -266,7 +266,7 @@ int virtio_video_cmd_decoder_cmd(struct virtio_video_device* vvd,
 		goto err;
 	}
 
-	ret = virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id, cmd_type, 0, NULL, 0, NULL);
+	ret = virtio_video_v4l2_to_hab_sync(vvd, stream, cmd_type, 0, NULL, 0, NULL);
 
 err:
 	return ret;
@@ -288,7 +288,7 @@ int virtio_video_cmd_encoder_cmd(struct virtio_video_device* vvd,
 		goto err;
 	}
 
-	ret = virtio_video_v4l2_to_hab_sync(vvd, stream->stream_id,
+	ret = virtio_video_v4l2_to_hab_sync(vvd, stream,
 					    cmd_type, 0, NULL, 0, NULL);
 
 err:

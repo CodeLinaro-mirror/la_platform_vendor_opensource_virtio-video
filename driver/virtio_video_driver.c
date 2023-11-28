@@ -27,7 +27,6 @@
 
 #include "virtio_video.h"
 #include "virtio_video_msm_debug.h"
-#include "video_generated.h"
 
 #ifdef CONFIG_MSM_VIRTIO_HAB
 #include <linux/habmm.h>
@@ -373,8 +372,6 @@ static int __init msm_virtio_video_init(void)
 {
 	int ret = 0;
 	struct virtio_device *vdev = NULL;
-
-	vpr_h(VPR_TAG, "%s commit tip: %s\n", __func__, VIDEO_COMPILE_TIP);
 
 	vdev = virthab_get_vdev(MM_VID);
 	if (!vdev) {
