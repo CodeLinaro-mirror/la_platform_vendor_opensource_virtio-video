@@ -969,6 +969,8 @@ static int virtio_video_device_open(struct file *file)
 	struct video_device *video_dev = video_devdata(file);
 	struct virtio_video_device *vvd = video_drvdata(file);
 
+	vpr_h(VPR_TAG, "commit tip: \"%s\"\n", VIDEO_COMPILE_TIP);
+
 	ret = virtio_video_set_device_busy(vvd);
 	if (ret) {
 		vpr_e(vvd2str(vvd), "device already in use.\n");
@@ -1003,7 +1005,7 @@ static int virtio_video_device_open(struct file *file)
 	format = VIRTIO_VIDEO_FORMAT_H264;
 #endif
 	virtio_video_stream_id_get(vvd, stream, &stream_id);
-	trace_msm_virtio_video_device_open("START", stream_id);
+	trace_virt_vid_device_open(stream_id);
 
 	ret = virtio_video_cmd_stream_create(vvd, stream_id, format, name);
 	if (ret) {
@@ -1029,8 +1031,6 @@ static int virtio_video_device_open(struct file *file)
 #endif
 
 	mutex_init(&stream->vq_mutex);
-	mutex_init(&stream->client_lock);
-	mutex_init(&stream->lock);
 	v4l2_fh_init(&stream->fh, video_dev);
 #ifdef VIRTIO_VIDEO_MSM
 	if (video_dev->ctrl_handler) {
@@ -1071,7 +1071,6 @@ static int virtio_video_device_open(struct file *file)
 			goto err_init_ctrls;
 		}
 	}
-	trace_msm_virtio_video_device_open("END", stream_id);
 	return 0;
 
 err_init_ctrls:
@@ -1096,7 +1095,7 @@ static int virtio_video_device_release(struct file *file)
 	struct video_device *video_dev = video_devdata(file);
 	struct virtio_video_device *vvd = video_drvdata(file);
 
-	trace_msm_virtio_video_device_release("START", stream->stream_id);
+	trace_virt_vid_device_release(stream->stream_id);
 
 	mutex_lock(video_dev->lock);
 
@@ -1121,8 +1120,6 @@ static int virtio_video_device_release(struct file *file)
 	virtio_video_clear_device_busy(vvd, NULL);
 
 	mutex_unlock(video_dev->lock);
-
-	trace_msm_virtio_video_device_release("END", stream->stream_id);
 
 	return 0;
 }

@@ -180,14 +180,7 @@ int msm_v4l2_querycap(struct file *file, void *fh,
 	strlcpy(cap->bus_info, MSM_VIRTIO_VIDEO_BUS_NAME, sizeof(cap->bus_info));
 	cap->version = MSM_VIRTIO_VIDEO_VERSION << 16;
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_querycap(vvd, stream, cap);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -206,14 +199,7 @@ int msm_v4l2_enum_fmt(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_enum_fmt(vvd, stream, fmtdesc);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -231,14 +217,7 @@ int msm_v4l2_try_fmt(struct file *file, void *fh, struct v4l2_format *format)
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_try_fmt(vvd, stream, format);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	return ret;
 }
@@ -263,14 +242,7 @@ int msm_v4l2_s_fmt(struct file* file, void* fh,
 		      format->fmt.meta.buffersize);
 	}
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_s_fmt(vvd, stream, format);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -289,14 +261,7 @@ int msm_v4l2_g_fmt(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_g_fmt(vvd, stream, format);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret) {
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -326,14 +291,7 @@ int msm_v4l2_s_selection(struct file *file, void *fh,
 	vpr_h(stream2str(stream), "%s: type=%d, target=%d, flags=%#x\n",
 	      __func__, sel->type, sel->target, sel->flags);
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_s_selection(vvd, stream, sel);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -348,14 +306,7 @@ int msm_v4l2_g_selection(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_g_selection(vvd, stream, sel);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -375,14 +326,7 @@ int msm_v4l2_s_parm(struct file *file, void *fh,
 
 	vpr_h(stream2str(stream), "%s: type=%d\n", __func__, parm->type);
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_s_parm(vvd, stream, parm);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -397,14 +341,7 @@ int msm_v4l2_g_parm(struct file* file, void* fh,
 	struct virtio_video_device* vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_g_parm(vvd, stream, parm);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -418,22 +355,13 @@ int msm_v4l2_op_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct virtio_video_stream* stream = ctrl2stream(ctrl);
 	struct virtio_video_device* vvd = to_virtio_vd(stream->video_dev);
-	struct v4l2_control control;
+	struct v4l2_control control = {0};
 	int ret = 0;
-
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
 
 	control.id = ctrl->id;
 	ret = virtio_video_cmd_g_ctrl(vvd, stream, &control);
-	if (ret)
-		goto unlock;
-	ctrl->val = control.value;
-
-unlock:
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
+	if (!ret)
+		ctrl->val = control.value;
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed, ctrl_id=%#x, ctrl_value=%#x\n",
@@ -454,9 +382,6 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 	vpr_h(stream2str(stream), "%s: ctrl_id=%#x, ctrl_value=%#x\n",
 	      __func__, ctrl->id, ctrl->val);
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	control.id = ctrl->id;
 	control.value = ctrl->val;
 
@@ -472,10 +397,6 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 		stream->client_id = control.value;
 	}
 	ret = virtio_video_cmd_s_ctrl(vvd, stream, &control);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -494,29 +415,23 @@ int msm_v4l2_reqbufs(struct file *file, void *fh,
 	vpr_h(stream2str(stream), "%s: count=%d, type=%s, memory=%d\n",
 	      __func__, buf->count, v4l2_type_name(buf->type), buf->memory);
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	port = v4l2_type_to_driver_port(stream, buf->type, __func__);
 	if (port < 0) {
 		vpr_e(stream2str(stream), "%s: port not found for v4l2 type %s\n",
 		      __func__, v4l2_type_name(buf->type));
 		ret = -EINVAL;
-		goto unlock;
+		goto exit;
 	}
 
 	ret = vb2_reqbufs(stream->bufq[port].vb2q, buf);
 	if (ret) {
 		vpr_e(stream2str(stream), "%s: vb2_querybuf(%d) failed, %d\n",
 		      __func__, buf->type, ret);
-		goto unlock;
+		goto exit;
 	}
 	ret = virtio_video_cmd_reqbufs(vvd, stream, buf);
 
-unlock:
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
+exit:
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -531,14 +446,7 @@ int msm_v4l2_querybuf(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_querybuf(vvd, stream, buf);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -576,8 +484,8 @@ int msm_v4l2_qbuf(struct file *file, void *fh,
 
 	ret = vb2_qbuf(queue, vdev->v4l2_dev->mdev, buf);
 	if (!ret)
-		trace_msm_virtio_video_qbuf(stream->stream_id, v4l2_type_name(buf->type),
-					    buf->index, buf->flags);
+		trace_virt_vid_qbuf(stream->stream_id, buf->type,
+					        buf->index, buf->flags);
 
 exit:
 	put_inst(stream);
@@ -600,9 +508,6 @@ int msm_v4l2_dqbuf(struct file *file, void *fh,
 		return -EINVAL;
 	}
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	vpr_h(stream2str(stream), "%s: index=%d, type=%s, flags=%d\n",
 	      __func__, buf->index, v4l2_type_name(buf->type), buf->flags);
 
@@ -610,24 +515,19 @@ int msm_v4l2_dqbuf(struct file *file, void *fh,
 	if (!queue) {
 		vpr_e(stream2str(stream), "%s: failed to get vb2 queue", __func__);
 		ret = -EINVAL;
-		goto unlock;
+		goto exit;
 	}
 
 	ret = vb2_dqbuf(queue, buf, true);
-	if (ret == -EAGAIN) {
+	if (ret == -EAGAIN)
 		vpr_h(stream2str(stream), "%s: no more buffer to dequeue", __func__);
-		goto unlock;
-	} else if (ret) {
+	else if (ret)
 		vpr_e(stream2str(stream), "%s: failed with %d\n", __func__, ret);
-		goto unlock;
-	}
-	trace_msm_virtio_video_dqbuf(stream->stream_id, v4l2_type_name(buf->type),
-				     buf->index, buf->flags);
 
-unlock:
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
+	trace_virt_vid_dqbuf(stream->stream_id, buf->type,
+				         buf->index, buf->flags);
+
+exit:
 
 	return ret;
 }
@@ -708,23 +608,16 @@ int msm_v4l2_subscribe_event(struct v4l2_fh *fh,
 	stream = container_of(fh, struct virtio_video_stream, fh);
 	vvd = to_virtio_vd(stream->video_dev);
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_subscribe_event(vvd, stream, sub);
 	if (ret)
-		goto unlock;
+		goto exit;
 
 	if (vvd->type == VIRTIO_VIDEO_DEVICE_DECODER)
 		ret = msm_vdec_subscribe_event(stream, sub);
 	if (vvd->type == VIRTIO_VIDEO_DEVICE_ENCODER)
 		ret = msm_venc_subscribe_event(stream, sub);
 
-unlock:
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
-
+exit:
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
 	else
@@ -743,14 +636,8 @@ int msm_v4l2_unsubscribe_event(struct v4l2_fh *fh,
 
 	stream = container_of(fh, struct virtio_video_stream, fh);
 	vvd = to_virtio_vd(stream->video_dev);
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
 
 	ret = virtio_video_cmd_unsubscribe_event(vvd, stream, sub);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -767,13 +654,10 @@ int msm_v4l2_try_decoder_cmd(struct file *file, void *fh,
 	struct virtio_video_stream *stream = file2stream(file);
 	int ret = 0;
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	vpr_h(stream2str(stream), "%s: cmd %x\n", __func__, dec->cmd);
 	if (dec->cmd != V4L2_DEC_CMD_STOP && dec->cmd != V4L2_DEC_CMD_START) {
 		ret = -EINVAL;
-		goto unlock;
+		goto exit;
 	}
 
 	dec->flags = 0;
@@ -784,10 +668,7 @@ int msm_v4l2_try_decoder_cmd(struct file *file, void *fh,
 		dec->start.format = V4L2_DEC_START_FMT_NONE;
 	}
 
-unlock:
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
+exit:
 
 	return ret;
 }
@@ -799,17 +680,10 @@ int msm_v4l2_decoder_cmd(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	vpr_h(stream2str(stream), "%s: cmd=%s, flags=%#x\n",
 	      __func__, codec_cmd_name(dec->cmd), dec->flags);
 
 	ret = virtio_video_cmd_decoder_cmd(vvd, stream, dec);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -820,25 +694,16 @@ int msm_v4l2_decoder_cmd(struct file *file, void *fh,
 int msm_v4l2_try_encoder_cmd(struct file *file, void *fh,
 			     struct v4l2_encoder_cmd *enc)
 {
-	struct virtio_video_stream *stream = file2stream(file);
 	int ret = 0;
-
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
 
 	if (enc->cmd != V4L2_ENC_CMD_STOP && enc->cmd != V4L2_ENC_CMD_START) {
 		ret = -EINVAL;
-		goto unlock;
+		return ret;
 	}
 
 	enc->flags = 0;
 
-unlock:
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
-
-	return ret;
+	return 0;
 }
 
 int msm_v4l2_encoder_cmd(struct file *file, void *fh,
@@ -851,14 +716,7 @@ int msm_v4l2_encoder_cmd(struct file *file, void *fh,
 	vpr_h(stream2str(stream), "%s: cmd=%s, flags=%#x\n",
 	      __func__, codec_cmd_name(enc->cmd), enc->flags);
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_encoder_cmd(vvd, stream, enc);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -873,15 +731,7 @@ int msm_v4l2_enum_framesizes(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
-
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_enum_framesizes(vvd, stream, fsize);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
@@ -899,14 +749,7 @@ int msm_v4l2_enum_frameintervals(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
-	client_lock(stream, __func__);
-	inst_lock(stream, __func__);
-
 	ret = virtio_video_cmd_enum_frameintervals(vvd, stream, fival);
-
-	inst_unlock(stream, __func__);
-	client_unlock(stream, __func__);
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(stream2str(stream), "%s: failed", __func__);
