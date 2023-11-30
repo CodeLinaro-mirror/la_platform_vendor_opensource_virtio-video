@@ -1258,7 +1258,7 @@ static int virtio_video_parse_controls(struct virtio_video_device *vvd,
 		}
 
 		/* parse qmenu - replace count/offsets with pointers. */
-		if (new_config->type == V4L2_CTRL_TYPE_MENU)
+		if (is_priv_ctrl(config->id) && new_config->type == V4L2_CTRL_TYPE_MENU)
 			virtio_video_parse_qmenu((char*)new_config +
 						 new_config->qmenu_offset,
 						 new_config->size -
@@ -1354,18 +1354,6 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 	const struct v4l2_file_operations *fops;
 	void *input_resp_buf, *output_resp_buf;
 
-	output_resp_buf = kzalloc(vvd->max_caps_len, GFP_KERNEL);
-	if (!output_resp_buf)
-		return -ENOMEM;
-
-#ifndef MSM_HAB_NO_SUPPORT
-	ret = virtio_video_query_capability(vvd, output_resp_buf,
-					    VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
-	if (ret) {
-		vpr_e(vvd2str(vvd), "failed to get output caps\n");
-		goto err_output_cap;
-	}
-#endif
 #ifdef VIRTIO_VIDEO_MSM
 	msm_vidc_init_ops(vvd);
 	INIT_LIST_HEAD(&vvd->ctrl_config_list);
