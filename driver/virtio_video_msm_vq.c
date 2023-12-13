@@ -45,12 +45,12 @@ static int virtio_video_v4l2_to_hab(struct virtio_video_device* vvd,
 		ret = virtio_video_queue_cmd_buffer(vvd, vbuf);
 
 	if (ret)
-		vpr_e(stream2str(stream), "%s: %s cmd failed. %s-%s ret %d",
+		vpr_e(strm2tag(stream), "%s: %s cmd failed. %s-%s ret %d",
 		      __func__, sync ? "sync" : "async",
 		      cmd_to_string(cmd_type),
 		      cmd_to_string(sub_cmd_type), ret);
 	else
-		vpr_h(stream2str(stream), "%s: %s cmd done: %s-%s\n",
+		vpr_h(strm2tag(stream), "%s: %s cmd done: %s-%s\n",
 		      __func__, sync? "sync" : "async",
 		      cmd_to_string(cmd_type),
 		      cmd_to_string(sub_cmd_type));
@@ -197,7 +197,7 @@ int virtio_video_cmd_qbuf(struct virtio_video_device* vvd,
 int virtio_video_cmd_querybuf(struct virtio_video_device* vvd,
 	struct virtio_video_stream* stream, struct v4l2_buffer* buf)
 {
-	vpr_e(stream2str(stream), "%s: invalid ioctl command\n", __func__);
+	vpr_e(strm2tag(stream), "%s: invalid ioctl command\n", __func__);
 
 	return -EINVAL;
 }
@@ -261,7 +261,7 @@ int virtio_video_cmd_decoder_cmd(struct virtio_video_device* vvd,
 	} else if (dec->cmd == V4L2_DEC_CMD_STOP) {
 		cmd_type = VIRTIO_VIDEO_CMD_STREAM_DRAIN;
 	} else {
-		vpr_e(stream2str(stream), "%s: invalid decoder command: %d\n", __func__, dec->cmd);
+		vpr_e(strm2tag(stream), "%s: invalid decoder command: %d\n", __func__, dec->cmd);
 		ret = -EINVAL;
 		goto err;
 	}
@@ -283,7 +283,7 @@ int virtio_video_cmd_encoder_cmd(struct virtio_video_device* vvd,
 	} else if (enc->cmd == V4L2_ENC_CMD_STOP) {
 		cmd_type = VIRTIO_VIDEO_CMD_STREAM_DRAIN;
 	} else {
-		vpr_e(stream2str(stream), "%s: invalid encoder command: %d\n", __func__, enc->cmd);
+		vpr_e(strm2tag(stream), "%s: invalid encoder command: %d\n", __func__, enc->cmd);
 		ret = -EINVAL;
 		goto err;
 	}
@@ -299,7 +299,7 @@ int virtio_video_cmd_try_decoder_cmd(struct virtio_video_device* vvd,
 				     struct virtio_video_stream* stream,
 				     struct v4l2_decoder_cmd* dec)
 {
-	vpr_e(stream2str(stream), "%s: invalid ioctl command\n", __func__);
+	vpr_e(strm2tag(stream), "%s: invalid ioctl command\n", __func__);
 
 	return -EINVAL;
 }
@@ -308,7 +308,7 @@ int virtio_video_cmd_try_encoder_cmd(struct virtio_video_device* vvd,
 				     struct virtio_video_stream* stream,
 				     struct v4l2_encoder_cmd* enc)
 {
-	vpr_e(stream2str(stream), "%s: invalid ioctl command\n", __func__);
+	vpr_e(strm2tag(stream), "%s: invalid ioctl command\n", __func__);
 
 	return -EINVAL;
 }
@@ -317,7 +317,7 @@ int virtio_video_cmd_try_fmt(struct virtio_video_device* vvd,
 			     struct virtio_video_stream* stream,
 			     struct v4l2_format* format)
 {
-	vpr_e(stream2str(stream), "%s: invalid ioctl command\n", __func__);
+	vpr_e(strm2tag(stream), "%s: invalid ioctl command\n", __func__);
 
 	return -EINVAL;
 }

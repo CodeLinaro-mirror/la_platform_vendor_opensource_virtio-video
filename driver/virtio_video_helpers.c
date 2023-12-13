@@ -297,13 +297,13 @@ int msm_vmem_alloc(unsigned long size, void **mem, const char *msg)
 	struct virtio_video_device *vvd = NULL;
 
 	if (*mem) {
-		vpr_e(vvd2str(vvd), "%s: error: double alloc\n", msg);
+		vpr_e(vvd2tag(vvd), "%s: error: double alloc\n", msg);
 		rc = -EINVAL;
 	}
 
 	*mem = vzalloc(size);
 	if (!*mem) {
-		vpr_e(vvd2str(vvd), "allocation failed for %s\n", msg);
+		vpr_e(vvd2tag(vvd), "allocation failed for %s\n", msg);
 		rc = -ENOMEM;
 	}
 
@@ -332,7 +332,7 @@ int v4l2_type_to_driver_port(struct virtio_video_stream *stream, u32 type,
 	} else if (type == OUTPUT_META_PLANE) {
 		port = OUTPUT_META_PORT;
 	} else {
-		vpr_e(stream2str(stream), "%s: port not found for v4l2 type %d\n",
+		vpr_e(strm2tag(stream), "%s: port not found for v4l2 type %d\n",
 		      func, type);
 		port = -EINVAL;
 	}
