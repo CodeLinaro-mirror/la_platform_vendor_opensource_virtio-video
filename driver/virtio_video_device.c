@@ -861,15 +861,24 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 		v4l2_vb->flags |= V4L2_BUF_FLAG_PFRAME;
 
 	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_EOS) {
+#ifndef VIRTIO_VIDEO_MSM
 		v4l2_vb->flags |= V4L2_BUF_FLAG_LAST;
 		virtio_video_state_update(stream, STREAM_STATE_STOPPED);
-#ifndef VIRTIO_VIDEO_MSM
 		virtio_video_queue_eos_event(stream);
 #else
-		vpr_e(strm2tag(stream), "%s: vvd type %d eos %d.\n", __func__,
-		      vvd->type, stream->enable_eos_event);
-		if (stream->enable_eos_event)
+		virtio_video_state_update(stream, STREAM_STATE_STOPPED);
+
+		if (stream->enable_eos_event) {
+			vpr_h(strm2tag(stream), "%s: %s vb2 %p trigger EOS event", __func__,
+			      v4l2_type_name(vb2_queue->type), vb);
+
 			virtio_video_queue_eos_event(stream);
+		} else {
+			v4l2_vb->flags |= V4L2_BUF_FLAG_LAST;
+
+			vpr_h(strm2tag(stream), "%s: %s vb2 %p add EOS flag", __func__,
+			      v4l2_type_name(vb2_queue->type), vb);
+		}
 #endif
 	}
 
@@ -881,6 +890,11 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 			virtio_video_pending_buf_list_del(vvd, virtio_vb);
 
 		v4l2_m2m_buf_done(v4l2_vb, done_state);
+		vpr_h(strm2tag(stream), "%s %s %s vb2 %p done list empty %d\n",
+		      __func__, v4l2_type_name(vb2_queue->type),
+		     (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_EOS) ? "EOS": "ERR",
+		     vb, list_empty(&vb2_queue->done_list));
+
 		return;
 	}
 
@@ -917,6 +931,9 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 		virtio_video_pending_buf_list_del(vvd, virtio_vb);
 
 	v4l2_m2m_buf_done(v4l2_vb, done_state);
+	vpr_h(strm2tag(stream), "%s %s vb2 %p done list empty %d",
+	      __func__, v4l2_type_name(vb2_queue->type), vb,
+	      list_empty(&vb2_queue->done_list));
 }
 
 static int virtio_video_set_device_busy(struct virtio_video_device *vvd)

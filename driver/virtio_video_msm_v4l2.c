@@ -526,6 +526,10 @@ int msm_v4l2_dqbuf(struct file *file, void *fh, struct v4l2_buffer *buf)
 	else if (ret)
 		vpr_e(strm2tag(stream), "%s: failed with %d\n",
 		      __func__, ret);
+	else
+		vpr_h(strm2tag(stream), "%s: %s flags %#x %s done", __func__,
+		      v4l2_type_name(buf->type), buf->flags,
+		      buf->flags & V4L2_BUF_FLAG_LAST? "EOS":"");
 
 	trace_virt_vid_dqbuf(stream->stream_id, buf->type,
 	                     buf->index, buf->flags);
