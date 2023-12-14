@@ -790,22 +790,43 @@ void virtio_video_handle_error(struct virtio_video_stream *stream)
 {
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 
+#ifdef VIRTIO_VIDEO_MSM
+	//note the meta buffers must be released before data buffers,
+	//because only INPUT & OUTPUT type are registered for poll_wait
+	if (vvd->is_m2m_dev)
+		virtio_video_queue_release_buffers
+			(stream, VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META);
+
+	virtio_video_queue_release_buffers
+		(stream, VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT_META);
+#endif
+
 	if (vvd->is_m2m_dev)
 		virtio_video_queue_release_buffers
 			(stream, VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
 
 	virtio_video_queue_release_buffers
 		(stream, VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
+
 }
 
 int virtio_video_queue_release_buffers(struct virtio_video_stream *stream,
 				       enum virtio_video_queue_type queue_type)
 {
+#ifndef VIRTIO_VIDEO_MSM
 	int ret;
+#endif
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	struct vb2_v4l2_buffer *v4l2_vb;
 	struct virtio_video_buffer *vvb;
+#ifdef VIRTIO_VIDEO_MSM
+	struct virtio_video_buffer *vvb_tmp = NULL;
+	struct vb2_buffer *vb2 = NULL;
+	struct vb2_queue *vb2_queue = NULL;
+	struct virtio_video_stream *vb2_stream = NULL;
+#endif
 
+#ifndef VIRTIO_VIDEO_MSM
 	ret = virtio_video_cmd_queue_clear(vvd, stream, queue_type);
 	if (ret) {
 		vpr_e(vvd2tag(vvd), "failed to clear queue\n");
@@ -829,6 +850,35 @@ int virtio_video_queue_release_buffers(struct virtio_video_stream *stream,
 			break;
 		v4l2_m2m_buf_done(v4l2_vb, VB2_BUF_STATE_ERROR);
 	}
+#else
+	vpr_l(strm2tag(stream), "%s start queue_type %d\n",
+	      __func__, queue_type);
+	spin_lock(&vvd->pending_buf_list_lock);
+	if (list_empty(&vvd->pending_buf_list)) {
+		spin_unlock(&vvd->pending_buf_list_lock);
+		return 0;
+	}
+
+	list_for_each_entry_safe(vvb, vvb_tmp, &vvd->pending_buf_list, list) {
+		vpr_l(strm2tag(stream), "%s pop buffer vvb %p\n",
+		      __func__, vvb);
+		v4l2_vb = &vvb->v4l2_m2m_vb.vb;
+		vb2 = &v4l2_vb->vb2_buf;
+		vb2_queue = vb2->vb2_queue;
+		vb2_stream = vb2_get_drv_priv(vb2_queue);
+		if (stream->stream_id == vb2_stream->stream_id &&
+		    queue_type == to_virtio_queue_type(vb2->type) &&
+                    (vb2->state & VB2_BUF_STATE_ACTIVE) > 0) {
+			vpr_l(strm2tag(stream), "%s release %s vb2 %p state %#x",
+			      __func__, v4l2_type_name(vb2->type), vb2,
+			      vb2->state);
+			list_del(&vvb->list);
+			v4l2_m2m_buf_done(v4l2_vb, VB2_BUF_STATE_ERROR);
+		}
+	}
+	spin_unlock(&vvd->pending_buf_list_lock);
+	vpr_l(strm2tag(stream), "%s done %d\n", __func__, queue_type);
+#endif
 
 	return 0;
 }

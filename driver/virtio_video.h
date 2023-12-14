@@ -362,10 +362,21 @@ static inline struct virtio_video_buffer *to_virtio_vb(struct vb2_buffer *vb)
 static inline enum virtio_video_queue_type
 to_virtio_queue_type(enum v4l2_buf_type type)
 {
+#ifndef VIRTIO_VIDEO_MSM
 	if (V4L2_TYPE_IS_OUTPUT(type))
 		return VIRTIO_VIDEO_QUEUE_TYPE_INPUT;
 	else
 		return VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT;
+#else
+	if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
+		return VIRTIO_VIDEO_QUEUE_TYPE_INPUT;
+	else if (type == V4L2_BUF_TYPE_META_OUTPUT)
+		return VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META;
+	else if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
+		return VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT;
+	else //V4L2_BUF_TYPE_META_CAPTURE
+		return VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT_META;
+#endif
 }
 
 static inline bool within_range(uint32_t min, uint32_t val, uint32_t max)
