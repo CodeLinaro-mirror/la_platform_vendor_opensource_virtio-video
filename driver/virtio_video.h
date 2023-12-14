@@ -79,7 +79,7 @@ struct buf_export_cache {
 #define virtqueue_kick              msm_hab_virtqueue_kick
 #define virtqueue_add_inbuf         msm_hab_virtqueue_add_inbuf
 #define virtqueue_disable_cb(x)     {}
-#define virtqueue_is_broken(x)      (false)
+#define virtqueue_is_broken         msm_hab_virtqueue_is_broken
 #define virtqueue_enable_cb(x)      (true)
 
 #define TAG_MAX_LEN 32

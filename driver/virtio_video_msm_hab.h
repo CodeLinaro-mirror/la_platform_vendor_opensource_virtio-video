@@ -35,6 +35,7 @@ enum hab_virtqueue_type {
 
 struct hab_virtqueue {
 	struct virtqueue vq;
+	bool broken;
 	enum hab_virtqueue_type type;
 	spinlock_t qlock;
 	uint32_t habmm_handle;
@@ -68,7 +69,7 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		     struct irq_affinity *desc);
 void msm_hab_del_vqs(struct virtio_device *vdev);
 void msm_hab_start(struct virtio_device *vdev);
-
+bool msm_hab_virtqueue_is_broken(struct virtqueue *_vq);
 int msm_hab_virtqueue_add_inbuf(struct virtqueue *vq,
 				struct scatterlist sg[], unsigned int num,
 				void *data, gfp_t gfp);

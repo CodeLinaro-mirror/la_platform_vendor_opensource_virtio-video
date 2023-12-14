@@ -313,7 +313,12 @@ retry:
 		spin_lock_irqsave(&vvd->commandq.qlock, flags);
 		goto retry;
 	} else {
+#ifndef VIRTIO_VIDEO_MSM
 		virtqueue_kick(vq);
+#else
+		if(virtqueue_kick(vq) == false)
+			ret = -EIO;
+#endif
 	}
 
 	spin_unlock_irqrestore(&vvd->commandq.qlock, flags);

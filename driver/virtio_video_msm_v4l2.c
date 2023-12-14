@@ -40,6 +40,12 @@ static int msm_vdec_subscribe_event(struct virtio_video_stream* stream,
 		return -EINVAL;
 	}
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	vvd = to_virtio_vd(stream->video_dev);
 
 	switch (sub->type) {
@@ -53,8 +59,8 @@ static int msm_vdec_subscribe_event(struct virtio_video_stream* stream,
 		ret = v4l2_ctrl_subscribe_event(&stream->fh, sub);
 		break;
 	default:
-		vpr_e(strm2tag(stream), "%s: invalid type=%d id=%d\n", __func__,
-		      sub->type, sub->id);
+		vpr_e(strm2tag(stream), "%s: invalid type=%d id=%d\n",
+		      __func__, sub->type, sub->id);
 		ret = -EINVAL;
 	}
 
@@ -76,6 +82,12 @@ static int msm_venc_subscribe_event(struct virtio_video_stream* stream,
 		return -EINVAL;
 	}
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	vvd = to_virtio_vd(stream->video_dev);
 
 	switch (sub->type) {
@@ -89,8 +101,8 @@ static int msm_venc_subscribe_event(struct virtio_video_stream* stream,
 		ret = v4l2_src_change_event_subscribe(&stream->fh, sub);
 		break;
 	default:
-		vpr_e(strm2tag(stream), "%s: invalid type=%d id=%d\n", __func__,
-		      sub->type, sub->id);
+		vpr_e(strm2tag(stream), "%s: invalid type=%d id=%d\n",
+		      __func__, sub->type, sub->id);
 		ret = -EINVAL;
 	}
 
@@ -175,6 +187,12 @@ int msm_v4l2_querycap(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	strlcpy(cap->driver, MSM_VIRTIO_VIDEO_DRV_NAME, sizeof(cap->driver));
 	strlcpy(cap->bus_info, MSM_VIRTIO_VIDEO_BUS_NAME, sizeof(cap->bus_info));
 	cap->version = MSM_VIRTIO_VIDEO_VERSION << 16;
@@ -198,6 +216,12 @@ int msm_v4l2_enum_fmt(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	ret = virtio_video_cmd_enum_fmt(vvd, stream, fmtdesc);
 
 	if (ret && fmtdesc->index == 0)
@@ -218,6 +242,12 @@ int msm_v4l2_try_fmt(struct file *file, void *fh, struct v4l2_format *format)
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	ret = virtio_video_cmd_try_fmt(vvd, stream, format);
 
 	return ret;
@@ -229,6 +259,12 @@ int msm_v4l2_s_fmt(struct file* file, void* fh,
 	struct virtio_video_stream* stream = file2stream(file);
 	struct virtio_video_device* vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
+
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
 
 	if (V4L2_TYPE_IS_MULTIPLANAR(format->type)) {
 		vpr_h(strm2tag(stream), "%s: type=%d, width=%d, height=%d, pixelfmt=%#x, num_planes=%d, sizeimage=%d, bytesperline=%d\n",
@@ -262,6 +298,12 @@ int msm_v4l2_g_fmt(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	ret = virtio_video_cmd_g_fmt(vvd, stream, format);
 
 	if (ret) {
@@ -289,6 +331,12 @@ int msm_v4l2_s_selection(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	vpr_h(strm2tag(stream), "%s: type=%d, target=%d, flags=%#x\n",
 	      __func__, sel->type, sel->target, sel->flags);
 
@@ -306,6 +354,12 @@ int msm_v4l2_g_selection(struct file *file, void *fh,
 	struct virtio_video_stream *stream = file2stream(file);
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
+
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
 
 	ret = virtio_video_cmd_g_selection(vvd, stream, sel);
 
@@ -325,6 +379,12 @@ int msm_v4l2_s_parm(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	vpr_h(strm2tag(stream), "%s: type=%d\n", __func__, parm->type);
 
 	ret = virtio_video_cmd_s_parm(vvd, stream, parm);
@@ -342,6 +402,12 @@ int msm_v4l2_g_parm(struct file* file, void* fh,
 	struct virtio_video_device* vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	ret = virtio_video_cmd_g_parm(vvd, stream, parm);
 
 	if (ret)
@@ -358,6 +424,12 @@ int msm_v4l2_op_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 	struct virtio_video_device* vvd = to_virtio_vd(stream->video_dev);
 	struct v4l2_control control = {0};
 	int ret = 0;
+
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
 
 	control.id = ctrl->id;
 	ret = virtio_video_cmd_g_ctrl(vvd, stream, &control);
@@ -379,6 +451,12 @@ int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 	struct virtio_video_device* vvd = to_virtio_vd(stream->video_dev);
 	struct v4l2_control control;
 	int ret = 0;
+
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
 
 	vpr_h(strm2tag(stream), "%s: ctrl_id=%#x, ctrl_value=%#x\n",
 	      __func__, ctrl->id, ctrl->val);
@@ -412,6 +490,7 @@ int msm_v4l2_reqbufs(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int port = 0;
 	int ret = 0;
+	int rc = 0;
 
 	vpr_h(strm2tag(stream), "%s: count=%d, type=%s, memory=%d\n",
 	      __func__, buf->count, v4l2_type_name(buf->type), buf->memory);
@@ -430,12 +509,13 @@ int msm_v4l2_reqbufs(struct file *file, void *fh,
 		      __func__, buf->type, ret);
 		goto exit;
 	}
-	ret = virtio_video_cmd_reqbufs(vvd, stream, buf);
+
+	rc = virtio_video_cmd_reqbufs(vvd, stream, buf);
+	if (rc)
+		vpr_h(strm2tag(stream), "%s: failed, rc %d, ignore\n",
+		      __func__, rc);
 
 exit:
-
-	if (ret)
-		vpr_e(strm2tag(stream), "%s: failed", __func__);
 
 	return ret;
 }
@@ -447,19 +527,25 @@ int msm_v4l2_querybuf(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	ret = virtio_video_cmd_querybuf(vvd, stream, buf);
 
 	if (ret)
 		vpr_e(strm2tag(stream), "%s: failed", __func__);
 	else
 		vpr_h(strm2tag(stream), "%s: index=%d, type=%s, flags=%d\n",
-		      __func__, buf->index, v4l2_type_name(buf->type), buf->flags);
+		      __func__, buf->index,
+		      v4l2_type_name(buf->type), buf->flags);
 
 	return ret;
 }
 
-int msm_v4l2_qbuf(struct file *file, void *fh,
-		  struct v4l2_buffer *buf)
+int msm_v4l2_qbuf(struct file *file, void *fh, struct v4l2_buffer *buf)
 {
 	struct virtio_video_stream *stream = file2stream(file);
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
@@ -468,18 +554,26 @@ int msm_v4l2_qbuf(struct file *file, void *fh,
 	struct vb2_queue *queue = NULL;
 
 	if (!stream || !vvd || !buf || !is_valid_v4l2_buffer(buf, stream)) {
-		vpr_e(strm2tag(stream),"%s: invalid params %pK %pK\n", __func__,
-		      stream, buf);
+		vpr_e(strm2tag(stream),"%s: invalid params %pK %pK\n",
+		      __func__, stream, buf);
 		ret = -EINVAL;
 		goto exit;
 	}
 
-	vpr_h(strm2tag(stream), "%s: index=%d, type=%s, flags=%d\n",
-	      __func__, buf->index, v4l2_type_name(buf->type), buf->flags);
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		goto exit;
+	}
+
+	vpr_h(strm2tag(stream), "%s: %s(%d) idx %d flags %#x\n",
+	      __func__, v4l2_type_name(buf->type), buf->type,
+	      buf->index, buf->flags);
 
 	queue = msm_vidc_get_vb2q(stream, buf->type, __func__);
 	if (!queue) {
-		vpr_e(strm2tag(stream), "%s failed to find buffer queue\n", __func__);
+		vpr_e(strm2tag(stream), "%s failed to find buffer queue\n",
+		      __func__);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -487,10 +581,9 @@ int msm_v4l2_qbuf(struct file *file, void *fh,
 	ret = vb2_qbuf(queue, vdev->v4l2_dev->mdev, buf);
 	if (!ret)
 		trace_virt_vid_qbuf(stream->stream_id, buf->type,
-					        buf->index, buf->flags);
+		                    buf->index, buf->flags);
 
 exit:
-	put_inst(stream);
 
 	if (ret)
 		vpr_e(strm2tag(stream), "%s: failed", __func__);
@@ -541,8 +634,7 @@ exit:
 	return ret;
 }
 
-int msm_v4l2_streamon(struct file *file, void *fh,
-		      enum v4l2_buf_type type)
+int msm_v4l2_streamon(struct file *file, void *fh, enum v4l2_buf_type type)
 {
 	struct virtio_video_stream *stream = file2stream(file);
 	int port = 0;
@@ -553,6 +645,15 @@ int msm_v4l2_streamon(struct file *file, void *fh,
 		ret = -EINVAL;
 		goto exit;
 	}
+
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		ret = -EIO;
+		goto exit;
+	}
+
+	vpr_h(strm2tag(stream), "%s: %s\n", __func__, v4l2_type_name(type));
 
 	port = v4l2_type_to_driver_port(stream, type, __func__);
 	if (port < 0) {
@@ -569,13 +670,11 @@ int msm_v4l2_streamon(struct file *file, void *fh,
 	}
 
 exit:
-	put_inst(stream);
 
 	return ret;
 }
 
-int msm_v4l2_streamoff(struct file *file, void *fh,
-		       enum v4l2_buf_type type)
+int msm_v4l2_streamoff(struct file *file, void *fh, enum v4l2_buf_type type)
 {
 	struct virtio_video_stream *stream = file2stream(file);
 	int ret = 0;
@@ -586,6 +685,8 @@ int msm_v4l2_streamoff(struct file *file, void *fh,
 		ret = -EINVAL;
 		goto exit;
 	}
+
+	vpr_h(strm2tag(stream), "%s: %s\n", __func__, v4l2_type_name(type));
 
 	port = v4l2_type_to_driver_port(stream, type, __func__);
 	if (port < 0) {
@@ -602,7 +703,6 @@ int msm_v4l2_streamoff(struct file *file, void *fh,
 	}
 
 exit:
-	put_inst(stream);
 
 	return ret;
 }
@@ -616,6 +716,13 @@ int msm_v4l2_subscribe_event(struct v4l2_fh *fh,
 
 	stream = container_of(fh, struct virtio_video_stream, fh);
 	vvd = to_virtio_vd(stream->video_dev);
+
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		ret = -EIO;
+		goto exit;
+	}
 
 	ret = virtio_video_cmd_subscribe_event(vvd, stream, sub);
 	if (ret)
@@ -649,12 +756,12 @@ int msm_v4l2_unsubscribe_event(struct v4l2_fh *fh,
 	ret = virtio_video_cmd_unsubscribe_event(vvd, stream, sub);
 
 	if (ret)
-		vpr_e(strm2tag(stream), "%s: failed", __func__);
+		vpr_h(strm2tag(stream), "%s: failed, ignore", __func__);
 	else
 		vpr_h(strm2tag(stream), "%s: type=%d, id=%d, flags=%#x\n",
 		      __func__, sub->type, sub->id, sub->flags);
 
-	return ret;
+	return 0;
 }
 
 int msm_v4l2_try_decoder_cmd(struct file *file, void *fh,
@@ -663,7 +770,14 @@ int msm_v4l2_try_decoder_cmd(struct file *file, void *fh,
 	struct virtio_video_stream *stream = file2stream(file);
 	int ret = 0;
 
+    if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	vpr_h(strm2tag(stream), "%s: cmd %x\n", __func__, dec->cmd);
+
 	if (dec->cmd != V4L2_DEC_CMD_STOP && dec->cmd != V4L2_DEC_CMD_START) {
 		ret = -EINVAL;
 		goto exit;
@@ -689,6 +803,12 @@ int msm_v4l2_decoder_cmd(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	vpr_h(strm2tag(stream), "%s: cmd=%s, flags=%#x\n",
 	      __func__, codec_cmd_name(dec->cmd), dec->flags);
 
@@ -704,6 +824,13 @@ int msm_v4l2_try_encoder_cmd(struct file *file, void *fh,
 			     struct v4l2_encoder_cmd *enc)
 {
 	int ret = 0;
+	struct virtio_video_stream *stream = file2stream(file);
+
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
 
 	if (enc->cmd != V4L2_ENC_CMD_STOP && enc->cmd != V4L2_ENC_CMD_START) {
 		ret = -EINVAL;
@@ -721,6 +848,12 @@ int msm_v4l2_encoder_cmd(struct file *file, void *fh,
 	struct virtio_video_stream *stream = file2stream(file);
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
+
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
 
 	vpr_h(strm2tag(stream), "%s: cmd=%s, flags=%#x\n",
 	      __func__, codec_cmd_name(enc->cmd), enc->flags);
@@ -740,6 +873,12 @@ int msm_v4l2_enum_framesizes(struct file *file, void *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
+
 	ret = virtio_video_cmd_enum_framesizes(vvd, stream, fsize);
 
 	if (ret)
@@ -757,6 +896,12 @@ int msm_v4l2_enum_frameintervals(struct file *file, void *fh,
 	struct virtio_video_stream *stream = file2stream(file);
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	int ret = 0;
+
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
 
 	ret = virtio_video_cmd_enum_frameintervals(vvd, stream, fival);
 

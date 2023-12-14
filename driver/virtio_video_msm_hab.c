@@ -51,6 +51,13 @@ static void stop_event_handler(struct hab_virtqueue* hvq);
 		spin_unlock(&hvq->qlock); \
 }
 
+bool virtqueue_is_broken(struct virtqueue *vq)
+{
+	struct hab_virtqueue * hvq = to_hab_vq(vq);
+
+	return READ_ONCE(hvq->broken);
+};
+
 static int attach_buf_to_vq_buf(struct hab_virtqueue *hvq,
                                 struct hab_list *ls, void *data)
 {
@@ -271,34 +278,49 @@ static int process_msm_hab_evt_resp(struct hab_virtqueue *hvq, void *data)
 	return ret;
 }
 
-static int virtio_video_hab_resp_handler(void* p)
+static void *get_one_evt_buf(struct hab_virtqueue *hvq, const int max_retry)
 {
-	struct hab_virtqueue* hvq = p;
 	struct virtio_video_device* vvd = hvq->vq.vdev->priv;
+	void *msg = NULL;
+	int retry = 0;
+
+	while (list_empty(&hvq->vbuf_list.list) && retry > max_retry) {
+		vpr_e(vvd2tag(vvd), "%s: no avail event buf, retry %d\n",
+		      __func__, retry);
+		usleep_range(20, 100);
+		retry++;
+		trace_hab_resp_evt_dq_vqbuf_err(hvq->vbuf_list.count);
+	}
+	msg = unattach_buf_from_vq_buf(hvq, &hvq->vbuf_list);
+
+	return msg;
+}
+
+static int virtio_video_hab_resp_handler(void *p)
+{
+	struct hab_virtqueue *hvq = p;
+	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
+	struct virtio_video_event *evt = NULL;
+	struct virtio_video_stream *stream = NULL;
 	const char *vq_name = hvq->vq.name;
 	uint8_t buf[MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE] = {0};
 	int size_bytes = 0;
 	void *msg = NULL;
 	int ret = 0;
-	int retry = 0;
+	int stream_id = 0;
 
 	vpr_h(vvd2tag(vvd), "%s %s: start\n", vq_name, __func__);
 
 	while (!kthread_should_stop()) {
+		evt = NULL;
+		msg = NULL;
+
 		if (hvq->type == MSM_VIRTQ_EVT_TYPE) {
 			vpr_l(vvd2tag(vvd), "%s %s: wait to recv, vbuf_list=%d\n",
 			      vq_name, __func__, hvq->vbuf_list.count);
 			trace_hab_resp_evt_dq_vqbuf(hvq->vbuf_list.count);
-
-			retry = MAX_RETRY_FOR_GET_EVT_BUF;
-			while (list_empty(&hvq->vbuf_list.list) && retry > 0) {
-				vpr_e(vvd2tag(vvd), "%s: no avail event buf, retry cnt down: %d\n",
-				      __func__, retry);
-				usleep_range(20, 100);
-				retry--;
-				trace_hab_resp_evt_dq_vqbuf_err(hvq->vbuf_list.count);
-			}
-			msg = unattach_buf_from_vq_buf(hvq, &hvq->vbuf_list);
+			msg = get_one_evt_buf(hvq, MAX_RETRY_FOR_GET_EVT_BUF);
+			evt = msg;
 			if (unlikely(!msg)) {
 				vpr_e(vvd2tag(vvd), "%s %s: unable get event buf\n",
 				      vq_name, __func__);
@@ -354,8 +376,26 @@ static int virtio_video_hab_resp_handler(void* p)
 
 exit:
 	return 0;
+
 err:
+	WRITE_ONCE(hvq->broken, true);
 	vpr_e(vvd2tag(vvd), "%s %s: exited. error %d\n", vq_name, __func__, ret);
+	//for commandq, commands will wait until timeout; no specific handling here
+	//for eventq, sending out error event
+	if (hvq->type == MSM_VIRTQ_EVT_TYPE)
+		if (msg)
+			attach_buf_to_vq_buf(hvq, &hvq->vbuf_list, msg);
+
+		idr_for_each_entry(&vvd->stream_idr, stream, stream_id) {
+		evt = get_one_evt_buf(hvq, 100 * MAX_RETRY_FOR_GET_EVT_BUF);
+		if (evt) {
+			vpr_h(vvd2tag(vvd), "%s %s: to send error event, resp_list=%d\n",
+			      vq_name, __func__, hvq->resp_list.count);
+			evt->event_type = VIRTIO_VIDEO_EVENT_ERROR;
+			evt->stream_id = stream_id;
+			process_msm_hab_evt_resp(hvq, msg);
+		}
+	}
 	msm_hab_del_vqs(hvq->vq.vdev);
 	return ret;
 }
@@ -489,16 +529,26 @@ bool msm_hab_virtqueue_kick(struct virtqueue *vq)
 {
 	struct hab_virtqueue * hvq = to_hab_vq(vq);
 	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
+	struct virtio_video_stream *stream = NULL;
 	uint32_t habmm_handle = hvq->habmm_handle;
 	struct virtio_video_msg *msg = NULL;
 	struct virtio_video_vbuffer *vbuf = NULL;
 	unsigned long flags = 0L;
 	char *tag = vvd2tag(vvd);
+	int stream_id = 0;
 	int ret = 0;
 
 	if (hvq->type == MSM_VIRTQ_CMD_TYPE) {
+		if (unlikely(READ_ONCE(hvq->broken)))
+			goto err;
+
 		vbuf = unattach_buf_from_vq_buf(hvq, &hvq->vbuf_list);
+		spin_unlock_irqrestore(&vvd->commandq.qlock, flags);
+
 		msg = (struct virtio_video_msg *)vbuf->buf;
+		stream_id = msg->hdr.stream_id;
+		stream = idr_find(&vvd->stream_idr, stream_id);
+		tag = strm2tag(stream);
 
 		vpr_h(tag, "%s: socket 0x%x: type %s, stream_id %d, %d %d %d\n",
 		      __func__, habmm_handle,
@@ -506,18 +556,25 @@ bool msm_hab_virtqueue_kick(struct virtqueue *vq)
 		      msg->hdr.stream_id, vbuf->size,
 		      vbuf->data_size, vbuf->resp_size);
 
-		spin_unlock_irqrestore(&vvd->commandq.qlock, flags);
-
 		ret = habmm_socket_send(habmm_handle, msg, sizeof(*msg), 0);
+		if (ret) {
+			WRITE_ONCE(hvq->broken, true);
+
+			vpr_e(tag, "%s: habmm_socket_send failed %d\n",
+			      __func__, ret);
+		}
 
 		spin_lock_irqsave(&vvd->commandq.qlock, flags);
 
 		if (ret)
-			vpr_e(tag, "%s: habmm_socket_send failed %d\n",
-			      __func__, ret);
+			goto err;
 	}
 
 	return true;
+
+err:
+	vpr_e(tag, "%s: vq broken, skip", __func__);
+	return false;
 }
 
 void msm_hab_sg_init_one(struct scatterlist *sg, const void *buf,
@@ -572,6 +629,9 @@ int msm_hab_virtqueue_add_sgs(struct virtqueue *vq, struct scatterlist *sgs[],
 	struct hab_vq_buffer *vq_buf = NULL;
 	struct virtio_video_device *vvd = vq->vdev->priv;
 
+	if (unlikely(READ_ONCE(hvq->broken))) {
+		return -EIO;
+	}
 	hvq_event_lock();
 	vq_buf = list_first_entry_or_null(&hvq->unused_vq_buf_list.list,
 	                                  struct hab_vq_buffer, list);
