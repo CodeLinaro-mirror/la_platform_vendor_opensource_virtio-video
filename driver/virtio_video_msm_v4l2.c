@@ -110,12 +110,6 @@ static int get_poll_flags(struct virtio_video_stream *stream,
 	unsigned long flags = 0;
 	struct virtio_video_device *vvd = NULL;
 
-	if (!stream || port >= MAX_PORT) {
-		vpr_e(vvd2tag(vvd), "%s: invalid params, inst %pK, port %d\n",
-		      __func__, stream, port);
-		return -EINVAL;
-	}
-
 	q = stream->bufq[port].vb2q;
 	vvd = to_virtio_vd(stream->video_dev);
 
@@ -133,10 +127,10 @@ static int get_poll_flags(struct virtio_video_stream *stream,
 	}
 	spin_unlock_irqrestore(&q->done_lock, flags);
 
-	if (poll)
-		vpr_l(strm2tag(stream), "%s: got poll %#x for port %d vb %p vb->state %d empty %d\n",
-		      __func__, poll, port, vb, vb ? vb->state: 0,
-		      list_empty(&q->done_list));
+	vpr_l(strm2tag(stream), "%s: poll=%#x for port=%d vb2 %p state=%d empty %d\n",
+	      __func__, poll, port, vb,
+	      vb ? vb->state: 0,
+	      list_empty(&q->done_list));
 
 	return poll;
 }
@@ -144,7 +138,7 @@ static int get_poll_flags(struct virtio_video_stream *stream,
 unsigned int msm_v4l2_poll(struct file *file, struct poll_table_struct *pt)
 {
 	struct virtio_video_stream* stream = file2stream(file);
-	int poll = 0;
+	int poll = 0, poll_in = 0, poll_out = 0;
 
 	if (!stream || is_session_error(stream)) {
 		vpr_e(strm2tag(stream), "%s: invalid stream\n", __func__);
@@ -152,21 +146,24 @@ unsigned int msm_v4l2_poll(struct file *file, struct poll_table_struct *pt)
 	}
 
 	poll_wait(file, &stream->fh.wait, pt);
-	poll_wait(file, &stream->bufq[INPUT_META_PORT].vb2q->done_wq, pt);
-	poll_wait(file, &stream->bufq[OUTPUT_META_PORT].vb2q->done_wq, pt);
 	poll_wait(file, &stream->bufq[INPUT_PORT].vb2q->done_wq, pt);
 	poll_wait(file, &stream->bufq[OUTPUT_PORT].vb2q->done_wq, pt);
 
 	if (v4l2_event_pending(&stream->fh))
 		poll |= POLLPRI;
 
-	poll |= get_poll_flags(stream, INPUT_META_PORT);
-	poll |= get_poll_flags(stream, OUTPUT_META_PORT);
-	poll |= get_poll_flags(stream, INPUT_PORT);
-	poll |= get_poll_flags(stream, OUTPUT_PORT);
+	poll_in   = get_poll_flags(stream, INPUT_PORT);
+	if (poll_in)
+		poll_in  &= get_poll_flags(stream, INPUT_META_PORT);
 
-	if (poll)
-		vpr_h(strm2tag(stream), "%s: return poll=%#x\n", __func__, poll);
+	poll_out  = get_poll_flags(stream, OUTPUT_PORT);
+	if (poll_out)
+		poll_out &= get_poll_flags(stream, OUTPUT_META_PORT);
+
+	poll = poll | poll_in | poll_out;
+
+	vpr_l(strm2tag(stream), "%s: return poll=%#x, poll_in=%#x, poll_out=%#x\n",
+	      __func__, poll, poll_in, poll_out);
 
 	return poll;
 }
@@ -469,7 +466,8 @@ int msm_v4l2_qbuf(struct file *file, void *fh,
 	struct vb2_queue *queue = NULL;
 
 	if (!stream || !vvd || !buf || !is_valid_v4l2_buffer(buf, stream)) {
-		vpr_e(strm2tag(stream),"%s: invalid params %pK %pK\n", __func__, stream, buf);
+		vpr_e(strm2tag(stream),"%s: invalid params %pK %pK\n", __func__,
+		      stream, buf);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -498,36 +496,39 @@ exit:
 	return ret;
 }
 
-int msm_v4l2_dqbuf(struct file *file, void *fh,
-		   struct v4l2_buffer *buf)
+int msm_v4l2_dqbuf(struct file *file, void *fh, struct v4l2_buffer *buf)
 {
 	struct virtio_video_stream *stream = file2stream(file);
 	struct vb2_queue *queue = NULL;
 	int ret = 0;
 
 	if (!stream || !buf || !is_valid_v4l2_buffer(buf, stream)) {
-		vpr_e(strm2tag(stream),"%s: invalid params %pK %pK\n", __func__, stream, buf);
+		vpr_e(strm2tag(stream),"%s: invalid params %pK %pK\n",
+		      __func__, stream, buf);
 		return -EINVAL;
 	}
 
-	vpr_h(strm2tag(stream), "%s: index=%d, type=%s, flags=%d\n",
-	      __func__, buf->index, v4l2_type_name(buf->type), buf->flags);
+	vpr_l(strm2tag(stream), "%s: %s flags %#x start\n",
+	      __func__, v4l2_type_name(buf->type), buf->flags);
 
 	queue = msm_vidc_get_vb2q(stream, buf->type, __func__);
 	if (!queue) {
-		vpr_e(strm2tag(stream), "%s: failed to get vb2 queue", __func__);
+		vpr_e(strm2tag(stream), "%s: failed to get vb2 queue",
+		      __func__);
 		ret = -EINVAL;
 		goto exit;
 	}
 
 	ret = vb2_dqbuf(queue, buf, true);
 	if (ret == -EAGAIN)
-		vpr_h(strm2tag(stream), "%s: no more buffer to dequeue", __func__);
+		vpr_h(strm2tag(stream), "%s: no more buffer to dequeue",
+		      __func__);
 	else if (ret)
-		vpr_e(strm2tag(stream), "%s: failed with %d\n", __func__, ret);
+		vpr_e(strm2tag(stream), "%s: failed with %d\n",
+		      __func__, ret);
 
 	trace_virt_vid_dqbuf(stream->stream_id, buf->type,
-				         buf->index, buf->flags);
+	                     buf->index, buf->flags);
 
 exit:
 
