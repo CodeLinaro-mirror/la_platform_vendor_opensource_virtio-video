@@ -200,8 +200,10 @@ int msm_v4l2_enum_fmt(struct file *file, void *fh,
 
 	ret = virtio_video_cmd_enum_fmt(vvd, stream, fmtdesc);
 
-	if (ret)
+	if (ret && fmtdesc->index == 0)
 		vpr_e(strm2tag(stream), "%s: failed", __func__);
+	else if (ret && fmtdesc->index && !fmtdesc->pixelformat)
+		vpr_h(strm2tag(stream), "%s: last", __func__);
 	else
 		vpr_h(strm2tag(stream), "%s: index=%#x, type=%#x, flags=%#x, pixelformat=%#x, description=%s\n",
 		      __func__, fmtdesc->index, fmtdesc->type, fmtdesc->flags,
