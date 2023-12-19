@@ -14,7 +14,7 @@
 #include "virtio_video.h"
 
 #define SESSION_ERROR -1
-#define DEFAULT_VQ_NUM 128
+#define DEFAULT_VQ_NUM 512
 
 #define HVQ_NUM 2
 #define COMMANDQ 0
