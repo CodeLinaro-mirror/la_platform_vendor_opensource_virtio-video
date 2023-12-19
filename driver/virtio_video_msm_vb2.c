@@ -178,7 +178,7 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 	int ret = 0;
 	struct virtio_video_stream *stream = NULL;
 	struct virtio_video_device* vvd = NULL;
-	enum virtio_video_queue_type queue_type = 0;
+	enum virtio_video_queue_type virtio_queue_type = 0;
 
 	if (!queue || !queue->drv_priv) {
 		vpr_e(vvd2tag(vvd), "%s: invalid input, queue %pK, stream %pK\n", __func__,
@@ -188,7 +188,7 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 
 	stream = queue->drv_priv;
 	vvd = to_virtio_vd(stream->video_dev);
-	queue_type = to_virtio_queue_type(queue->type);
+	virtio_queue_type = to_virtio_queue_type(queue->type);
 
 	if (!is_decode_session(vvd) && !is_encode_session(vvd)) {
 		vpr_e(strm2tag(stream), "%s: unsupported session type %d\n",
@@ -196,38 +196,43 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 		goto exit;
 	}
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: %s in session error state\n",
+		      __func__, v4l2_type_name(queue->type));
+		ret = -EIO;
+		goto session_err;
+	}
+
 	if (queue->type == INPUT_META_PLANE || queue->type == OUTPUT_META_PLANE)
-		goto wait;
+		goto wait_vb2;
 
 	ret = virtio_video_cmd_streamoff(vvd, stream, queue->type);
 
-	if (ret)
-		vpr_h(strm2tag(stream), "%s: streamoff %s failed %d, ignore\n",
+session_err:
+	if (ret) {
+		vpr_h(strm2tag(stream), "%s: streamoff %s failed %d, to release buffers\n",
 		      __func__, v4l2_type_name(queue->type), ret);
 
-wait:
-	vpr_e(strm2tag(stream), "%s: to release buffers %s",
-	      __func__, v4l2_type_name(queue->type));
+		if (queue->type == INPUT_MPLANE)
+			virtio_video_queue_release_buffers(stream,
+			               VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META);
+		else if (queue->type == OUTPUT_MPLANE)
+			virtio_video_queue_release_buffers(stream,
+			               VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT_META);
 
-	if (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT)
-		virtio_video_queue_release_buffers(stream,
-				VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META);
-	else if (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT)
-		virtio_video_queue_release_buffers(stream,
-				VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT_META);
+		virtio_video_queue_release_buffers(stream, virtio_queue_type);
+	}
 
-	virtio_video_queue_release_buffers(stream, queue_type);
-	vpr_e(strm2tag(stream), "%s: wait for all buffers %s",
-	      __func__, v4l2_type_name(queue->type));
+wait_vb2:
 	ret = vb2_wait_for_all_buffers(queue);
 	if (ret)
 		vpr_e(strm2tag(stream), "%s: failed for waitting %s buffer done %d\n",
 		      __func__, v4l2_type_name(queue->type), ret);
-	else
-		vpr_h(strm2tag(stream), "%s: all %s buffer done\n", __func__,
-		      v4l2_type_name(queue->type));
 
 exit:
+	vpr_h(strm2tag(stream), "%s: %s done\n", __func__,
+	      v4l2_type_name(queue->type));
+
 	return;
 }
 
