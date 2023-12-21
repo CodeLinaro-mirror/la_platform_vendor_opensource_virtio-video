@@ -51,7 +51,7 @@ static void stop_event_handler(struct hab_virtqueue* hvq);
 		spin_unlock(&hvq->qlock); \
 }
 
-bool virtqueue_is_broken(struct virtqueue *vq)
+bool msm_hab_virtqueue_is_broken(struct virtqueue *vq)
 {
 	struct hab_virtqueue * hvq = to_hab_vq(vq);
 

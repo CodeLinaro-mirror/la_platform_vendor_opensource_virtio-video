@@ -317,15 +317,8 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 	virtio_vb->queued = true;
 	virtio_vb->resource_id = export_id[0];
 
-	spin_lock(&vvd->pending_buf_list_lock);
-
+	virtio_video_pending_buf_list_add(vvd, virtio_vb);
 	ret = virtio_video_cmd_qbuf(vvd, stream, pb, virtio_vb);
-	if (ret)
-		vpr_e(strm2tag(stream), "%s qbuf err ret=%d", __func__, ret);
-	else
-		list_add_tail(&virtio_vb->list, &vvd->pending_buf_list);
-
-	spin_unlock(&vvd->pending_buf_list_lock);
 
 unexport:
 	if (ret) {
