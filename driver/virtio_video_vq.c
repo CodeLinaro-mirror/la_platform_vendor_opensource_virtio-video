@@ -372,18 +372,6 @@ static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 	return 0;
 }
 
-static void virtio_video_buf_done_per_port(struct done_buffer *buffers, int port)
-{
-	struct virtio_video_buffer *virtio_vb = NULL;
-	uint32_t flags = 0;
-	uint64_t timestamp = 0;
-
-	virtio_vb = buffers[port].virtio_vb;
-	flags = buffers[port].flags;
-	timestamp = buffers[port].timestamp;
-	virtio_video_buf_done(virtio_vb, flags, timestamp, NULL);
-}
-
 static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
                                          struct virtio_video_event *evt)
 {
@@ -396,8 +384,6 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 	struct vb2_buffer *vb = NULL;
 	int plane = 0;
 	uint32_t export_id = 0;
-	struct done_buffer *buffers = stream->buffers;
-	int port = 0;
 
 	v4l2_buf = (struct v4l2_buffer*)evt->payload;
 
@@ -454,28 +440,16 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 		}
 
 		vpr_h(strm2tag(stream), "%s: %s %s idx %d export_id %d flags %#x vb2 %p\n",
-		      __func__, event2str(event_type), v4l2_type_name(v4l2_buf->type),
+		      __func__, event2str(event_type),
+		      v4l2_type_name(v4l2_buf->type),
 		      v4l2_buf->index, export_id, v4l2_buf->flags, vb);
-
-		port = v4l2_type_to_driver_port(stream, v4l2_buf->type, __func__);
-		buffers[port].virtio_vb = virtio_vb;
-		buffers[port].flags = v4l2_buf->flags;
-		buffers[port].timestamp = v4l2_buffer_get_timestamp(v4l2_buf);
 
 		if (event_type == VIRTIO_VIDEO_EVENT_EBD)
 			msm_buf_put_export_id(stream, export_id);
 
-		if (buffers[INPUT_PORT].virtio_vb && buffers[INPUT_META_PORT].virtio_vb) {
-			virtio_video_buf_done_per_port(buffers, INPUT_META_PORT);
-			buffers[INPUT_META_PORT].virtio_vb = NULL;
-			virtio_video_buf_done_per_port(buffers, INPUT_PORT);
-			buffers[INPUT_PORT].virtio_vb = NULL;
-		} else if (buffers[OUTPUT_PORT].virtio_vb && buffers[OUTPUT_META_PORT].virtio_vb) {
-			virtio_video_buf_done_per_port(buffers, OUTPUT_META_PORT);
-			buffers[OUTPUT_META_PORT].virtio_vb = NULL;
-			virtio_video_buf_done_per_port(buffers, OUTPUT_PORT);
-			buffers[OUTPUT_PORT].virtio_vb = NULL;
-		}
+		virtio_video_buf_done(virtio_vb, v4l2_buf->flags,
+		                      v4l2_buffer_get_timestamp(v4l2_buf),
+		                      NULL);
 	}
 }
 
