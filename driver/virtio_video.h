@@ -98,12 +98,6 @@ struct virtio_video_ctrl_entry {
 	struct virtio_video_ctrl_config *config;
 };
 
-struct done_buffer {
-	struct virtio_video_buffer *virtio_vb;
-	uint32_t flags;
-	uint64_t timestamp;
-};
-
 #endif
 
 struct video_format_frame {
@@ -227,7 +221,6 @@ struct virtio_video_stream {
 	struct buf_queue bufq[MAX_PORT];
 	struct buf_export_cache buf_cache;
 	bool enable_eos_event;
-	struct done_buffer buffers[MAX_PORT];
 	uint32_t client_id;
 	uint32_t codec;
 	uint32_t domain;
