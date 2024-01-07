@@ -17,6 +17,11 @@
 #define spin_unlock_irqrestore(a, b)   {spin_unlock(a); b = 0;}
 #endif
 
+struct hab_list {
+	struct list_head list;
+	int32_t count;
+};
+
 struct hab_vq_buffer {
 	void* buf;
 	struct list_head list;
@@ -33,15 +38,22 @@ struct hab_virtqueue {
 	enum hab_virtqueue_type type;
 	spinlock_t qlock;
 	uint32_t habmm_handle;
-	struct list_head vbuf_list;
-	struct list_head resp_list;
-	struct list_head unused_vq_buf_list;
+	struct hab_list vbuf_list;
+	struct hab_list resp_list;
+	struct hab_list unused_vq_buf_list;
 	struct task_struct* resp_thread;
 };
 
 static inline struct hab_virtqueue *to_hab_vq(struct virtqueue *_vq)
 {
 	return container_of(_vq, struct hab_virtqueue, vq);
+}
+
+static inline uint32_t get_habmm_handle(struct virtio_video_stream *stream)
+{
+	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
+	struct hab_virtqueue *hvq = to_hab_vq(vvd->commandq.vq);
+	return hvq->habmm_handle;
 }
 
 int msm_hab_vdev_init(struct virtio_device *vdev);

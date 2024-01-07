@@ -62,7 +62,7 @@ struct buf_export_entry {
 	struct list_head list;
 	uint64_t inode;
 	uint32_t size;
-	uint32_t buffer_id;
+	uint32_t export_id;
 	enum virtio_video_queue_type buf_type;
 };
 
@@ -221,8 +221,6 @@ struct virtio_video_stream {
 #ifdef VIRTIO_VIDEO_MSM
 	struct v4l2_format fmts[MAX_PORT];
 	struct buf_queue bufq[MAX_PORT];
-	struct mutex client_lock;
-	struct mutex lock;
 	struct buf_export_cache buf_cache;
 	bool enable_eos_event;
 	struct done_buffer buffers[MAX_PORT];
@@ -386,10 +384,6 @@ void virtio_video_state_update(struct virtio_video_stream *stream,
 int virtio_video_alloc_vbufs(struct virtio_video_device *vvd);
 void virtio_video_free_vbufs(struct virtio_video_device *vvd);
 int virtio_video_alloc_events(struct virtio_video_device *vvd);
-bool virtio_video_vbuf_is_pending(struct virtio_video_device *vvd,
-			    struct virtio_video_vbuffer *vbuf);
-void virtio_video_free_vbuf(struct virtio_video_device *vvd,
-		      struct virtio_video_vbuffer *vbuf);
 
 int virtio_video_device_init(struct virtio_video_device *vvd);
 void virtio_video_device_deinit(struct virtio_video_device *vvd);
@@ -570,26 +564,6 @@ static inline bool is_encode_session(struct virtio_video_device* vvd)
 static inline bool is_session_error(struct virtio_video_stream* stream)
 {
 	return virtio_video_state(stream) == STREAM_STATE_ERROR;
-}
-
-static inline void inst_lock(struct virtio_video_stream* inst, const char* function)
-{
-	mutex_lock(&inst->lock);
-}
-
-static inline void inst_unlock(struct virtio_video_stream* inst, const char* function)
-{
-	mutex_unlock(&inst->lock);
-}
-
-static inline void client_lock(struct virtio_video_stream* inst, const char* function)
-{
-	mutex_lock(&inst->client_lock);
-}
-
-static inline void client_unlock(struct virtio_video_stream* inst, const char* function)
-{
-	mutex_unlock(&inst->client_lock);
 }
 
 int virtio_video_pending_buf_list_add(struct virtio_video_device* vvd,

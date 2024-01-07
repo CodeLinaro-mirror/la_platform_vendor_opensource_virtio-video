@@ -371,19 +371,18 @@ static struct virtio_device* vdec = NULL;
 static int __init msm_virtio_video_init(void)
 {
 	int ret = 0;
-	struct virtio_device* vdev = NULL;
-	struct virtio_video_device *vvd = NULL;
+	struct virtio_device *vdev = NULL;
 
 	vdev = virthab_get_vdev(MM_VID);
 	if (!vdev) {
-		vpr_e(vvd2str(vvd), "failed to get vdev for video\n");
+		vpr_e(VPR_TAG, "failed to get vdev for video\n");
 		ret = -ENODEV;
 		goto err;
 	}
 
 	ret = register_virtio_driver(&virtio_video_driver);
 	if (ret) {
-		vpr_e(vvd2str(vvd), "%s: virtio video driver registration failed\n", __func__);
+		vpr_e(VPR_TAG, "%s: driver registration failed\n", __func__);
 		goto err;
 	}
 
@@ -394,11 +393,11 @@ static int __init msm_virtio_video_init(void)
 		vdec->id.vendor = VIRTIO_DEV_ANY_ID;
 		vdec->dev.parent = &vdev->dev;
 		vdec->dev.release = msm_vdev_release;
-		vpr_h(vvd2str(vvd), "%s: registering virtio device for video decoder\n", __func__);
+		vpr_h(VPR_TAG, "%s: registering virtio device for video decoder\n", __func__);
 		ret = register_virtio_device(vdec);
 		if (ret) {
 			put_device(&vdec->dev);
-			vpr_e(vvd2str(vvd), "%s: virtio device for decoder registration failed\n", __func__);
+			vpr_e(VPR_TAG, "%s: virtio device for decoder registration failed\n", __func__);
 			goto err_dec;
 		}
 	} else {
@@ -413,11 +412,11 @@ static int __init msm_virtio_video_init(void)
 		venc->id.vendor = VIRTIO_DEV_ANY_ID;
 		venc->dev.parent = &vdev->dev;
 		venc->dev.release = msm_vdev_release;
-		vpr_h(vvd2str(vvd), "%s: registering virtio device for video encoder\n", __func__);
+		vpr_h(VPR_TAG, "%s: registering virtio device for video encoder\n", __func__);
 		ret = register_virtio_device(venc);
 		if (ret) {
 			put_device(&venc->dev);
-			vpr_e(vvd2str(vvd), "%s: virtio device for encoder registration failed\n", __func__);
+			vpr_e(VPR_TAG, "%s: virtio device for encoder registration failed\n", __func__);
 			goto err_enc;
 		}
 	} else {
@@ -441,9 +440,7 @@ err:
 
 static void __exit msm_virtio_video_exit(void)
 {
-	struct virtio_video_device *vvd = NULL;
-
-	vpr_h(vvd2str(vvd), "virtio-video: %s\n", __func__);
+	vpr_h(VPR_TAG, "virtio-video: %s\n", __func__);
 
 	unregister_virtio_device(vdec);
 	unregister_virtio_device(venc);

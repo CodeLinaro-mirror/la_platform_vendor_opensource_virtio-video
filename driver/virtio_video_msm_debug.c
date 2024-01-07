@@ -161,16 +161,20 @@ const char *codec_cmd_name(uint32_t cmd)
 	return "UNKNOWN";
 }
 
-const char *buffer_event_name(uint32_t event)
+const char *event2str(uint32_t event)
 {
 	switch (event) {
 	case VIRTIO_VIDEO_EVENT_FBD:
 		return "FBD";
 	case VIRTIO_VIDEO_EVENT_EBD:
 		return "EBD";
+	case VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED:
+		return "RCH";
+	case VIRTIO_VIDEO_EVENT_ERROR:
+		return "ERR";
 	}
 
-	return "UNKNOWN";
+	return "N/A";
 }
 
 #define DEBUG_INFO_MAX_LEN 255
@@ -202,4 +206,11 @@ char *stream2str(struct virtio_video_stream *stream)
 	}
 
 	return debug_info;
+}
+
+char *stream_id2str(struct virtio_video_device *vvd, unsigned long id)
+{
+	struct virtio_video_stream *stream = idr_find(&vvd->stream_idr, id);
+
+	return stream2str(stream);
 }

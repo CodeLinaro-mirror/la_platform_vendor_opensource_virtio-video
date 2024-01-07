@@ -20,116 +20,148 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include "virtio_video.h"
+#include "video_generated.h"
 
-DECLARE_EVENT_CLASS(msm_virtio_video_inst,
-
-	TP_PROTO(char *dummy, int id),
-
-	TP_ARGS(dummy, id),
-
+DECLARE_EVENT_CLASS(virtio_video_inst,
+	TP_PROTO(int id),
+	TP_ARGS(id),
 	TP_STRUCT__entry(
-		__field(char *, dummy)
 		__field(int, id)
 	),
-
 	TP_fast_assign(
-		__entry->dummy = dummy;
 		__entry->id = id;
 	),
-
-	TP_printk("%d: %s\n", __entry->id, __entry->dummy)
+	TP_printk("[%d]", __entry->id)
 );
 
-DEFINE_EVENT(msm_virtio_video_inst, msm_virtio_video_device_open,
-
-	TP_PROTO(char *dummy, int id),
-
-	TP_ARGS(dummy, id)
+DEFINE_EVENT(virtio_video_inst, virt_vid_device_open,
+	TP_PROTO(int id),
+	TP_ARGS(id)
 );
 
-DEFINE_EVENT(msm_virtio_video_inst, msm_virtio_video_device_release,
-
-	TP_PROTO(char *dummy, int id),
-
-	TP_ARGS(dummy, id)
+DEFINE_EVENT(virtio_video_inst, virt_vid_device_release,
+	TP_PROTO(int id),
+	TP_ARGS(id)
 );
 
+DECLARE_EVENT_CLASS(list_cnt,
+	TP_PROTO(int list_cnt),
+	TP_ARGS(list_cnt),
+	TP_STRUCT__entry(
+		__field(int, list_cnt)
+	),
+	TP_fast_assign(
+		__entry->list_cnt = list_cnt;
+	),
+	TP_printk("cnt=%d", __entry->list_cnt)
+);
+
+DEFINE_EVENT(list_cnt, hab_resp_evt_dq_vqbuf_err,
+	TP_PROTO(int list_cnt),
+	TP_ARGS(list_cnt)
+);
+
+DEFINE_EVENT(list_cnt, hab_resp_evt_dq_vqbuf,
+	TP_PROTO(int list_cnt),
+	TP_ARGS(list_cnt)
+);
+
+DEFINE_EVENT(list_cnt, hab_resp_cmd_dq_vqbuf,
+	TP_PROTO(int list_cnt),
+	TP_ARGS(list_cnt)
+);
+
+DEFINE_EVENT(list_cnt, hab_resp_evt_done,
+	TP_PROTO(int list_cnt),
+	TP_ARGS(list_cnt)
+);
+
+DEFINE_EVENT(list_cnt, hab_resp_cmd_done,
+	TP_PROTO(int list_cnt),
+	TP_ARGS(list_cnt)
+);
+
+DEFINE_EVENT(list_cnt, hab_evt_add_vqbuf,
+	TP_PROTO(int list_cnt),
+	TP_ARGS(list_cnt)
+);
+
+DEFINE_EVENT(list_cnt, hab_cmd_add_vqbuf,
+	TP_PROTO(int list_cnt),
+	TP_ARGS(list_cnt)
+);
 
 DECLARE_EVENT_CLASS(virtio_video_buffer_queue_events,
-
-	TP_PROTO(int id, const char *type, int index, int flags),
-
+	TP_PROTO(int id, int type, int index, int flags),
 	TP_ARGS(id, type, index, flags),
-
 	TP_STRUCT__entry(
 		__field(int, id)
-		__field(const char *, type)
+		__field(int, type)
 		__field(int, index)
 		__field(int, flags)
 	),
-
 	TP_fast_assign(
 		__entry->id = id;
 		__entry->type = type;
 		__entry->index = index;
 		__entry->flags = flags;
 	),
-
 	TP_printk(
-		"%d: %s: idx %2d flags %#x\n",
+		"[%d] %d: idx %2d flags %#x",
 		__entry->id, __entry->type, __entry->index, __entry->flags)
 );
 
-DEFINE_EVENT(virtio_video_buffer_queue_events, msm_virtio_video_qbuf,
-
-	TP_PROTO(int id, const char *type, int index, int flags),
-
+DEFINE_EVENT(virtio_video_buffer_queue_events, virt_vid_qbuf,
+	TP_PROTO(int id, int type, int index, int flags),
 	TP_ARGS(id, type, index, flags)
 );
 
-DEFINE_EVENT(virtio_video_buffer_queue_events, msm_virtio_video_dqbuf,
-
-	TP_PROTO(int id, const char *type, int index, int flags),
-
+DEFINE_EVENT(virtio_video_buffer_queue_events, virt_vid_dqbuf,
+	TP_PROTO(int id, int type, int index, int flags),
 	TP_ARGS(id, type, index, flags)
 );
-
 
 DECLARE_EVENT_CLASS(virtio_video_buffer_callback_events,
-
-	TP_PROTO(int id, const char *op, int fd, int index, int type, int flags),
-
-	TP_ARGS(id, op, fd, index, type, flags),
-
+	TP_PROTO(int stream_id, int fd, int index, int type, int flags),
+	TP_ARGS(stream_id, fd, index, type, flags),
 	TP_STRUCT__entry(
-		__field(int, id)
-		__field(const char *, op)
+		__field(int, stream_id)
 		__field(int, fd)
 		__field(int, index)
 		__field(int, type)
 		__field(int, flags)
 	),
-
 	TP_fast_assign(
-		__entry->id = id;
-		__entry->op = op;
+		__entry->stream_id = stream_id;
 		__entry->fd = fd;
 		__entry->index = index;
 		__entry->type = type;
 		__entry->flags = flags;
 	),
-
 	TP_printk(
-		"%d: %s: fd %#x idx %2d type %2d flags %#x\n",
-		__entry->id, __entry->op, __entry->fd, __entry->index,
+		"[%d] fd %#x idx %2d type %2d flags %#x",
+		__entry->stream_id, __entry->fd, __entry->index,
 		__entry->type, __entry->flags)
 );
 
-DEFINE_EVENT(virtio_video_buffer_callback_events, msm_virtio_video_buffer_callback,
+DEFINE_EVENT(virtio_video_buffer_callback_events, virt_vid_evt_ebd,
+	TP_PROTO(int stream_id, int fd, int index, int type, int flags),
+	TP_ARGS(stream_id, fd, index, type, flags)
+);
 
-	TP_PROTO(int id, const char *op, int fd, int index, int type, int flags),
+DEFINE_EVENT(virtio_video_buffer_callback_events, virt_vid_evt_fbd,
+	TP_PROTO(int stream_id, int fd, int index, int type, int flags),
+	TP_ARGS(stream_id, fd, index, type, flags)
+);
 
-	TP_ARGS(id, op, fd, index, type, flags)
+DEFINE_EVENT(virtio_video_buffer_callback_events, virt_vid_evt_rch,
+	TP_PROTO(int stream_id, int fd, int index, int type, int flags),
+	TP_ARGS(stream_id, fd, index, type, flags)
+);
+
+DEFINE_EVENT(virtio_video_buffer_callback_events, virt_vid_evt_err,
+	TP_PROTO(int stream_id, int fd, int index, int type, int flags),
+	TP_ARGS(stream_id, fd, index, type, flags)
 );
 
 #endif //_VIRTIO_VIDEO_TRACE_
@@ -142,13 +174,14 @@ DEFINE_EVENT(virtio_video_buffer_callback_events, msm_virtio_video_buffer_callba
 
 #define VPR_DBG_LABEL "virtio-video"
 #define VPR_DBG_STR   "core"
+#define VPR_TAG VPR_DBG_LABEL" : "VPR_DBG_STR
 
 extern unsigned int debug;
 
 enum VPR_msg_prio {
-    VPR_ERR        = 0x00000001,
-    VPR_HIGH       = 0x00000002,
-    VPR_LOW        = 0x00000004,
+	VPR_ERR        = 0x00000001,
+	VPR_HIGH       = 0x00000002,
+	VPR_LOW        = 0x00000004,
 };
 
 #define e_printk_inst(__level, __fmt, ...) \
@@ -177,8 +210,9 @@ void put_inst(struct virtio_video_stream* inst);
 const char *v4l2_type_name(uint32_t port);
 const char *cmd_to_string(uint32_t cmd_type);
 const char *codec_cmd_name(uint32_t cmd);
-const char *buffer_event_name(uint32_t event);
+const char *event2str(uint32_t event);
 char *vvd2str(struct virtio_video_device *vvd);
 char *stream2str(struct virtio_video_stream *stream);
+char *stream_id2str(struct virtio_video_device *vvd, unsigned long stream_id);
 
 #endif //_VIRTIO_VIDEO_MSM_DEBUG_H_
