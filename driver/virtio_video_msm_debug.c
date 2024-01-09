@@ -11,7 +11,7 @@ void put_inst(struct virtio_video_stream *stream)
 {
 
 	if (!stream || !stream->video_dev) {
-		vpr_e(stream2str(stream), "%s: invalid params\n", __func__);
+		vpr_e(strm2tag(stream), "%s: invalid params\n", __func__);
 		return;
 	}
 }
@@ -19,13 +19,13 @@ void put_inst(struct virtio_video_stream *stream)
 const char *v4l2_type_name(uint32_t port)
 {
 	switch (port) {
-	case INPUT_MPLANE:      return "INPUT";
+	case INPUT_MPLANE:      return " INPUT";
 	case OUTPUT_MPLANE:     return "OUTPUT";
-	case INPUT_META_PLANE:  return "INPUT_META";
-	case OUTPUT_META_PLANE: return "OUTPUT_META";
+	case INPUT_META_PLANE:  return " INMTA";
+	case OUTPUT_META_PLANE: return "OUTMTA";
 	}
 
-	return "UNKNOWN";
+	return "NA";
 }
 
 void print_vb2_buffer(const char *str, struct virtio_video_stream *stream,
@@ -177,40 +177,73 @@ const char *event2str(uint32_t event)
 	return "N/A";
 }
 
-#define DEBUG_INFO_MAX_LEN 255
-char *vvd2str(struct virtio_video_device *vvd)
-{
-	static char debug_info[DEBUG_INFO_MAX_LEN] = "";
-
-	if (vvd != NULL) {
-		snprintf(debug_info, DEBUG_INFO_MAX_LEN, "%s : %s",
-			 vvd->v4l2_dev.name, VPR_DBG_STR);
-	} else {
-		snprintf(debug_info, DEBUG_INFO_MAX_LEN, "%s : %s",
-			 VPR_DBG_LABEL, VPR_DBG_STR);
-	}
-
-	return debug_info;
-}
-
-char *stream2str(struct virtio_video_stream *stream)
-{
-	static char debug_info[DEBUG_INFO_MAX_LEN] = "";
-
-	if (stream != NULL) {
-		snprintf(debug_info, DEBUG_INFO_MAX_LEN, "%s : %s",
-			 stream->video_dev->v4l2_dev->name, stream->debug_str);
-	} else {
-		snprintf(debug_info, DEBUG_INFO_MAX_LEN, "%s : %s",
-			 VPR_DBG_LABEL, VPR_DBG_STR);
-	}
-
-	return debug_info;
-}
-
-char *stream_id2str(struct virtio_video_device *vvd, unsigned long id)
+char *stream_id2tag(struct virtio_video_device *vvd, unsigned long id)
 {
 	struct virtio_video_stream *stream = idr_find(&vvd->stream_idr, id);
 
-	return stream2str(stream);
+	return strm2tag(stream);
+}
+
+static const char *get_codec_str(int type)
+{
+	switch (type) {
+	case VIRTIO_VIDEO_PIX_FMT_H264: return " avc";
+	case VIRTIO_VIDEO_PIX_FMT_HEVC: return "hevc";
+	case VIRTIO_VIDEO_PIX_FMT_VP9:  return " vp9";
+	case VIRTIO_VIDEO_PIX_FMT_MPEG2: return "mpeg2";
+	case VIRTIO_VIDEO_MSM_PIX_FMT_AV1:  return " av1";
+	case VIRTIO_VIDEO_MSM_PIX_FMT_HEIC: return "heic";
+	}
+
+	return NULL;
+}
+
+static const char *get_domain_str(int type)
+{
+	switch (type) {
+	case VIRTIO_VIDEO_DEVICE_ENCODER: return "E";
+	case VIRTIO_VIDEO_DEVICE_DECODER: return "D";
+	}
+
+	return ".";
+}
+
+void msm_update_device_tag(struct virtio_video_device *vvd)
+{
+	if (vvd) {
+		snprintf(vvd->tag, sizeof(vvd->tag), "%s : %s",
+			 vvd->v4l2_dev.name, VPR_DBG_STR);
+		vpr_h(VPR_TAG, "%s: result=%s", __func__, vvd->tag);
+	} else {
+		vpr_e(VPR_TAG, "%s: cannot update tag\n", __func__);
+	}
+
+	return;
+}
+
+void msm_update_stream_tag(struct virtio_video_stream *stream)
+{
+	const char *codec = NULL;
+	const char *domain = NULL;
+	struct virtio_video_device *vvd = NULL;
+	u32 client_id = stream->client_id;
+
+	if (!stream) {
+		vpr_e(VPR_TAG, "%s: cannot update tag\n", __func__);
+		return;
+	}
+
+	codec = get_codec_str(stream->codec);
+	domain = get_domain_str(stream->domain);
+	if ((client_id != INVALID_CLIENT_ID) && (codec != NULL)) {
+		vvd = to_virtio_vd(stream->video_dev);
+		snprintf(stream->tag, sizeof(stream->tag),
+		         "%s : %s%s_%d",
+		         stream->video_dev->v4l2_dev->name,
+		         codec, domain, client_id);
+		vpr_h(vvd2tag(vvd), "%s: codec: %s, domain: %s, result: %s\n",
+		      __func__, codec, domain, stream->tag);
+	}
+
+	return;
 }

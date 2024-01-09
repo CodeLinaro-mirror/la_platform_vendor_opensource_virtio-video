@@ -154,7 +154,9 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	ret = v4l2_device_register(dev, &vvd->v4l2_dev);
 	if (ret)
 		goto err_v4l2_reg;
-
+#ifdef VIRTIO_VIDEO_MSM
+	msm_update_device_tag(vvd);
+#endif
 	spin_lock_init(&vvd->commandq.qlock);
 	init_waitqueue_head(&vvd->commandq.reclaim_queue);
 
@@ -164,7 +166,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 
 	ret = virtio_find_vqs(vdev, 2, vqs, callbacks, names, NULL);
 	if (ret) {
-		vpr_e(vvd2str(vvd), "failed to find virt queues\n");
+		vpr_e(vvd2tag(vvd), "failed to find virt queues\n");
 		goto err_vqs;
 	}
 
@@ -173,14 +175,14 @@ static int virtio_video_probe(struct virtio_device* vdev)
 
 	ret = virtio_video_alloc_vbufs(vvd);
 	if (ret) {
-		vpr_e(vvd2str(vvd), "failed to alloc vbufs\n");
+		vpr_e(vvd2tag(vvd), "failed to alloc vbufs\n");
 		goto err_vbufs;
 	}
 
 	virtio_cread(vdev, struct virtio_video_config, max_caps_length,
 		     &vvd->max_caps_len);
 	if (!vvd->max_caps_len) {
-		vpr_e(vvd2str(vvd), "max_caps_len is zero\n");
+		vpr_e(vvd2tag(vvd), "max_caps_len is zero\n");
 		ret = -EINVAL;
 		goto err_config;
 	}
@@ -188,7 +190,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	virtio_cread(vdev, struct virtio_video_config, max_resp_length,
 		     &vvd->max_resp_len);
 	if (!vvd->max_resp_len) {
-		vpr_e(vvd2str(vvd), "max_resp_len is zero\n");
+		vpr_e(vvd2tag(vvd), "max_resp_len is zero\n");
 		ret = -EINVAL;
 		goto err_config;
 	}
@@ -204,7 +206,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 
 	ret = virtio_video_device_init(vvd);
 	if (ret) {
-		vpr_e(vvd2str(vvd), "failed to init virtio video\n");
+		vpr_e(vvd2tag(vvd), "failed to init virtio video\n");
 		goto err_init;
 	}
 
@@ -228,7 +230,7 @@ static void virtio_video_remove(struct virtio_device *vdev)
 {
 	struct virtio_video_device *vvd = vdev->priv;
 
-	vpr_h(vvd2str(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
+	vpr_h(vvd2tag(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
 
 	virtio_video_device_deinit(vvd);
 	virtio_video_free_vbufs(vvd);
@@ -282,7 +284,7 @@ static void msm_vdev_get(struct virtio_device *vdev, unsigned offset,
 	const char *dev_n = dev_name(&vdev->dev);
 	struct virtio_video_device *vvd = vdev->priv;
 
-	vpr_h(vvd2str(vvd), "%s: %s offset=%x\n", dev_n, __func__, offset);
+	vpr_h(vvd2tag(vvd), "%s: %s offset=%x\n", dev_n, __func__, offset);
 
 	cfg = msm_hab_get_config(vdev);
 	if (offset == offsetof(struct virtio_video_config, max_caps_length))
@@ -290,7 +292,7 @@ static void msm_vdev_get(struct virtio_device *vdev, unsigned offset,
 	else if (offset == offsetof(struct virtio_video_config, max_resp_length))
 		*(uint32_t *)buf = cfg.max_resp_length;
 	else
-		vpr_e(vvd2str(vvd), "%s: %s unsupported\n", dev_n, __func__);
+		vpr_e(vvd2tag(vvd), "%s: %s unsupported\n", dev_n, __func__);
 }
 
 static void msm_vdev_release(struct device *dev)
@@ -298,7 +300,7 @@ static void msm_vdev_release(struct device *dev)
 	struct virtio_device *vdev = container_of(dev, struct virtio_device, dev);
 	struct virtio_video_device *vvd = vdev->priv;
 
-	vpr_h(vvd2str(vvd), "%s: %s\n", dev_name(dev), __func__);
+	vpr_h(vvd2tag(vvd), "%s: %s\n", dev_name(dev), __func__);
 }
 
 static void msm_vdev_reset(struct virtio_device *vdev)
@@ -306,16 +308,16 @@ static void msm_vdev_reset(struct virtio_device *vdev)
 	struct virtio_video_device *vvd = vdev->priv;
 
 	if (msm_hab_vdev_init(vdev))
-		vpr_e(vvd2str(vvd), "%s: failed for video%d", __func__, vdev->id.device);
+		vpr_e(vvd2tag(vvd), "%s: failed for video%d", __func__, vdev->id.device);
 	else
-		vpr_h(vvd2str(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
+		vpr_h(vvd2tag(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
 }
 
 static void msm_vdev_set_status(struct virtio_device *vdev, uint8_t status)
 {
 	struct virtio_video_device *vvd = vdev->priv;
 
-	vpr_h(vvd2str(vvd), "%s: %s: setting status %x\n", dev_name(&vdev->dev), __func__,
+	vpr_h(vvd2tag(vvd), "%s: %s: setting status %x\n", dev_name(&vdev->dev), __func__,
 	      status);
 
 	if (status & VIRTIO_CONFIG_S_DRIVER_OK)
@@ -326,7 +328,7 @@ static uint8_t msm_vdev_get_status(struct virtio_device *vdev)
 {
 	struct virtio_video_device *vvd = vdev->priv;
 
-	vpr_h(vvd2str(vvd), "%s: %s: getting status\n", dev_name(&vdev->dev), __func__);
+	vpr_h(vvd2tag(vvd), "%s: %s: getting status\n", dev_name(&vdev->dev), __func__);
 
 	return 0;
 }
@@ -335,7 +337,7 @@ static uint64_t msm_vdev_get_features(struct virtio_device *vdev)
 {
 	struct virtio_video_device *vvd = vdev->priv;
 
-	vpr_h(vvd2str(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
+	vpr_h(vvd2tag(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
 
 	return msm_hab_get_features(vdev);
 }
@@ -345,11 +347,11 @@ static int msm_vdev_finalize_features(struct virtio_device *vdev)
 	int ret = 0;
 	struct virtio_video_device *vvd = vdev->priv;
 
-	vpr_h(vvd2str(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
+	vpr_h(vvd2tag(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
 
 	ret = msm_hab_set_features(vdev);
 	if (ret)
-		vpr_e(vvd2str(vvd), "%s: failed for video%d, ret %d", __func__, vdev->id.device, ret);
+		vpr_e(vvd2tag(vvd), "%s: failed for video%d, ret %d", __func__, vdev->id.device, ret);
 
 	return ret;
 }
