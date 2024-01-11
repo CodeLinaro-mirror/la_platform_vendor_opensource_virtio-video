@@ -79,8 +79,10 @@ struct buf_export_cache {
 #define virtqueue_kick              msm_hab_virtqueue_kick
 #define virtqueue_add_inbuf         msm_hab_virtqueue_add_inbuf
 #define virtqueue_disable_cb(x)     {}
-#define virtqueue_is_broken(x)      (false)
+#define virtqueue_is_broken         msm_hab_virtqueue_is_broken
 #define virtqueue_enable_cb(x)      (true)
+
+#define TAG_MAX_LEN 32
 
 enum msm_vidc_port_type {
 	INPUT_PORT = 0,
@@ -203,9 +205,11 @@ enum video_stream_state {
 	STREAM_STATE_ERROR,
 };
 
+#ifdef VIRTIO_VIDEO_MSM
 struct buf_queue {
 	struct vb2_queue *vb2q;
 };
+#endif
 
 struct virtio_video_stream {
 	uint32_t stream_id;
@@ -227,7 +231,7 @@ struct virtio_video_stream {
 	uint32_t client_id;
 	uint32_t codec;
 	uint32_t domain;
-	uint8_t debug_str[24];
+	char tag[TAG_MAX_LEN];
 #endif
 };
 
@@ -293,6 +297,7 @@ struct virtio_video_device {
 #ifdef VIRTIO_VIDEO_MSM
 	const struct vb2_mem_ops *vb2_mem_ops;
 	struct list_head ctrl_config_list;
+	char tag[TAG_MAX_LEN];
 #endif
 };
 
@@ -357,10 +362,21 @@ static inline struct virtio_video_buffer *to_virtio_vb(struct vb2_buffer *vb)
 static inline enum virtio_video_queue_type
 to_virtio_queue_type(enum v4l2_buf_type type)
 {
+#ifndef VIRTIO_VIDEO_MSM
 	if (V4L2_TYPE_IS_OUTPUT(type))
 		return VIRTIO_VIDEO_QUEUE_TYPE_INPUT;
 	else
 		return VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT;
+#else
+	if (type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
+		return VIRTIO_VIDEO_QUEUE_TYPE_INPUT;
+	else if (type == V4L2_BUF_TYPE_META_OUTPUT)
+		return VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META;
+	else if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
+		return VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT;
+	else //V4L2_BUF_TYPE_META_CAPTURE
+		return VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT_META;
+#endif
 }
 
 static inline bool within_range(uint32_t min, uint32_t val, uint32_t max)
@@ -524,7 +540,7 @@ int virtio_video_stream_get_params(struct virtio_video_device *vvd,
 int virtio_video_stream_get_controls(struct virtio_video_device *vvd,
 				     struct virtio_video_stream *stream);
 
-
+#ifdef VIRTIO_VIDEO_MSM
 void *virtio_video_alloc_req(struct virtio_video_device *vvd,
 				    struct virtio_video_vbuffer **vbuffer_p,
 				    int size);
@@ -536,15 +552,11 @@ void *virtio_video_alloc_req_resp(struct virtio_video_device *vvd,
 			    int req_size, int resp_size,
 			    void *resp_buf);
 
-
 int virtio_video_queue_cmd_buffer(struct virtio_video_device *vvd,
 			      struct virtio_video_vbuffer *vbuf);
 
-
 int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 			      struct virtio_video_vbuffer *vbuf);
-
-#ifdef VIRTIO_VIDEO_MSM
 
 int msm_vmem_alloc(unsigned long size, void **mem, const char *msg);
 void msm_vmem_free(void **addr);
@@ -574,7 +586,6 @@ int virtio_video_pending_buf_list_del(struct virtio_video_device* vvd,
 
 bool is_priv_ctrl(u32 id);
 
-int msm_virtio_video_update_debug_str(struct virtio_video_stream *inst);
 #endif
 
 #endif /* _VIRTIO_VIDEO_H */
