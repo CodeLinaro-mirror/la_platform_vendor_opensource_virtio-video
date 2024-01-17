@@ -918,14 +918,8 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 #else
 		virtio_video_state_update(stream, STREAM_STATE_STOPPED);
 
-		if (stream->enable_eos_event) {
-			vpr_h(strm2tag(stream), "%s: %s vb2 %p trigger EOS event", __func__,
-			      v4l2_type_name(vb2_queue->type), vb);
-
-			virtio_video_queue_eos_event(stream);
-		} else {
+		if (!stream->enable_eos_event) {
 			v4l2_vb->flags |= V4L2_BUF_FLAG_LAST;
-
 			vpr_h(strm2tag(stream), "%s: %s vb2 %p add EOS flag", __func__,
 			      v4l2_type_name(vb2_queue->type), vb);
 		}
@@ -934,8 +928,12 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 
 	if ((flags & VIRTIO_VIDEO_DEQUEUE_FLAG_ERR) ||
 	    (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_EOS)) {
+#ifndef VIRTIO_VIDEO_MSM
 		vb->planes[0].bytesused = 0;
-
+#else
+		if (V4L2_TYPE_IS_MULTIPLANAR(vb->type))
+			vb->planes[0].bytesused = 0;
+#endif
 		if (!vvd->is_m2m_dev)
 			virtio_video_pending_buf_list_del(vvd, virtio_vb);
 
@@ -944,6 +942,12 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 		      __func__, v4l2_type_name(vb2_queue->type),
 		     (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_EOS) ? "EOS": "ERR",
 		     vb, list_empty(&vb2_queue->done_list));
+#ifdef VIRTIO_VIDEO_MSM
+		if ((flags & VIRTIO_VIDEO_DEQUEUE_FLAG_EOS) &&
+		    (vb->type == OUTPUT_META_PLANE) &&
+		    stream->enable_eos_event)
+			virtio_video_queue_eos_event(stream);
+#endif
 
 		return;
 	}
