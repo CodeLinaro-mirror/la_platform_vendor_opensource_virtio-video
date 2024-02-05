@@ -176,13 +176,13 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 		memset(&ctrl_cfg, 0, sizeof(ctrl_cfg));
 		config = entry->config;
 
-		vpr_h(stream2str(stream), "%s: add ctrl, id=%#x, type=%#x, flags=%#x, "
+		vpr_h(strm2tag(stream), "%s: add ctrl, id=%#x, type=%#x, flags=%#x, "
 		      "max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n",
 		      __func__, config->id, config->type, config->flags, config->max, config->min, config->step,
 		      config->def, (char*)config + config->name_offset, config->is_private);
 
 		if (is_priv_ctrl(config->id)) {
-			vpr_h(stream2str(stream), "%s: add private ctrl", __func__);
+			vpr_h(strm2tag(stream), "%s: add private ctrl", __func__);
 			ctrl_cfg.ops = &virtio_video_enc_ctrl_ops;
 			ctrl_cfg.id = config->id,
 			ctrl_cfg.name = (char*)config + config->name_offset;
@@ -204,7 +204,7 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 
 			ctrl = v4l2_ctrl_new_custom(&stream->ctrl_handler, &ctrl_cfg, NULL);
 		} else {
-			vpr_h(stream2str(stream), "%s: add std ctrl", __func__);
+			vpr_h(strm2tag(stream), "%s: add std ctrl", __func__);
 
 			if (config->type == V4L2_CTRL_TYPE_MENU) {
 				ctrl = v4l2_ctrl_new_std_menu(&stream->ctrl_handler,
@@ -224,7 +224,7 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 		}
 
 		if (stream->ctrl_handler.error) {
-			vpr_e(stream2str(stream), "%s: failed to add ctrl, id=%#x, type=%#x, flags=%#x, "
+			vpr_e(strm2tag(stream), "%s: failed to add ctrl, id=%#x, type=%#x, flags=%#x, "
 			      "max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n",
 			      __func__, config->id, config->type, config->flags,
 			      config->max, config->min, config->step, config->def,
@@ -409,7 +409,7 @@ static int virtio_video_try_encoder_cmd(struct file *file, void *fh,
 	case V4L2_ENC_CMD_STOP:
 	case V4L2_ENC_CMD_START:
 		if (cmd->flags != 0) {
-			vpr_e(stream2str(stream), "flags=%u are not supported",
+			vpr_e(strm2tag(stream), "flags=%u are not supported",
 			      cmd->flags);
 			return -EINVAL;
 		}
@@ -459,7 +459,7 @@ static int virtio_video_encoder_cmd(struct file *file, void *fh,
 
 		ret = virtio_video_cmd_stream_drain(vvd, stream->stream_id);
 		if (ret) {
-			vpr_e(stream2str(stream), "failed to drain stream\n");
+			vpr_e(strm2tag(stream), "failed to drain stream\n");
 			return ret;
 		}
 
@@ -599,7 +599,7 @@ static int virtio_video_enc_g_parm(struct file *file, void *priv,
 		return -EIO;
 
 	if (!V4L2_TYPE_IS_OUTPUT(a->type)) {
-		vpr_e(stream2str(stream),
+		vpr_e(strm2tag(stream),
 		      "getting FPS is only possible for the output queue\n");
 		return -EINVAL;
 	}
@@ -633,7 +633,7 @@ static int virtio_video_enc_s_parm(struct file *file, void *priv,
 		frame_rate = (u64)USEC_PER_SEC;
 		do_div(frame_rate, frame_interval);
 	} else {
-		vpr_e(stream2str(stream),
+		vpr_e(strm2tag(stream),
 		      "setting FPS is only possible for the output queue\n");
 		return -EINVAL;
 	}

@@ -172,9 +172,16 @@ DEFINE_EVENT(virtio_video_buffer_callback_events, virt_vid_evt_err,
 #ifndef _VIRTIO_VIDEO_MSM_DEBUG_H_
 #define _VIRTIO_VIDEO_MSM_DEBUG_H_
 
-#define VPR_DBG_LABEL "virtio-video"
-#define VPR_DBG_STR   "core"
-#define VPR_TAG VPR_DBG_LABEL" : "VPR_DBG_STR
+#define VPR_DBG_LABEL           "virtio-video"
+#define VPR_DBG_STR             "core"
+#define VPR_TAG                 VPR_DBG_LABEL" : "VPR_DBG_STR
+static inline char *vvd2tag(struct virtio_video_device *vvd) {
+	return (vvd) ? vvd->tag : (VPR_TAG);
+}
+
+static inline char *strm2tag(struct virtio_video_stream *stream) {
+	return (stream) ? stream->tag : (VPR_TAG);
+}
 
 extern unsigned int debug;
 
@@ -184,7 +191,7 @@ enum VPR_msg_prio {
 	VPR_LOW        = 0x00000004,
 };
 
-#define e_printk_inst(__level, __fmt, ...) \
+#define e_printk(__level, __fmt, ...) \
     do { \
         if (debug & (__level)) { \
             pr_err("%s: " __fmt, \
@@ -192,7 +199,7 @@ enum VPR_msg_prio {
         } \
     } while (0)
 
-#define i_printk_inst(__level, __fmt, ...) \
+#define i_printk(__level, __fmt, ...) \
     do { \
         if (debug & (__level)) { \
             pr_info("%s: " __fmt, \
@@ -200,19 +207,19 @@ enum VPR_msg_prio {
         } \
     } while (0)
 
-#define vpr_e(debug_info, __fmt, ...) e_printk_inst(VPR_ERR, __fmt, debug_info, ##__VA_ARGS__)
-#define vpr_h(debug_info, __fmt, ...) i_printk_inst(VPR_HIGH, __fmt, debug_info, ##__VA_ARGS__)
-#define vpr_l(debug_info, __fmt, ...) i_printk_inst(VPR_LOW,  __fmt, debug_info, ##__VA_ARGS__)
+#define vpr_e(tag, __fmt, ...) e_printk(VPR_ERR,  __fmt, tag, ##__VA_ARGS__)
+#define vpr_h(tag, __fmt, ...) i_printk(VPR_HIGH, __fmt, tag, ##__VA_ARGS__)
+#define vpr_l(tag, __fmt, ...) i_printk(VPR_LOW,  __fmt, tag, ##__VA_ARGS__)
 
-void print_vb2_buffer(const char *str, struct virtio_video_stream *inst,
-		struct vb2_buffer *vb2);
+void print_vb2_buffer(const char *str, struct virtio_video_stream *stream,
+                      struct vb2_buffer *vb2);
 void put_inst(struct virtio_video_stream* inst);
 const char *v4l2_type_name(uint32_t port);
 const char *cmd_to_string(uint32_t cmd_type);
 const char *codec_cmd_name(uint32_t cmd);
 const char *event2str(uint32_t event);
-char *vvd2str(struct virtio_video_device *vvd);
-char *stream2str(struct virtio_video_stream *stream);
-char *stream_id2str(struct virtio_video_device *vvd, unsigned long stream_id);
+char *stream_id2tag(struct virtio_video_device *vvd, unsigned long stream_id);
+void msm_update_stream_tag(struct virtio_video_stream *stream);
+void msm_update_device_tag(struct virtio_video_device *vvd);
 
 #endif //_VIRTIO_VIDEO_MSM_DEBUG_H_

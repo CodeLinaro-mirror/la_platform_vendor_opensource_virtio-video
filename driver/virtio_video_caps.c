@@ -102,7 +102,7 @@ static size_t virtio_video_parse_virtio_frame(struct virtio_video_device *vvd,
 							     buf + offset);
 		if (extra_size == 0) {
 			kfree(frm->frame_rates);
-			vpr_e(vvd2str(vvd), "failed to parse frame rate\n");
+			vpr_e(vvd2tag(vvd), "failed to parse frame rate\n");
 			return 0;
 		}
 		offset += extra_size;
@@ -141,7 +141,7 @@ static size_t virtio_video_parse_virtio_fmt(struct virtio_video_device *vvd,
 							buf + offset);
 		if (extra_size == 0) {
 			kfree(fmt->frames);
-			vpr_e(vvd2str(vvd), "failed to parse frame\n");
+			vpr_e(vvd2tag(vvd), "failed to parse frame\n");
 			return 0;
 		}
 		offset += extra_size;
@@ -163,12 +163,12 @@ int virtio_video_parse_virtio_capability(struct virtio_video_device *vvd,
 	int ret;
 
 	if (!resp || ret_fmt_list == NULL || ret_num_fmts == NULL) {
-		vpr_e(vvd2str(vvd), "invalid arguments!\n");
+		vpr_e(vvd2tag(vvd), "invalid arguments!\n");
 		return -EINVAL;
 	}
 
 	if (le32_to_cpu(resp->num_descs) <= 0) {
-		vpr_e(vvd2str(vvd), "invalid capability response\n");
+		vpr_e(vvd2tag(vvd), "invalid capability response\n");
 		return -EINVAL;
 	}
 
@@ -187,7 +187,7 @@ int virtio_video_parse_virtio_capability(struct virtio_video_device *vvd,
 		fmt_size = virtio_video_parse_virtio_fmt(vvd, fmt,
 							 resp_buf + offset);
 		if (fmt_size == 0) {
-			vpr_e(vvd2str(vvd), "failed to parse fmt\n");
+			vpr_e(vvd2tag(vvd), "failed to parse fmt\n");
 			ret = -ENOENT;
 			goto parse_fmt_err;
 		}
@@ -215,7 +215,7 @@ int virtio_video_parse_virtio_capabilities(struct virtio_video_device *vvd,
 						&vvd->input_fmt_list,
 						&vvd->num_input_fmts);
 		if (ret) {
-			vpr_e(vvd2str(vvd), "Failed to parse input capability: %d\n",
+			vpr_e(vvd2tag(vvd), "Failed to parse input capability: %d\n",
 			      ret);
 			return ret;
 		}
@@ -226,7 +226,7 @@ int virtio_video_parse_virtio_capabilities(struct virtio_video_device *vvd,
 						 &vvd->output_fmt_list,
 						 &vvd->num_output_fmts);
 		if (ret) {
-			vpr_e(vvd2str(vvd), "Failed to parse output capability: %d\n",
+			vpr_e(vvd2tag(vvd), "Failed to parse output capability: %d\n",
 			      ret);
 			return ret;
 		}
@@ -286,7 +286,7 @@ static int virtio_video_parse_control_levels(struct virtio_video_device *vvd,
 	ret = virtio_video_query_control_level(vvd, resp_buf, resp_size,
 					       virtio_format);
 	if (ret) {
-		vpr_e(vvd2str(vvd), "failed to query level\n");
+		vpr_e(vvd2tag(vvd), "failed to query level\n");
 		goto lvl_err;
 	}
 
@@ -356,7 +356,7 @@ static int virtio_video_parse_control_profiles(struct virtio_video_device *vvd,
 	ret = virtio_video_query_control_profile(vvd, resp_buf, resp_size,
 						 virtio_format);
 	if (ret) {
-		vpr_e(vvd2str(vvd), "failed to query profile\n");
+		vpr_e(vvd2tag(vvd), "failed to query profile\n");
 		goto prf_err;
 	}
 
@@ -427,13 +427,13 @@ int virtio_video_parse_virtio_control(struct virtio_video_device *vvd)
 
 		ret = virtio_video_parse_control_profiles(vvd, c_fmt);
 		if (ret) {
-			vpr_e(vvd2str(vvd), "failed to parse control profile\n");
+			vpr_e(vvd2tag(vvd), "failed to parse control profile\n");
 			goto parse_ctrl_prf_err;
 		}
 
 		ret = virtio_video_parse_control_levels(vvd, c_fmt);
 		if (ret) {
-			vpr_e(vvd2str(vvd), "failed to parse control level\n");
+			vpr_e(vvd2tag(vvd), "failed to parse control level\n");
 			goto parse_ctrl_lvl_err;
 		}
 		list_add(&c_fmt->controls_list_entry, &vvd->controls_fmt_list);
