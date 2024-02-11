@@ -114,10 +114,8 @@ static void* unattach_buf_from_vq_buf(struct hab_virtqueue *hvq,
 static int virtio_video_msm_hab_open(struct virtio_device *vdev, struct hab_virtqueue *hvq)
 {
 	int ret = 0;
-	int mmid = 0;
+	int mmid = MM_VID;
 	struct virtio_video_device *vvd = vdev->priv;
-
-	mmid = (vdev->id.device == VIRTIO_ID_VIDEO_DECODER) ? MM_VID : MM_VID_2;
 
 	vpr_h(vvd2tag(vvd), "%s: mmid=%d\n", __func__, mmid);
 

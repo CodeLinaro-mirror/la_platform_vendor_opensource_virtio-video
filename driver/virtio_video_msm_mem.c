@@ -15,7 +15,7 @@
 #include "virtio_video_msm_mem.h"
 
 #define MAX_EXPORT_RETRY 5
-#define MAX_NUM_EXPORT_CACHE_ENTRY 64
+#define MAX_NUM_EXPORT_CACHE_ENTRY 128
 
 
 static struct buf_export_entry*
@@ -123,24 +123,21 @@ uint32_t msm_buf_get_export_id(struct virtio_video_stream* stream,
 
 	//alloc an entry if no existing one
 	for (i = 0; i < MAX_EXPORT_RETRY && ret != -ENOMEM; i++) {
-			ret = habmm_export(habmmhandle, (void*)fd, size, &export_id,
-					   export_flag);
-			if (ret) {
-				vpr_e(tag, "%s: export failed. retry %d rc %d",
-				      __func__, i, ret);
-			} else {
-				vpr_h(tag, "%s: export ok, type %d fd %d export_id %d sz %d retry %d",
-				      __func__, buf_type, fd,
-				      export_id, size, i);
-				break;
-			}
+		ret = habmm_export(habmmhandle, (void*)fd, size, &export_id, export_flag);
+		if (ret) {
+			vpr_e(tag, "%s: export failed. retry %d rc %d", __func__, i, ret);
+		} else {
+			vpr_h(tag, "%s: export ok, type %d fd %d export_id %d sz %d retry %d",
+			      __func__, buf_type, fd, export_id, size, i);
+			break;
+		}
 	}
 
 	if (unlikely(ret) || unlikely(!export_id)) {
-			vpr_e(tag, "%s: export failed. buf type %d fd %d sz %d", __func__,
-			      buf_type, fd, size);
-			export_id = 0;
-			goto exit;
+		vpr_e(tag, "%s: export failed. buf type %d fd %d sz %d", __func__,
+		      buf_type, fd, size);
+		export_id = 0;
+		goto exit;
 	}
 
 	if (buf_type == OUTPUT_MPLANE || buf_type == OUTPUT_META_PLANE) {
