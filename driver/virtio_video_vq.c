@@ -445,8 +445,7 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 		      v4l2_buf->index, export_id, v4l2_buf->flags, vb);
 
 		virtio_video_buf_done(virtio_vb, v4l2_buf->flags,
-		                      v4l2_buffer_get_timestamp(v4l2_buf),
-		                      NULL);
+		                      v4l2_buffer_get_timestamp(v4l2_buf), NULL);
 	}
 }
 
