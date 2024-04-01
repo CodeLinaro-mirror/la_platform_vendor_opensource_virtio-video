@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kthread.h>
@@ -15,7 +15,7 @@
 #include "virtio_video_msm_mem.h"
 
 #define MAX_EXPORT_RETRY 5
-#define MAX_NUM_EXPORT_CACHE_ENTRY 128
+#define MAX_NUM_EXPORT_CACHE_ENTRY 256
 
 
 static struct buf_export_entry*
@@ -140,20 +140,18 @@ uint32_t msm_buf_get_export_id(struct virtio_video_stream* stream,
 		goto exit;
 	}
 
-	if (buf_type == OUTPUT_MPLANE || buf_type == OUTPUT_META_PLANE) {
-		entry = alloc_one_export_entry(&stream->buf_cache, fd, size,
-		                               buf_type, export_id, tag);
-		if (!entry) {
-			vpr_e(tag, "alloc entry failed");
+	entry = alloc_one_export_entry(&stream->buf_cache, fd, size,
+				       buf_type, export_id, tag);
+	if (!entry) {
+		vpr_e(tag, "alloc entry failed");
 
-			if (habmm_unexport(habmmhandle, export_id, 0))
-				vpr_e(tag, "failed to unexport id %d", export_id);
+		if (habmm_unexport(habmmhandle, export_id, 0))
+			vpr_e(tag, "failed to unexport id %d", export_id);
 
-			export_id = 0;
-		} else {
-			vpr_h(tag, "%s: alloc entry. buf type %d fd %d export_id %d sz %d",
-			      __func__, buf_type, fd, export_id, size);
-		}
+		export_id = 0;
+	} else {
+		vpr_h(tag, "%s: alloc entry. buf type %d fd %d export_id %d sz %d",
+		      __func__, buf_type, fd, export_id, size);
 	}
 
 exit:
