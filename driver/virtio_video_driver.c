@@ -2,7 +2,7 @@
 /* Driver for virtio video device.
  *
  * Copyright 2020 OpenSynergy GmbH.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -120,7 +120,10 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	idr_init(&vvd->resource_idr);
 	spin_lock_init(&vvd->stream_idr_lock);
 	idr_init(&vvd->stream_idr);
-
+#ifdef MSM_VIDC_HW_VIRT
+	spin_lock_init(&vvd->pending_event_list_lock);
+	spin_lock_init(&vvd->wq_lock);
+#endif
 	init_waitqueue_head(&vvd->wq);
 
 	if (virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_NON_CONTIG))
@@ -163,6 +166,9 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	INIT_WORK(&vvd->eventq.work, virtio_video_process_events);
 
 	INIT_LIST_HEAD(&vvd->pending_vbuf_list);
+#ifdef MSM_VIDC_HW_VIRT
+	INIT_LIST_HEAD(&vvd->pending_event_list);
+#endif
 
 	ret = virtio_find_vqs(vdev, 2, vqs, callbacks, names, NULL);
 	if (ret) {
@@ -369,6 +375,21 @@ static const struct virtio_config_ops msm_vdev_config_ops = {
 
 static struct virtio_device* venc = NULL;
 static struct virtio_device* vdec = NULL;
+
+#ifdef MSM_VIDC_HW_VIRT
+struct virtio_video_device* msm_virtio_video_hw_virtualization_get_vvd(void)
+{
+	struct virtio_video_device *vvd = NULL;
+	if (NULL == vdec) {
+		vpr_e(VPR_TAG, "failed to get vdev for hardware virtualization\n");
+	}
+	else {
+		vvd = (struct virtio_video_device *)vdec->priv;
+	}
+
+	return vvd;
+}
+#endif
 
 static int __init msm_virtio_video_init(void)
 {

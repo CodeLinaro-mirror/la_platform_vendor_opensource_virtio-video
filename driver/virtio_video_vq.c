@@ -27,6 +27,9 @@
 #include "virtio_video_msm_debug.h"
 #endif
 #include "virtio_video_msm_mem.h"
+#ifdef MSM_VIDC_HW_VIRT
+#include "vidc_hw_virt.h"
+#endif
 
 #ifdef VIRTIO_VIDEO_MSM
 #define MAX_INLINE_CMD_SIZE   512
@@ -454,6 +457,10 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 {
 	struct virtio_video_stream *stream = NULL;
 	uint32_t stream_id = evt->stream_id;
+#ifdef MSM_VIDC_HW_VIRT
+	uint32_t *device_id = 0;
+	struct virtio_video_queuing_event queuing_evt = {};
+#endif
 
 #ifndef VIRTIO_VIDEO_MSM
 	struct video_device *vd = &vvd->video_dev;
@@ -494,6 +501,17 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 		virtio_video_handle_error(stream);
 		trace_virt_vid_evt_err(stream_id, 0, 0, 0, 0);
 		break;
+#ifdef MSM_VIDC_HW_VIRT
+	case VIRTIO_VIDEO_EVENT_GVM_SSR:
+		vpr_h(strm2tag(stream), "%s: stream_id=%u: gvm SSR event\n",
+		      __func__, stream_id);
+		device_id = (uint32_t*)evt->payload;
+		queuing_evt.evt = evt;
+		queuing_evt.device_id = device_id;
+		virtio_video_pending_event_list_add(vvd, &queuing_evt);
+		wake_up(&vvd->wq);
+		break;
+#endif
 	default:
 		vpr_h(strm2tag(stream), "stream_id=%u: unknown event\n",
 		      stream_id);
@@ -1080,3 +1098,28 @@ int virtio_video_cmd_set_control(struct virtio_video_device *vvd,
 	return virtio_video_queue_cmd_buffer(vvd, vbuf);
 }
 
+#ifdef MSM_VIDC_HW_VIRT
+int virtio_video_queue_event_wait(struct virtio_video_event *evt)
+{
+	unsigned long flags = 0L;
+	int ret;
+	struct virtio_video_device *vvd = msm_virtio_video_hw_virtualization_get_vvd();
+	struct virtqueue *vq = vvd->eventq.vq;
+	struct virtio_video_queuing_event *queuing_event;
+
+	if (list_empty(&vvd->pending_event_list)) {
+		spin_lock_irqsave(&vvd->wq_lock, flags);
+		wait_event(vvd->wq, vq->num_free);
+		spin_unlock_irqrestore(&vvd->wq_lock, flags);
+	}
+
+	ret = virtio_video_pending_event_list_pop(vvd, &queuing_event);
+	if (ret)
+		vpr_e(vvd2tag(vvd), "unable to fetch the event\n");
+	else
+		evt = queuing_event->evt;
+	return ret;
+}
+
+EXPORT_SYMBOL(virtio_video_queue_event_wait);
+#endif
