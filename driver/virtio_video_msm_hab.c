@@ -23,6 +23,8 @@
 
 #define MAX_RETRY_FOR_GET_EVT_BUF 100
 
+#define HAB_TIMEOUT 1000
+
 struct virtio_video_initial_data {
 	uint64_t features;
 	struct virtio_video_config configs;
@@ -114,14 +116,12 @@ static void* unattach_buf_from_vq_buf(struct hab_virtqueue *hvq,
 static int virtio_video_msm_hab_open(struct virtio_device *vdev, struct hab_virtqueue *hvq)
 {
 	int ret = 0;
-	int mmid = 0;
+	int mmid = MM_VID;
 	struct virtio_video_device *vvd = vdev->priv;
-
-	mmid = (vdev->id.device == VIRTIO_ID_VIDEO_DECODER) ? MM_VID : MM_VID_2;
 
 	vpr_h(vvd2tag(vvd), "%s: mmid=%d\n", __func__, mmid);
 
-	ret = habmm_socket_open(&hvq->habmm_handle, mmid, 0, 0);
+	ret = habmm_socket_open(&hvq->habmm_handle, mmid, HAB_TIMEOUT, 0);
 	if (ret) {
 		vpr_e(vvd2tag(vvd), "%s: socket open failed %d\n", __func__, ret);
 		goto err;
@@ -312,7 +312,6 @@ static int virtio_video_hab_resp_handler(void *p)
 	vpr_h(vvd2tag(vvd), "%s %s: start\n", vq_name, __func__);
 
 	while (!kthread_should_stop()) {
-		evt = NULL;
 		msg = NULL;
 
 		if (hvq->type == MSM_VIRTQ_EVT_TYPE) {
@@ -320,7 +319,6 @@ static int virtio_video_hab_resp_handler(void *p)
 			      vq_name, __func__, hvq->vbuf_list.count);
 			trace_hab_resp_evt_dq_vqbuf(hvq->vbuf_list.count);
 			msg = get_one_evt_buf(hvq, MAX_RETRY_FOR_GET_EVT_BUF);
-			evt = msg;
 			if (unlikely(!msg)) {
 				vpr_e(vvd2tag(vvd), "%s %s: unable get event buf\n",
 				      vq_name, __func__);
@@ -339,10 +337,12 @@ static int virtio_video_hab_resp_handler(void *p)
 		ret = habmm_socket_recv(hvq->habmm_handle,
 		                        msg, &size_bytes, 0, 0);
 		if (unlikely(ret)) {
-			if (-EINTR == ret) {
+			if (ret == -EINTR) {
+				if (hvq->type == MSM_VIRTQ_EVT_TYPE)
+					attach_buf_to_vq_buf(hvq, &hvq->vbuf_list, msg);
 				continue;
 			}
-			else if (-ENODEV == ret) {
+			else if (ret == -ENODEV) {
 				vpr_h(vvd2tag(vvd), "%s %s: socket 0x%x closed\n",
 				      vq_name, __func__, hvq->habmm_handle);
 				goto exit;
@@ -393,7 +393,7 @@ err:
 			      vq_name, __func__, hvq->resp_list.count);
 			evt->event_type = VIRTIO_VIDEO_EVENT_ERROR;
 			evt->stream_id = stream_id;
-			process_msm_hab_evt_resp(hvq, msg);
+			process_msm_hab_evt_resp(hvq, evt);
 		}
 	}
 	msm_hab_del_vqs(hvq->vq.vdev);
@@ -438,8 +438,8 @@ static int get_inital_data(struct hab_virtqueue hvq[], struct virtio_video_initi
 	int ret = 0;
 	struct virtio_video_device *vvd = NULL;
 
-	ret = habmm_socket_recv(hvq[EVENTQ].habmm_handle,
-				data, &size_bytes, 0, 0);
+	ret = habmm_socket_recv(hvq[EVENTQ].habmm_handle, data, &size_bytes,
+				HAB_TIMEOUT, HABMM_SOCKET_RECV_FLAGS_TIMEOUT);
 	if (ret)
 		vpr_e(vvd2tag(vvd), "failed to receive data, ret %d", ret);
 

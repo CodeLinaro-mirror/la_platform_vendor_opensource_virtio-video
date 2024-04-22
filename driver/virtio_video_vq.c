@@ -2,7 +2,7 @@
 /* Driver for virtio video device.
  *
  * Copyright 2020 OpenSynergy GmbH.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Based on drivers/gpu/drm/virtio/virtgpu_vq.c
  * Copyright (C) 2015 Red Hat, Inc.
@@ -444,12 +444,8 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 		      v4l2_type_name(v4l2_buf->type),
 		      v4l2_buf->index, export_id, v4l2_buf->flags, vb);
 
-		if (event_type == VIRTIO_VIDEO_EVENT_EBD)
-			msm_buf_put_export_id(stream, export_id);
-
 		virtio_video_buf_done(virtio_vb, v4l2_buf->flags,
-		                      v4l2_buffer_get_timestamp(v4l2_buf),
-		                      NULL);
+		                      v4l2_buffer_get_timestamp(v4l2_buf), NULL);
 	}
 }
 

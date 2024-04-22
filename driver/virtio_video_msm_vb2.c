@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "virtio_video.h"
@@ -71,16 +71,17 @@ int msm_vidc_queue_setup(struct vb2_queue *queue,
 	struct v4l2_format format = {0};
 
 	if (!queue || !num_buffers || !num_planes || !sizes) {
-		vpr_e(vvd2tag(vvd), "%s: invalid params: queue %pK, num_buffers %pK, num_planes %pK"
-		      "sizes %pK\n", __func__, queue, num_buffers, num_planes, sizes);
+		vpr_e(vvd2tag(vvd), "%s: invalid params: queue %pK, num_buffers %pK"
+		      ", num_planes %pK sizes %pK\n",
+		      __func__, queue, num_buffers, num_planes, sizes);
 		ret = -EINVAL;
 		goto exit;
 	}
 
 	stream = queue->drv_priv;
 	if (!stream || !stream->video_dev) {
-		vpr_e(vvd2tag(vvd), "%s: invalid params: stream %pk, video_dev %pK\n", __func__,
-		      stream, stream->video_dev);
+		vpr_e(vvd2tag(vvd), "%s: invalid params: stream %pk, video_dev %pK\n",
+		      __func__, stream, stream->video_dev);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -208,6 +209,18 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 
 	ret = virtio_video_cmd_streamoff(vvd, stream, queue->type);
 
+	if (queue->type == OUTPUT_MPLANE) {
+		vpr_h(strm2tag(stream), "%s: OUTPUT unexport\n", __func__);
+		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
+		vpr_h(strm2tag(stream), "%s: OUTMTA unexport\n", __func__);
+		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT_META);
+	} else if (queue->type == INPUT_MPLANE) {
+		vpr_h(strm2tag(stream), "%s:  INPUT unexport\n", __func__);
+		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
+		vpr_h(strm2tag(stream), "%s:  INMTA unexport\n", __func__);
+		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META);
+	}
+
 session_err:
 	if (ret) {
 		vpr_h(strm2tag(stream), "%s: streamoff %s failed %d, to release buffers\n",
@@ -271,9 +284,10 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 	if (queue->is_multiplanar) {
 		for (plane = 0; plane < vb2->num_planes; plane++) {
 			buf_fd = vb2->planes[plane].m.fd;
-			export_id[plane] = msm_buf_get_export_id(stream, buf_fd,
-								 vb2->planes[plane].length,
-								 vb2->type);
+			export_id[plane]
+				= msm_buf_get_export_id(stream, buf_fd,
+				                        vb2->planes[plane].length,
+				                        to_virtio_queue_type(vb2->type));
 			if (!export_id[plane]) {
 				ret = -1;
 				goto unexport;
@@ -287,8 +301,8 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 
 		for (plane = 0; plane < vb2->num_planes; plane++) {
 			pb->m.planes[plane].m.fd = export_id[plane];
-			vpr_h(strm2tag(stream), "%s: QBUF: %s: idx %d fd %d=%#x, "
-			      "size %d filled %d offset %d ts %llu vb2 %p\n", __func__,
+			vpr_h(strm2tag(stream), "%s: QBUF: %s: idx %3d fd %3d=%#3x "
+			      "size %8d filled %8d offset %d ts %llu vb2 %p\n", __func__,
 			      v4l2_type_name(pb->type), pb->index,
 			      pb->m.planes[plane].m.fd,
 			      pb->m.planes[plane].m.fd,
@@ -301,14 +315,15 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 		queue->buf_ops->fill_user_buffer(vb2, pb);
 
 		buf_fd = pb->m.fd;
-		export_id[0] = msm_buf_get_export_id(stream, buf_fd, pb->length, pb->type);
+		export_id[0] = msm_buf_get_export_id(stream, buf_fd, pb->length,
+		                                     to_virtio_queue_type(pb->type));
 		if (!export_id[0]) {
 			ret = -1;
 			goto unexport;
 		}
 		pb->m.fd = export_id[0];
-		vpr_h(strm2tag(stream), "%s: QBUF: %s: idx %d fd %d=%#x "
-		      "size %d filled %d ts %llu vb2 %p\n", __func__,
+		vpr_h(strm2tag(stream), "%s: QBUF: %s: idx %3d fd %3d=%#3x "
+		      "size %8d filled %8d ts %llu vb2 %p\n", __func__,
 		      v4l2_type_name(pb->type), pb->index, pb->m.fd, pb->m.fd,
 		      pb->length, pb->bytesused,
 		      v4l2_buffer_get_timestamp(pb), vb2);
@@ -324,7 +339,8 @@ unexport:
 	if (ret) {
 		for (plane = 0; plane < VIDEO_MAX_PLANES; plane++) {
 			if (export_id[plane])
-				msm_buf_put_export_id(stream, export_id[plane]);
+				msm_buf_put_export_id(stream, export_id[plane],
+				                      to_virtio_queue_type(vb2->type));
 		}
 	}
 

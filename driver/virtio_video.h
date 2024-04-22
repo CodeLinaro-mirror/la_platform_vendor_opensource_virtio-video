@@ -2,7 +2,7 @@
 /* Common header for virtio video driver.
  *
  * Copyright 2020 OpenSynergy GmbH.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,14 +57,6 @@
 	(V4L2_CTRL_ID2WHICH(idx) == V4L2_CTRL_CLASS_MPEG) && \
 	V4L2_CTRL_DRIVER_PRIV(idx))
 #endif
-
-struct buf_export_entry {
-	struct list_head list;
-	uint64_t inode;
-	uint32_t size;
-	uint32_t export_id;
-	enum virtio_video_queue_type buf_type;
-};
 
 struct buf_export_cache {
 	struct kmem_cache* exports;
