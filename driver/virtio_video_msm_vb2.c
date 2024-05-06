@@ -340,7 +340,7 @@ unexport:
 		for (plane = 0; plane < VIDEO_MAX_PLANES; plane++) {
 			if (export_id[plane])
 				msm_buf_put_export_id(stream, export_id[plane],
-				                      to_virtio_queue_type(vb2->type));
+				                      to_virtio_queue_type(vb2->type), true);
 		}
 	}
 

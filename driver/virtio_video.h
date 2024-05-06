@@ -62,6 +62,7 @@ struct buf_export_cache {
 	struct kmem_cache* exports;
 	struct list_head export_fifo;
 	int used_count;
+	struct mutex lock;
 };
 
 #define sg_init_one                 msm_hab_sg_init_one

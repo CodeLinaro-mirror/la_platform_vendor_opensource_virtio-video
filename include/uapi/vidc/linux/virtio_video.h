@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  * Copyright (C) 2020 OpenSynergy GmbH.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _UAPI_LINUX_VIRTIO_VIDEO_H
@@ -996,6 +996,13 @@ struct virtio_video_v4l2_buffer {
 	__u32                           length;
 	__u32                           padding2;
 	__u32                           padding;
+};
+
+#define VIRTIO_VIDEO_CLEANUP_LIMIT 5
+
+struct virtio_video_erased_buffers {
+	__u32    count;
+	__u32    export_ids[VIRTIO_VIDEO_CLEANUP_LIMIT];
 };
 
 struct virtio_video_cmd_hdr {
