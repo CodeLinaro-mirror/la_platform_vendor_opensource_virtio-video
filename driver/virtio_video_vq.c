@@ -383,6 +383,9 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 	int event_type = le32_to_cpu(evt->event_type);
 	struct virtio_video_buffer *entry = NULL, *virtio_vb = NULL;
 	struct v4l2_buffer *v4l2_buf = NULL;
+#ifdef VIRTIO_VIDEO_MSM
+	struct virtio_video_erased_buffers* buffers = NULL;
+#endif
 	struct vb2_v4l2_buffer *v4l2_vb = NULL;
 	struct vb2_buffer *vb = NULL;
 	int plane = 0;
@@ -450,6 +453,16 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 		virtio_video_buf_done(virtio_vb, v4l2_buf->flags,
 		                      v4l2_buffer_get_timestamp(v4l2_buf), NULL);
 	}
+
+#ifdef VIRTIO_VIDEO_MSM
+	msm_buf_put_export_id(stream, export_id, to_virtio_queue_type(v4l2_buf->type), false);
+
+	if (V4L2_TYPE_IS_MULTIPLANAR(v4l2_buf->type)) {
+		buffers = (struct virtio_video_erased_buffers*)((char*)v4l2_buf->m.planes +
+			   sizeof(v4l2_buf->m.planes[0]));
+		msm_buf_cleanup_buffers(stream, buffers);
+	}
+#endif
 }
 
 static void virtio_video_handle_event(struct virtio_video_device *vvd,
@@ -480,7 +493,7 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 		virtio_video_handle_buf_done(stream, evt);
 		break;
 	case VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED:
-		vpr_h(strm2tag(stream), "%s: stream_id=%u: resolution change event\n",
+		vpr_h(strm2tag(stream), "%s: stream_id=%u: reconfig/resolution change event\n",
 		      __func__, stream_id);
 #ifndef VIRTIO_VIDEO_MSM
 		virtio_video_cmd_get_params(vvd, stream,
