@@ -3,12 +3,17 @@
 #ifeq ($(CONFIG_MSM_VIRTIO_VIDEO), y)
 LINUXINCLUDE    += -I${VIDEO_ROOT}/include/uapi \
                    -I${KERNEL_ROOT}/include \
-                   -I${VIDEO_ROOT}/driver
+                   -I${VIDEO_ROOT}/driver \
+                   -I${VIDEO_ROOT}/include
 
 USERINCLUDE     += -I${VIDEO_ROOT}/include/uapi
 
 KBUILD_CPPFLAGS += -DVIRTIO_VIDEO_MSM
 KBUILD_CPPFLAGS += -DMSM_HAB_NO_SUPPORT
+## please comment out the ifeq macro to validate hw virtualization
+#ifeq ($(CONFIG_ARCH_NORDAU), y)
+#KBUILD_CPPFLAGS += -DMSM_VIDC_HW_VIRT
+#endif
 
 ccflags-y := -I"$(src)/include/uapi"
 

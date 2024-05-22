@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/errno.h>
 #include "virtio_video.h"
@@ -323,3 +323,242 @@ int virtio_video_cmd_try_fmt(struct virtio_video_device* vvd,
 
 	return -EINVAL;
 }
+
+#ifdef MSM_VIDC_HW_VIRT
+static int msm_create_hw_virt_stream(struct virtio_video_device *vvd)
+{
+	int ret = 0;
+	uint32_t stream_id = 0;
+	struct virtio_video_stream *stream = NULL;
+	char name[TASK_COMM_LEN]= {0};
+	enum virtio_video_format format = VIRTIO_VIDEO_FORMAT_H264;
+
+	stream = kzalloc(sizeof(*stream), GFP_KERNEL);
+	if (!stream) {
+		ret = -ENOMEM;
+	} else {
+		get_task_comm(name, current);
+		stream->client_id = INVALID_CLIENT_ID;
+		stream->codec = INVALID_CODEC;
+		stream->domain = cpu_to_le32(vvd->type);
+		snprintf(stream->tag, sizeof(stream->tag), VPR_TAG);
+		virtio_video_stream_id_get(vvd, stream, &stream_id);
+		stream->stream_id = stream_id;
+		vvd->gvm_stream_id = stream_id;
+		virtio_video_state_reset(stream);
+		ret = virtio_video_cmd_stream_create(vvd, stream_id, format, name);
+		if (ret) {
+			vpr_e(strm2tag(stream), "failed to create hw_virt stream\n");
+			virtio_video_stream_id_put(vvd, stream_id);
+			kfree(stream);
+		}
+	}
+
+	return ret;
+}
+
+static void
+virtio_video_cmd_open_gvm_cb(struct virtio_video_device *vvd,
+			     struct virtio_video_vbuffer *vbuf)
+{
+	struct virtio_video_open_gvm_resp *resp =
+		(struct virtio_video_open_gvm_resp *)vbuf->resp_buf;
+
+	vvd->device_core_mask = le32_to_cpu(resp->device_core_mask);
+}
+
+int32_t virtio_video_cmd_open_gvm(uint32_t vm_id, uint32_t device_id_mask)
+{
+	int32_t ret = 0;
+	struct virtio_video_open_gvm *req_p = NULL;
+	struct virtio_video_vbuffer *vbuf = NULL;
+	size_t resp_size = sizeof(struct virtio_video_open_gvm_resp);
+	struct virtio_video_device *vvd = msm_virtio_video_hw_virtualization_get_vvd();
+
+	if (vvd == NULL) {
+		vpr_e(VPR_TAG, "%s: invalid vvd", __func__);
+		ret = -EXDEV;
+	} else {
+		ret = msm_create_hw_virt_stream(vvd);
+		if (ret) {
+			vpr_e(VPR_TAG, "%S: failed creating hw_virt stream", __func__);
+		} else {
+			req_p = virtio_video_alloc_req_resp(vvd,
+			                                    virtio_video_cmd_open_gvm_cb,
+			                                    &vbuf,
+			                                    sizeof(*req_p),
+			                                    resp_size,
+			                                    NULL);
+			req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_OPEN_GVM);
+			req_p->hdr.stream_id = cpu_to_le32(vvd->gvm_stream_id);
+			req_p->vm_id = cpu_to_le32(vm_id);
+			req_p->device_id_mask = cpu_to_le32(device_id_mask);
+			ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
+			if (ret == -ETIMEDOUT) {
+			    vpr_e(vvd2tag(vvd), "timed out waiting for open gvm\n");
+			} else if (vvd->device_id_mask == req_p->device_id_mask) {
+			    vpr_e(vvd2tag(vvd), "open GVM BE returns NULL\n");
+			    ret = -EINVAL;
+			}
+		}
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(virtio_video_cmd_open_gvm);
+
+int32_t virtio_video_cmd_close_gvm(void)
+{
+	int32_t ret = 0;
+	struct virtio_video_close_gvm *req_p = NULL;
+	struct virtio_video_vbuffer *vbuf = NULL;
+	struct virtio_video_device *vvd = msm_virtio_video_hw_virtualization_get_vvd();
+
+	if (vvd == NULL) {
+		vpr_e(VPR_TAG, "%s: invalid vvd", __func__);
+		ret = -EXDEV;
+	} else {
+		struct virtio_video_stream *stream = idr_find(&vvd->stream_idr, vvd->gvm_stream_id);
+		req_p = virtio_video_alloc_req_resp(vvd,
+		                                    NULL,
+		                                    &vbuf,
+		                                    sizeof(*req_p),
+		                                    0,
+		                                    NULL);
+		req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_CLOSE_GVM);
+		req_p->hdr.stream_id = cpu_to_le32(vvd->gvm_stream_id);
+		ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
+		if (ret == -ETIMEDOUT) {
+		    vpr_e(vvd2tag(vvd), "timed out waiting for close gvm\n");
+		}
+		virtio_video_cmd_stream_destroy(vvd, vvd->gvm_stream_id);
+		virtio_video_stream_id_put(vvd, vvd->gvm_stream_id);
+		kfree(stream);
+		vvd->gvm_stream_id = 0;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(virtio_video_cmd_close_gvm);
+
+static void
+virtio_video_cmd_open_gvm_session_cb(struct virtio_video_device *vvd,
+				     struct virtio_video_vbuffer *vbuf)
+{
+	struct virtio_video_open_gvm_session_resp *resp =
+		(struct virtio_video_open_gvm_session_resp *)vbuf->resp_buf;
+
+	vvd->device_id = le32_to_cpu(resp->device_id);
+	vvd->session_id = le32_to_cpu(resp->session_id);
+	vvd->session_handle = le64_to_cpu(resp->session_handle);
+}
+
+int32_t virtio_video_cmd_open_gvm_session(uint32_t vm_id, uint32_t* device_id, uint32_t* session_id)
+{
+	int32_t ret = 0;
+	struct virtio_video_open_gvm_session *req_p = NULL;
+	struct virtio_video_vbuffer *vbuf = NULL;
+	struct virtio_video_device *vvd = msm_virtio_video_hw_virtualization_get_vvd();
+	size_t resp_size = sizeof(struct virtio_video_open_gvm_session_resp);
+
+	if (vvd == NULL) {
+		vpr_e(VPR_TAG, "%s: invalid vvd", __func__);
+		ret = -EXDEV;
+	} else {
+		if (vvd->session_handle == 0) {
+			req_p = virtio_video_alloc_req_resp(vvd,
+			                                    virtio_video_cmd_open_gvm_session_cb,
+			                                    &vbuf,
+			                                    sizeof(*req_p),
+			                                    resp_size,
+			                                    NULL);
+			req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_OPEN_GVM_SESSION);
+			req_p->hdr.stream_id = cpu_to_le32(vvd->gvm_stream_id);
+			req_p->vm_id = cpu_to_le32(vm_id);
+			ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
+			if (ret == -ETIMEDOUT) {
+				vpr_e(vvd2tag(vvd), "timed out waiting for open gvm session\n");
+			} else if (vvd->device_id == 0 || vvd->session_id == 0
+					 || vvd->session_handle == 0) {
+				vpr_e(vvd2tag(vvd), "open GVM session BE returns NULL\n");
+				ret = -EINVAL;
+			} else {
+				*device_id = vvd->device_id;
+				*session_id = vvd->session_id;
+			}
+		}
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(virtio_video_cmd_open_gvm_session);
+
+int32_t virtio_video_cmd_pause_gvm_session(uint32_t device_id, uint32_t session_id)
+{
+	int32_t ret = 0;
+	struct virtio_video_gvm_session *req_p = NULL;
+	struct virtio_video_vbuffer *vbuf = NULL;
+	struct virtio_video_device *vvd = msm_virtio_video_hw_virtualization_get_vvd();
+
+	if (vvd == NULL) {
+		vpr_e(VPR_TAG, "%s: invalid vvd", __func__);
+		ret = -EXDEV;
+	} else {
+		if (vvd->session_handle != 0) {
+			req_p = virtio_video_alloc_req_resp(vvd,
+			                                    NULL,
+			                                    &vbuf,
+			                                    sizeof(*req_p),
+			                                    0,
+			                                    NULL);
+			req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_PAUSE_GVM_SESSION);
+			req_p->hdr.stream_id = cpu_to_le32(vvd->gvm_stream_id);
+			req_p->device_id = cpu_to_le32(device_id);
+			req_p->session_id = cpu_to_le32(session_id);
+			req_p->session_handle = cpu_to_le64(vvd->session_handle);
+			ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
+			if (ret == -ETIMEDOUT) {
+			    vpr_e(vvd2tag(vvd), "timed out waiting for pause gvm session\n");
+			}
+		}
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(virtio_video_cmd_pause_gvm_session);
+
+int32_t virtio_video_cmd_resume_gvm_session(uint32_t device_id, uint32_t session_id)
+{
+	int32_t ret = 0;
+	struct virtio_video_gvm_session *req_p = NULL;
+	struct virtio_video_vbuffer *vbuf = NULL;
+	struct virtio_video_device *vvd = msm_virtio_video_hw_virtualization_get_vvd();
+
+	if (vvd == NULL) {
+		vpr_e(VPR_TAG, "%s: invalid vvd", __func__);
+		ret = -EXDEV;
+	} else {
+		if (vvd->session_handle != 0) {
+			req_p = virtio_video_alloc_req_resp(vvd,
+			                                    NULL,
+			                                    &vbuf,
+			                                    sizeof(*req_p),
+			                                    0,
+			                                    NULL);
+			req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_RESUME_GVM_SESSION);
+			req_p->hdr.stream_id = cpu_to_le32(vvd->gvm_stream_id);
+			req_p->device_id = cpu_to_le32(device_id);
+			req_p->session_id = cpu_to_le32(session_id);
+			req_p->session_handle = cpu_to_le64(vvd->session_handle);
+			ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
+			if (ret == -ETIMEDOUT) {
+			    vpr_e(vvd2tag(vvd), "timed out waiting for resume gvm session\n");
+			}
+		}
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(virtio_video_cmd_resume_gvm_session);
+
+#endif
