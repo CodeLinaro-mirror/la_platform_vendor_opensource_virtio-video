@@ -24,7 +24,7 @@
 #include <media/videobuf2-dma-sg.h>
 
 #include "virtio_video.h"
-#ifdef CONFIG_MSM_VIRTIO_HAB
+#if IS_ENABLED(CONFIG_MSM_HAB)
 #include "virtio_video_msm_hab.h"
 #endif
 #include "virtio_video_msm_v4l2.h"

@@ -22,11 +22,11 @@
  */
 
 #include "virtio_video.h"
-#ifdef CONFIG_MSM_VIRTIO_HAB
+#ifdef VIRTIO_VIDEO_MSM
 #include "virtio_video_msm_hab.h"
 #include "virtio_video_msm_debug.h"
-#endif
 #include "virtio_video_msm_mem.h"
+#endif
 #ifdef MSM_VIDC_HW_VIRT
 #include "vidc_hw_virt.h"
 #endif
