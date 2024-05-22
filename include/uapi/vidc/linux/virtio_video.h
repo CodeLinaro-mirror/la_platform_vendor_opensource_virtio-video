@@ -998,6 +998,13 @@ struct virtio_video_v4l2_buffer {
 	__u32                           padding;
 };
 
+#define VIRTIO_VIDEO_CLEANUP_LIMIT 5
+
+struct virtio_video_erased_buffers {
+	__u32    count;
+	__u32    export_ids[VIRTIO_VIDEO_CLEANUP_LIMIT];
+};
+
 struct virtio_video_cmd_hdr {
 	__le32    type; /* One of enum virtio_video_cmd_type */
 	__le32    stream_id;
