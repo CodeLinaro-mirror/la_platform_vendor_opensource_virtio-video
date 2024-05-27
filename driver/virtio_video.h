@@ -295,6 +295,7 @@ struct virtio_video_device {
 	uint64_t gvm_stream_id;
 	uint32_t device_id_mask;
 	uint32_t device_core_mask;
+	uint32_t vm_id;
 	uint32_t device_id;
 	uint32_t session_id;
 	uint64_t session_handle;

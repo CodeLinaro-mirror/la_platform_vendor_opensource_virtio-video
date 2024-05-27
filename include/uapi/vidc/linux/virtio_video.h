@@ -1587,15 +1587,10 @@ struct virtio_video_gvm_session {
 	__le64 session_handle;
 };
 
-#define GVM_DEVICE_ID_0         0x00000001
-#define GVM_DEVICE_ID_1         0x00000002
-#define GVM_DEVICE_0_CORE_0     0x00000010
-#define GVM_DEVICE_0_CORE_1     0x00000020
-#define GVM_DEVICE_1_CORE_0     0x00000100
-#define GVM_DEVICE_1_CORE_1     0x00000200
-#define GVM_SSR_DEVICE_0        0x00000001
-#define GVM_SSR_DEVICE_1        0x00000002
-#define GVM_SSR_DEVICE_DRIVER   0x80000000
+#define VIDC_DEVICE_0               0x00000001
+#define VIDC_DEVICE_1               0x00000002
+#define VIDC_CORE_0                 0x00000001
+#define VIDC_CORE_1                 0x00000002
 
 #endif
 
