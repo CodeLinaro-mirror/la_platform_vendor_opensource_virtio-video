@@ -367,7 +367,9 @@ virtio_video_cmd_open_gvm_cb(struct virtio_video_device *vvd,
 	vvd->device_core_mask = le32_to_cpu(resp->device_core_mask);
 }
 
-int32_t virtio_video_cmd_open_gvm(uint32_t vm_id, uint32_t device_id_mask)
+int32_t virtio_video_cmd_open_gvm(uint32_t vm_id,
+				  uint32_t device_id_mask,
+				  uint32_t *device_core_mask)
 {
 	int32_t ret = 0;
 	struct virtio_video_open_gvm *req_p = NULL;
@@ -396,9 +398,9 @@ int32_t virtio_video_cmd_open_gvm(uint32_t vm_id, uint32_t device_id_mask)
 			ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 			if (ret == -ETIMEDOUT) {
 			    vpr_e(vvd2tag(vvd), "timed out waiting for open gvm\n");
-			} else if (vvd->device_id_mask == req_p->device_id_mask) {
-			    vpr_e(vvd2tag(vvd), "open GVM BE returns NULL\n");
-			    ret = -EINVAL;
+			} else {
+			    *device_core_mask = vvd->device_core_mask;
+			    vvd->vm_id = vm_id;
 			}
 		}
 	}
@@ -453,7 +455,7 @@ virtio_video_cmd_open_gvm_session_cb(struct virtio_video_device *vvd,
 	vvd->session_handle = le64_to_cpu(resp->session_handle);
 }
 
-int32_t virtio_video_cmd_open_gvm_session(uint32_t vm_id, uint32_t* device_id, uint32_t* session_id)
+int32_t virtio_video_cmd_open_gvm_session(uint32_t* device_id, uint32_t* session_id)
 {
 	int32_t ret = 0;
 	struct virtio_video_open_gvm_session *req_p = NULL;
@@ -474,7 +476,7 @@ int32_t virtio_video_cmd_open_gvm_session(uint32_t vm_id, uint32_t* device_id, u
 			                                    NULL);
 			req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_OPEN_GVM_SESSION);
 			req_p->hdr.stream_id = cpu_to_le32(vvd->gvm_stream_id);
-			req_p->vm_id = cpu_to_le32(vm_id);
+			req_p->vm_id = cpu_to_le32(vvd->vm_id);
 			ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 			if (ret == -ETIMEDOUT) {
 				vpr_e(vvd2tag(vvd), "timed out waiting for open gvm session\n");

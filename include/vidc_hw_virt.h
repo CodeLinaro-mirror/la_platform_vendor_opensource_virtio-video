@@ -31,9 +31,11 @@ struct virtio_video_queuing_event {
  */
 int virtio_video_queue_event_wait(struct virtio_video_event *evt);
 
-int32_t virtio_video_cmd_open_gvm(uint32_t vm_id, uint32_t device_id_mask);
+int32_t virtio_video_cmd_open_gvm(uint32_t vm_id,
+				  uint32_t device_id_mask,
+				  uint32_t *device_core_mask);
 int32_t virtio_video_cmd_close_gvm(void);
-int32_t virtio_video_cmd_open_gvm_session(uint32_t vm_id, uint32_t* device_id, uint32_t* session_id);
+int32_t virtio_video_cmd_open_gvm_session(uint32_t* device_id, uint32_t* session_id);
 int32_t virtio_video_cmd_pause_gvm_session(uint32_t device_id, uint32_t session_id);
 int32_t virtio_video_cmd_resume_gvm_session(uint32_t device_id, uint32_t session_id);
 
