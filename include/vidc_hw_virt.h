@@ -10,9 +10,10 @@
 #include <linux/virtio.h>
 #include <linux/virtio_ids.h>
 #include <linux/virtio_config.h>
-#include <vidc/linux/virtio_video.h>
 #include <linux/list.h>
 #include <linux/completion.h>
+#include <include/virtio_video.h>
+#include <include/virtio_video_msm_ext.h>
 
 /*========================================================================
  Defines structure

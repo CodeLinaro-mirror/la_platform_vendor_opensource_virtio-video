@@ -32,6 +32,7 @@
 #include <media/videobuf2-dma-sg.h>
 #include <media/videobuf2-dma-contig.h>
 #include "include/virtio_video.h"
+#include "include/virtio_video_msm_ext.h"
 #ifdef MSM_VIDC_HW_VIRT
 #include "include/vidc_hw_virt.h"
 #endif
@@ -42,6 +43,12 @@
 #define MIN_BUFS_MAX VIDEO_MAX_FRAME
 #define MIN_BUFS_STEP 1
 #define MIN_BUFS_DEF 1
+
+enum virtio_video_device_type {
+	VIRTIO_VIDEO_DEVICE_ENCODER = 0x0100,
+	VIRTIO_VIDEO_DEVICE_DECODER,
+	VIRTIO_VIDEO_DEVICE_CAMERA,
+};
 
 #ifdef VIRTIO_VIDEO_MSM
 #define INPUT_MPLANE V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE

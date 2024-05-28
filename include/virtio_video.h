@@ -3,6 +3,7 @@
  * Virtio Video Device
  *
  * Copyright (C) 2020-2023 OpenSynergy GmbH.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _UAPI_LINUX_VIRTIO_VIDEO_H
@@ -22,7 +23,9 @@
  * scatter-gather lists.
  */
 #define VIRTIO_VIDEO_F_RESOURCE_NON_CONTIG 1
-
+#ifdef VIRTIO_VIDEO_MSM
+#define VIRTIO_VIDEO_F_VENDOR              2
+#endif
 #define VIRTIO_VIDEO_MAX_PLANES 8
 
 /*
@@ -145,6 +148,11 @@ enum virtio_video_cmd_type {
 	VIRTIO_VIDEO_CMD_GET_CONTROL,
 	VIRTIO_VIDEO_CMD_SET_CONTROL,
 
+#ifdef VIRTIO_VIDEO_MSM
+	VIRTIO_VIDEO_CMD_STREAMON,
+	VIRTIO_VIDEO_CMD_STREAMOFF,
+	VIRTIO_VIDEO_CMD_STREAM_START,
+#endif
 	/* Response */
 	VIRTIO_VIDEO_RESP_OK_NODATA = 0x0200,
 	VIRTIO_VIDEO_RESP_OK_QUERY_CAPABILITY,
@@ -170,6 +178,10 @@ struct virtio_video_cmd_hdr {
 enum virtio_video_queue_type {
 	VIRTIO_VIDEO_QUEUE_TYPE_INPUT = 0x100,
 	VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT,
+#ifdef VIRTIO_VIDEO_MSM
+	VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META,
+	VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT_META,
+#endif
 };
 
 struct virtio_video_query_capability {
@@ -447,9 +459,15 @@ struct virtio_video_set_control_resp {
 enum virtio_video_event_type {
 	/* For all devices */
 	VIRTIO_VIDEO_EVENT_ERROR = 0x0100,
-
+#ifdef VIRTIO_VIDEO_MSM
+	VIRTIO_VIDEO_EVENT_FBD,
+	VIRTIO_VIDEO_EVENT_EBD,
+#endif
 	/* For decoder only */
 	VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED = 0x0200,
+#ifdef MSM_VIDC_HW_VIRT
+	VIRTIO_VIDEO_EVENT_GVM_SSR = 0x0300,
+#endif
 };
 
 struct virtio_video_event {
