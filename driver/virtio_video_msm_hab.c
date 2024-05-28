@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kthread.h>
@@ -298,7 +298,7 @@ err:
 
 static int process_msm_hab_evt_resp(struct hab_virtqueue *hvq, void *data)
 {
-	struct virtio_video_event *evt = (struct virtio_video_event *)data;
+	struct virtio_video_msm_event *evt = (struct virtio_video_msm_event *)data;
 	struct virtqueue *vq = &hvq->vq;
 	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
 	char *tag = stream_id2tag(vvd, evt->stream_id);
@@ -338,7 +338,7 @@ static int virtio_video_hab_resp_handler(void *p)
 {
 	struct hab_virtqueue *hvq = p;
 	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
-	struct virtio_video_event *evt = NULL;
+	struct virtio_video_msm_event *evt = NULL;
 	struct virtio_video_stream *stream = NULL;
 	const char *vq_name = hvq->vq.name;
 	uint8_t buf[MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE] = {0};
@@ -363,7 +363,7 @@ static int virtio_video_hab_resp_handler(void *p)
 				ret = -ENOENT;
 				goto err;
 			}
-			size_bytes = sizeof(struct virtio_video_event);
+			size_bytes = sizeof(struct virtio_video_msm_event);
 		} else {
 			vpr_l(vvd2tag(vvd), "%s %s: wait to recv\n", vq_name, __func__);
 			trace_hab_resp_cmd_dq_vqbuf(1);
