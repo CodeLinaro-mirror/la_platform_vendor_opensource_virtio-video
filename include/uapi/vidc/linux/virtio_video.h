@@ -1038,7 +1038,7 @@ enum virtio_video_v4l2_ctrl_type {
 #define VIRTIO_VIDEO_V4L2_CTRL_MAX_DIMS  (4)
 #define VIRTIO_BIT(nr)                   ((1) << (nr))
 
-enum msm_vidc_inst_capability_flags {
+enum virtio_video_msm_inst_capability_flags {
 	CAP_FLAG_NONE                    = 0,
 	CAP_FLAG_DYNAMIC_ALLOWED         = VIRTIO_BIT(0),
 	CAP_FLAG_MENU                    = VIRTIO_BIT(1),
@@ -1050,7 +1050,7 @@ enum msm_vidc_inst_capability_flags {
 	CAP_FLAG_META                    = VIRTIO_BIT(7),
 };
 /* various Metadata - encoder & decoder */
-enum msm_vidc_metadata_bits {
+enum virtio_video_msm_metadata_bits {
 	MSM_VIDC_META_DISABLE          = 0x0,
 	MSM_VIDC_META_ENABLE           = 0x1,
 	MSM_VIDC_META_TX_INPUT         = 0x2,
@@ -1598,6 +1598,7 @@ struct virtio_video_gvm_session {
 #define VIDC_DEVICE_1               0x00000002
 #define VIDC_CORE_0                 0x00000001
 #define VIDC_CORE_1                 0x00000002
+#define GVM_SSR_DEVICE_DRIVER       0x80000000
 
 #endif
 
