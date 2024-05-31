@@ -1,11 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
-LINUXINCLUDE    += -I${VIDEO_ROOT}/include/uapi \
-                   -I${KERNEL_ROOT}/include \
+LINUXINCLUDE    += -I${KERNEL_ROOT}/include \
                    -I${VIDEO_ROOT}/driver \
-                   -I${VIDEO_ROOT}/include
-
-USERINCLUDE     += -I${VIDEO_ROOT}/include/uapi
+                   -I${VIDEO_ROOT}
 
 KBUILD_CPPFLAGS += -DVIRTIO_VIDEO_MSM
 KBUILD_CPPFLAGS += -DMSM_HAB_NO_SUPPORT
