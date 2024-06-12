@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kthread.h>
@@ -15,13 +15,21 @@
 #include "virtio_video_msm_mem.h"
 
 #define MAX_EXPORT_RETRY 5
-#define MAX_NUM_EXPORT_CACHE_ENTRY 128
+#define MAX_NUM_EXPORT_CACHE_ENTRY 256
 
+
+struct buf_export_entry {
+	struct list_head list;
+	uint64_t inode;
+	uint32_t size;
+	uint32_t export_id;
+	enum virtio_video_queue_type queue_type;
+};
 
 static struct buf_export_entry*
 get_entry_from_fd(struct list_head *fifo,
                   uint64_t fd, uint32_t size,
-                  enum virtio_video_queue_type buf_type,
+                  enum virtio_video_queue_type queue_type,
                   const char *tag)
 {
 	struct buf_export_entry *entry = NULL, *found = NULL;
@@ -30,18 +38,18 @@ get_entry_from_fd(struct list_head *fifo,
 
 	dmabuf = dma_buf_get(fd);
 	if (IS_ERR_OR_NULL(dmabuf)) {
-		vpr_e(tag, "%s: dma_buf_get error fd=0x%x", __func__, fd);
+		vpr_e(tag, "%s: dma_buf_get error fd=%d", __func__, fd);
 		goto exit;
 	}
 
 	inode = (uint64_t)dmabuf->file->f_inode;
 	list_for_each_entry(entry, fifo, list) {
 		if ((entry->inode == inode) &&
-		    (entry->buf_type == buf_type) && (entry->size == size)) {
+		    (entry->queue_type == queue_type) && (entry->size == size)) {
 			found = entry;
-			vpr_h(tag, "%s: fd %d, export_id=%d, inode %#x buffer_type %d, size %d",
+			vpr_h(tag, "%s: fd %d export_id=%d inode %#x queue_type %2d, sz %d",
 			      __func__, fd, entry->export_id, inode,
-			      buf_type, size);
+			      queue_type, size);
 			break;
 		}
 	}
@@ -54,7 +62,7 @@ exit:
 static struct buf_export_entry*
 alloc_one_export_entry(struct buf_export_cache* cache,
                        uint64_t fd, uint32_t size,
-                       enum virtio_video_queue_type buf_type,
+                       enum virtio_video_queue_type queue_type,
                        uint32_t export_id,
                        const char *tag)
 {
@@ -63,7 +71,8 @@ alloc_one_export_entry(struct buf_export_cache* cache,
 	uint64_t inode = 0;
 
 	if (cache->used_count >= MAX_NUM_EXPORT_CACHE_ENTRY) {
-		vpr_e(tag, "%s: export cache is full, fd %d", __func__, fd);
+		vpr_e(tag, "%s: export cache full(%d>=%d), fd %d", __func__,
+		      cache->used_count, MAX_NUM_EXPORT_CACHE_ENTRY, fd);
 		goto exit;
 	}
 
@@ -82,13 +91,13 @@ alloc_one_export_entry(struct buf_export_cache* cache,
 		entry->inode = inode;
 		entry->export_id = export_id;
 		entry->size = size;
-		entry->buf_type = buf_type;
+		entry->queue_type = queue_type;
 
 		list_add_tail(&entry->list, &cache->export_fifo);
 		cache->used_count++;
-		vpr_h(tag, "%s: fd %d export_id %d inode %#x dmabuf %#x size %d buf_type %d cache_size %d",
+		vpr_h(tag, "%s: fd %3d export_id %3d inode %#x dmabuf %#x queue_type %#2d cache count %2d sz %d",
 		      __func__, fd, export_id, inode, dmabuf,
-		      size, buf_type, cache->used_count);
+		      queue_type, cache->used_count, size);
 	}
 
 	dma_buf_put(dmabuf);
@@ -97,14 +106,14 @@ exit:
 	return entry;
 }
 
-uint32_t msm_buf_get_export_id(struct virtio_video_stream* stream,
-			       uint64_t fd, uint32_t size,
-			       enum virtio_video_queue_type buf_type)
+int msm_buf_get_export_id(struct virtio_video_stream* stream,
+                          uint64_t fd, uint32_t size,
+                          enum virtio_video_queue_type queue_type)
 {
 	uint32_t habmmhandle = get_habmm_handle(stream);
 	int ret = 0;
 	uint32_t export_id = 0;
-	const uint32_t export_flag = HABMM_EXPIMP_FLAGS_FD;
+	const uint32_t exp_flag = HABMM_EXPIMP_FLAGS_FD;
 	int i = 0;
 	struct buf_export_entry *entry = NULL;
 	const char *tag = strm2tag(stream);
@@ -115,7 +124,7 @@ uint32_t msm_buf_get_export_id(struct virtio_video_stream* stream,
 	}
 
 	entry = get_entry_from_fd(&stream->buf_cache.export_fifo,
-	                          fd, size, buf_type, tag);
+	                          fd, size, queue_type, tag);
 	if (entry) {
 		export_id = entry->export_id;
 		goto exit;
@@ -123,44 +132,41 @@ uint32_t msm_buf_get_export_id(struct virtio_video_stream* stream,
 
 	//alloc an entry if no existing one
 	for (i = 0; i < MAX_EXPORT_RETRY && ret != -ENOMEM; i++) {
-		ret = habmm_export(habmmhandle, (void*)fd, size, &export_id, export_flag);
-		if (ret) {
-			vpr_e(tag, "%s: export failed. retry %d rc %d", __func__, i, ret);
-		} else {
-			vpr_h(tag, "%s: export ok, type %d fd %d export_id %d sz %d retry %d",
-			      __func__, buf_type, fd, export_id, size, i);
+		ret = habmm_export(habmmhandle, (void*)fd, size, &export_id, exp_flag);
+		if (!ret) {
+			vpr_h(tag, "%s: export ok, queue_type %2d fd %3d export_id %3d sz %d",
+			      __func__, queue_type, fd, export_id, size);
 			break;
 		}
 	}
 
 	if (unlikely(ret) || unlikely(!export_id)) {
-		vpr_e(tag, "%s: export failed. buf type %d fd %d sz %d", __func__,
-		      buf_type, fd, size);
+		vpr_e(tag, "%s: export failed. queue_type %#3d fd %3d sz %d", __func__,
+		      queue_type, fd, size);
 		export_id = 0;
 		goto exit;
 	}
 
-	if (buf_type == OUTPUT_MPLANE || buf_type == OUTPUT_META_PLANE) {
-		entry = alloc_one_export_entry(&stream->buf_cache, fd, size,
-		                               buf_type, export_id, tag);
-		if (!entry) {
-			vpr_e(tag, "alloc entry failed");
+	entry = alloc_one_export_entry(&stream->buf_cache, fd, size,
+	                               queue_type, export_id, tag);
+	if (!entry) {
+		vpr_e(tag, "alloc entry failed");
 
-			if (habmm_unexport(habmmhandle, export_id, 0))
-				vpr_e(tag, "failed to unexport id %d", export_id);
+		if (habmm_unexport(habmmhandle, export_id, 0))
+			vpr_e(tag, "failed to unexport id %d", export_id);
 
-			export_id = 0;
-		} else {
-			vpr_h(tag, "%s: alloc entry. buf type %d fd %d export_id %d sz %d",
-			      __func__, buf_type, fd, export_id, size);
-		}
+		export_id = 0;
+	} else {
+		vpr_h(tag, "%s: alloc entry. queue_type %2d fd %3d export_id %d sz %d",
+		      __func__, queue_type, fd, export_id, size);
 	}
 
 exit:
 	return export_id;
 }
 
-int msm_buf_put_export_id(struct virtio_video_stream* stream, uint32_t export_id)
+static inline int msm_buf_unexport(struct virtio_video_stream* stream,
+                                   uint32_t export_id)
 {
 	int ret = 0;
 	uint32_t habmmhandle = get_habmm_handle(stream);
@@ -170,8 +176,63 @@ int msm_buf_put_export_id(struct virtio_video_stream* stream, uint32_t export_id
 		vpr_e(strm2tag(stream), "%s: failed to unexport id %d, ret=%d",
 		      __func__, export_id, ret);
 	else
-		vpr_h(strm2tag(stream), "%s: unexport ok, export_id=%d",
-		      __func__, export_id);
+		vpr_h(strm2tag(stream), "%s: unexport ok, export_id %d", __func__,
+		      export_id);
+
+	return ret;
+}
+
+static inline void msm_buf_free_cache_entry(struct virtio_video_stream* stream,
+                                            struct buf_export_entry *entry)
+{
+	struct buf_export_cache* cache = &stream->buf_cache;
+
+	list_del(&entry->list);
+	kmem_cache_free(cache->exports, entry);
+	cache->used_count--;
+
+	vpr_l(strm2tag(stream), "%s: export_id %d, cache released, cache count %d",
+	      __func__, entry->export_id, cache->used_count);
+
+	return;
+}
+
+int msm_buf_put_export_id(struct virtio_video_stream* stream,
+                          uint32_t export_id,
+                          enum virtio_video_queue_type queue_type)
+{
+	int ret = 0;
+	struct buf_export_entry* entry = NULL, *temp = NULL;
+	struct buf_export_cache* cache = &stream->buf_cache;
+
+	ret = msm_buf_unexport(stream, export_id);
+
+	list_for_each_entry_safe(entry, temp, &cache->export_fifo, list) {
+		if (entry->export_id == export_id) {
+			msm_buf_free_cache_entry(stream, entry);
+			vpr_l(strm2tag(stream), "%s: queue_type %2d export_id %d",
+			      __func__, entry->queue_type, export_id);
+			break;
+		}
+	}
+
+	return ret;
+}
+
+int msm_buf_put_export_queue_type(struct virtio_video_stream* stream,
+                                  enum virtio_video_queue_type queue_type)
+{
+	int ret = 0;
+	struct buf_export_entry* entry = NULL, *temp = NULL;
+	struct buf_export_cache* cache = &stream->buf_cache;
+	vpr_l(strm2tag(stream), "%s: queue_type %2d", __func__, queue_type);
+
+	list_for_each_entry_safe(entry, temp, &cache->export_fifo, list) {
+		if (entry->queue_type == queue_type) {
+			ret = msm_buf_unexport(stream, entry->export_id);
+			msm_buf_free_cache_entry(stream, entry);
+		}
+	}
 
 	return ret;
 }
@@ -182,7 +243,7 @@ int msm_export_cache_init(struct virtio_video_stream* stream)
 	int ret = 0;
 
 	cache->exports = kmem_cache_create("virtio-video-exp-cache",
-					   sizeof(struct buf_export_entry), 0, 0, NULL);
+	                              sizeof(struct buf_export_entry), 0, 0, NULL);
 	if (!cache->exports) {
 		ret = -ENOMEM;
 		goto exit;
@@ -201,10 +262,10 @@ void msm_export_cache_destroy(struct virtio_video_stream* stream)
 	struct buf_export_cache* cache = &stream->buf_cache;
 
 	list_for_each_entry_safe(entry, temp, &cache->export_fifo, list) {
-		list_del(&entry->list);
-		msm_buf_put_export_id(stream, entry->export_id);
-		kmem_cache_free(cache->exports, entry);
+		msm_buf_unexport(stream, entry->export_id);
+		msm_buf_free_cache_entry(stream, entry);
 	}
+
 	kmem_cache_destroy(cache->exports);
 	cache->used_count = 0;
 }
