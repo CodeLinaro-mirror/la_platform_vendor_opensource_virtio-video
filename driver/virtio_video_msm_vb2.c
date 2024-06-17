@@ -395,6 +395,7 @@ int vb2q_init(struct virtio_video_stream *stream,
 	queue->drv_priv = stream;
 	queue->allow_zero_bytesused = 1;
 	queue->copy_timestamp = 1;
+	queue->buf_struct_size = sizeof(struct virtio_video_buffer);
 
 	ret = vb2_queue_init(queue);
 	if (ret)
