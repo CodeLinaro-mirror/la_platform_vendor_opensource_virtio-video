@@ -1326,6 +1326,7 @@ static const struct v4l2_m2m_ops virtio_video_device_m2m_ops = {
 	.job_abort	= virtio_video_device_job_abort,
 };
 
+#ifndef MSM_VIDC_HW_VIRT
 static int virtio_video_device_register(struct virtio_video_device *vvd)
 {
 	int ret;
@@ -1353,6 +1354,7 @@ static void virtio_video_device_unregister(struct virtio_video_device *vvd)
 {
 	video_unregister_device(&vvd->video_dev);
 }
+#endif
 
 #ifdef VIRTIO_VIDEO_MSM
 
@@ -1626,19 +1628,22 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 		goto parse_ctrl_err;
 	}
 #endif
+#ifndef MSM_VIDC_HW_VIRT
 	ret = virtio_video_device_register(vvd);
 	if (ret) {
 		vpr_e(vvd2tag(vvd), "failed to init virtio video device\n");
 		goto register_err;
 	}
-
+#endif
 	goto out_cleanup;
 
+#ifndef MSM_VIDC_HW_VIRT
 register_err:
 #ifdef VIRTIO_VIDEO_MSM
 	virtio_video_clean_controls(vvd);
 #else
 	virtio_video_clean_control(vvd);
+#endif
 #endif
 #ifndef MSM_HAB_NO_SUPPORT
 parse_ctrl_err:
@@ -1663,7 +1668,9 @@ void virtio_video_device_deinit(struct virtio_video_device *vvd)
 {
 	vvd->commandq.ready = false;
 	vvd->eventq.ready = false;
+#ifndef MSM_VIDC_HW_VIRT
 	virtio_video_device_unregister(vvd);
+#endif
 	if (vvd->is_m2m_dev)
 		v4l2_m2m_release(vvd->m2m_dev);
 #ifdef VIRTIO_VIDEO_MSM
