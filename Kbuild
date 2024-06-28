@@ -6,14 +6,15 @@ LINUXINCLUDE    += -I${KERNEL_ROOT}/include \
 
 KBUILD_CPPFLAGS += -DVIRTIO_VIDEO_MSM
 KBUILD_CPPFLAGS += -DMSM_HAB_NO_SUPPORT
-## please comment out the ifeq macro to validate hw virtualization
-#ifeq ($(CONFIG_ARCH_NORDAU), y)
-#KBUILD_CPPFLAGS += -DMSM_VIDC_HW_VIRT
-#endif
+
+ifeq ($(CONFIG_ARCH_NORDAU), y)
+KBUILD_CPPFLAGS += -DMSM_VIDC_HW_VIRT
+msm_virtio_video-objs += driver/virtio_video_msm_hw_virt.o
+endif
 
 ccflags-y := -I"$(src)/include/uapi"
 
-msm_virtio_video-objs := \
+msm_virtio_video-objs += \
 	driver/virtio_video_driver.o \
 	driver/virtio_video_vq.o \
 	driver/virtio_video_device.o \

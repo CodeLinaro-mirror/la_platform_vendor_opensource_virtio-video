@@ -610,7 +610,7 @@ int virtio_video_pending_event_list_del(struct virtio_video_device *vvd,
 bool is_priv_ctrl(u32 id);
 
 #ifdef MSM_VIDC_HW_VIRT
-struct virtio_video_device* msm_virtio_video_hw_virtualization_get_vvd(void);
+struct virtio_video_device* msm_virtio_video_hw_virt_get_vvd(void);
 #endif
 
 #endif

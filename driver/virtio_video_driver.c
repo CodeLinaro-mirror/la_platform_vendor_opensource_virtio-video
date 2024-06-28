@@ -379,13 +379,17 @@ static struct virtio_device* venc = NULL;
 static struct virtio_device* vdec = NULL;
 
 #ifdef MSM_VIDC_HW_VIRT
-struct virtio_video_device* msm_virtio_video_hw_virtualization_get_vvd(void)
+/* HW Virtualization uses only single HAB
+ * channel for both encoder and decoder.
+ */
+struct virtio_video_device* msm_virtio_video_hw_virt_get_vvd(void)
 {
 	struct virtio_video_device *vvd = NULL;
-	if (NULL == vdec) {
-		vpr_e(VPR_TAG, "failed to get vdev for hardware virtualization\n");
-	}
-	else {
+
+	if (!vdec) {
+		vpr_e(VPR_TAG,
+		      "failed to get vdev for hardware virtualization\n");
+	} else {
 		vvd = (struct virtio_video_device *)vdec->priv;
 	}
 

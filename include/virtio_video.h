@@ -465,9 +465,6 @@ enum virtio_video_event_type {
 #endif
 	/* For decoder only */
 	VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED = 0x0200,
-#ifdef MSM_VIDC_HW_VIRT
-	VIRTIO_VIDEO_EVENT_GVM_SSR = 0x0300,
-#endif
 };
 
 struct virtio_video_event {
