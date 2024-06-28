@@ -6,6 +6,9 @@
 #define CREATE_TRACE_POINTS
 #include "virtio_video_msm_debug.h"
 #include "virtio_video.h"
+#ifdef MSM_VIDC_HW_VIRT
+#include "include/virtio_video_hw_virt.h"
+#endif
 
 void put_inst(struct virtio_video_stream *stream)
 {
@@ -79,6 +82,18 @@ const char *cmd_to_string(uint32_t cmd_type)
 		return "STREAMOFF";
 	case VIRTIO_VIDEO_CMD_STREAM_START:
 		return "STREAM_START";
+#ifdef MSM_VIDC_HW_VIRT
+	case VIRTIO_VIDEO_CMD_OPEN_GVM:
+		return "OPEN_GVM";
+	case VIRTIO_VIDEO_CMD_CLOSE_GVM:
+		return "CLOSE_GVM";
+	case VIRTIO_VIDEO_CMD_OPEN_GVM_SESSION:
+		return "OPEN_GVM_SESSION";
+	case VIRTIO_VIDEO_CMD_PAUSE_GVM_SESSION:
+		return "PAUSE_GVM_SESSION";
+	case VIRTIO_VIDEO_CMD_RESUME_GVM_SESSION:
+		return "RESUME_GVM_SESSION";
+#endif
 
 	/* Response */
 	case VIRTIO_VIDEO_RESP_OK_NODATA:
@@ -106,6 +121,18 @@ const char *cmd_to_string(uint32_t cmd_type)
 		return "RESP_ERR_INVALID_PARAMETER";
 	case VIRTIO_VIDEO_RESP_ERR_UNSUPPORTED_CONTROL:
 		return "RESP_ERR_UNSUPPORTED_CONTROL";
+#ifdef MSM_VIDC_HW_VIRT
+	case VIRTIO_VIDEO_RESP_OPEN_GVM:
+		return "RESP_OPEN_GVM";
+	case VIRTIO_VIDEO_RESP_CLOSE_GVM:
+		return "RESP_CLOSE_GVM";
+	case VIRTIO_VIDEO_RESP_OPEN_GVM_SESSION:
+		return "RESP_OPEN_GVM_SESSION";
+	case VIRTIO_VIDEO_RESP_PAUSE_GVM_SESSION:
+		return "RESP_PAUSE_GVM_SESSION";
+	case VIRTIO_VIDEO_RESP_RESUME_GVM_SESSION:
+		return "RESP_RESUME_GVM_SESSION";
+#endif
 
 	/* sub_cmd*/
 	case ENUM_FMT:
@@ -172,6 +199,10 @@ const char *event2str(uint32_t event)
 		return "RCH";
 	case VIRTIO_VIDEO_EVENT_ERROR:
 		return "ERR";
+#ifdef MSM_VIDC_HW_VIRT
+	case VIRTIO_VIDEO_EVENT_GVM_SSR:
+		return "GVM_SSR";
+#endif
 	}
 
 	return "N/A";
