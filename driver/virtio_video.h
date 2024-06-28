@@ -24,7 +24,6 @@
 #include <linux/virtio.h>
 #include <linux/virtio_ids.h>
 #include <linux/virtio_config.h>
-#include <vidc/linux/virtio_video.h>
 #include <linux/list.h>
 #include <linux/completion.h>
 #include <media/v4l2-device.h>
@@ -32,8 +31,9 @@
 #include <media/v4l2-ctrls.h>
 #include <media/videobuf2-dma-sg.h>
 #include <media/videobuf2-dma-contig.h>
+#include "include/virtio_video.h"
 #ifdef MSM_VIDC_HW_VIRT
-#include "vidc_hw_virt.h"
+#include "include/vidc_hw_virt.h"
 #endif
 
 #define DRIVER_NAME "virtio-video"
