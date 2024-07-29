@@ -63,7 +63,7 @@
 /*P010*/
 #define VIRTIO_VIDEO_PIX_FMT_VIDC_P010 \
 	virtio_video_fourcc('P', '0', '1', '0')
- /* compressed formats */
+/* compressed formats */
 #define VIRTIO_VIDEO_PIX_FMT_H264 \
 	virtio_video_fourcc('H', '2', '6', '4') /* H264 with start codes */
 #define VIRTIO_VIDEO_PIX_FMT_MPEG2 \
@@ -444,7 +444,7 @@ struct virtio_video_meta_format {
 
 struct virtio_video_data_format {
 	__u32     type;
-        __u32     padding;
+	__u32     padding;
 	union {
 		struct virtio_video_pix_format           pix;     /* VIRTIO_VIDEO_BUF_TYPE_VIDEO_CAPTURE */
 		struct virtio_video_pix_format_mplane    pix_mp;  /* VIRTIO_VIDEO_BUF_TYPE_VIDEO_CAPTURE_MPLANE */
@@ -454,42 +454,48 @@ struct virtio_video_data_format {
 };
 
 enum virtio_video_colorspace {
-    VIRTIO_VIDEO_COLORSPACE_DEFAULT             = 0,
-    VIRTIO_VIDEO_COLORSPACE_SMPTE170M           = 1,
-    VIRTIO_VIDEO_COLORSPACE_SMPTE240M           = 2,
-    VIRTIO_VIDEO_COLORSPACE_REC709              = 3,
-    VIRTIO_VIDEO_COLORSPACE_BT878               = 4,
-    VIRTIO_VIDEO_COLORSPACE_470_SYSTEM_M        = 5,
-    VIRTIO_VIDEO_COLORSPACE_470_SYSTEM_BG       = 6,
-    VIRTIO_VIDEO_COLORSPACE_JPEG                = 7,
-    VIRTIO_VIDEO_COLORSPACE_SRGB                = 8,
-    VIRTIO_VIDEO_COLORSPACE_OPRGB               = 9,
-    VIRTIO_VIDEO_COLORSPACE_BT2020              = 10,
-    VIRTIO_VIDEO_COLORSPACE_RAW                 = 11,
-    VIRTIO_VIDEO_COLORSPACE_DCI_P3              = 12,
+	VIRTIO_VIDEO_COLORSPACE_DEFAULT             = 0,
+	VIRTIO_VIDEO_COLORSPACE_SMPTE170M           = 1,
+	VIRTIO_VIDEO_COLORSPACE_SMPTE240M           = 2,
+	VIRTIO_VIDEO_COLORSPACE_REC709              = 3,
+	VIRTIO_VIDEO_COLORSPACE_BT878               = 4,
+	VIRTIO_VIDEO_COLORSPACE_470_SYSTEM_M        = 5,
+	VIRTIO_VIDEO_COLORSPACE_470_SYSTEM_BG       = 6,
+	VIRTIO_VIDEO_COLORSPACE_JPEG                = 7,
+	VIRTIO_VIDEO_COLORSPACE_SRGB                = 8,
+	VIRTIO_VIDEO_COLORSPACE_OPRGB               = 9,
+	VIRTIO_VIDEO_COLORSPACE_BT2020              = 10,
+	VIRTIO_VIDEO_COLORSPACE_RAW                 = 11,
+	VIRTIO_VIDEO_COLORSPACE_DCI_P3              = 12,
 };
 
 enum virtio_video_xfer_func {
-    VIRTIO_VIDEO_XFER_FUNC_DEFAULT              = 0,
-    VIRTIO_VIDEO_XFER_FUNC_709                  = 1,
-    VIRTIO_VIDEO_XFER_FUNC_SRGB                 = 2,
-    VIRTIO_VIDEO_XFER_FUNC_OPRGB                = 3,
-    VIRTIO_VIDEO_XFER_FUNC_SMPTE240M            = 4,
-    VIRTIO_VIDEO_XFER_FUNC_NONE                 = 5,
-    VIRTIO_VIDEO_XFER_FUNC_DCI_P3               = 6,
-    VIRTIO_VIDEO_XFER_FUNC_SMPTE2084            = 7,
+	VIRTIO_VIDEO_XFER_FUNC_DEFAULT              = 0,
+	VIRTIO_VIDEO_XFER_FUNC_709                  = 1,
+	VIRTIO_VIDEO_XFER_FUNC_SRGB                 = 2,
+	VIRTIO_VIDEO_XFER_FUNC_OPRGB                = 3,
+	VIRTIO_VIDEO_XFER_FUNC_SMPTE240M            = 4,
+	VIRTIO_VIDEO_XFER_FUNC_NONE                 = 5,
+	VIRTIO_VIDEO_XFER_FUNC_DCI_P3               = 6,
+	VIRTIO_VIDEO_XFER_FUNC_SMPTE2084            = 7,
 };
 
 enum virtio_video_ycbcr_encoding {
-    VIRTIO_VIDEO_YCBCR_ENC_DEFAULT              = 0,
-    VIRTIO_VIDEO_YCBCR_ENC_601                  = 1,
-    VIRTIO_VIDEO_YCBCR_ENC_709                  = 2,
-    VIRTIO_VIDEO_YCBCR_ENC_XV601                = 3,
-    VIRTIO_VIDEO_YCBCR_ENC_XV709                = 4,
-    VIRTIO_VIDEO_YCBCR_ENC_SYCC                 = 5,
-    VIRTIO_VIDEO_YCBCR_ENC_BT2020               = 6,
-    VIRTIO_VIDEO_YCBCR_ENC_BT2020_CONST_LUM     = 7,
-    VIRTIO_VIDEO_YCBCR_ENC_SMPTE240M            = 8,
+	VIRTIO_VIDEO_YCBCR_ENC_DEFAULT              = 0,
+	VIRTIO_VIDEO_YCBCR_ENC_601                  = 1,
+	VIRTIO_VIDEO_YCBCR_ENC_709                  = 2,
+	VIRTIO_VIDEO_YCBCR_ENC_XV601                = 3,
+	VIRTIO_VIDEO_YCBCR_ENC_XV709                = 4,
+	VIRTIO_VIDEO_YCBCR_ENC_SYCC                 = 5,
+	VIRTIO_VIDEO_YCBCR_ENC_BT2020               = 6,
+	VIRTIO_VIDEO_YCBCR_ENC_BT2020_CONST_LUM     = 7,
+	VIRTIO_VIDEO_YCBCR_ENC_SMPTE240M            = 8,
+};
+
+enum virtio_video_quantization {
+	VIRTIO_VIDEO_QUANTIZATION_DEFAULT           = 0,
+	VIRTIO_VIDEO_QUANTIZATION_FULL_RANGE        = 1,
+	VIRTIO_VIDEO_QUANTIZATION_LIM_RANGE         = 2,
 };
 
 /*
