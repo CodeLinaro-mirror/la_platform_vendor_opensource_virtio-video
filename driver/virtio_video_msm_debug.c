@@ -257,13 +257,14 @@ void msm_update_stream_tag(struct virtio_video_stream *stream)
 	const char *codec = NULL;
 	const char *domain = NULL;
 	struct virtio_video_device *vvd = NULL;
-	u32 client_id = stream->client_id;
+	u32 client_id = 0;
 
 	if (!stream) {
 		vpr_e(VPR_TAG, "%s: cannot update tag\n", __func__);
 		return;
 	}
 
+	client_id = stream->client_id;
 	codec = get_codec_str(stream->codec);
 	domain = get_domain_str(stream->domain);
 	if ((client_id != INVALID_CLIENT_ID) && (codec != NULL)) {
