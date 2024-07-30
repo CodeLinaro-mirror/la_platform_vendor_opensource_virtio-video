@@ -581,6 +581,10 @@ bool msm_hab_virtqueue_kick(struct virtqueue *vq)
 			goto err;
 
 		vbuf = unattach_buf_from_vq_buf(hvq, &hvq->vbuf_list);
+
+		if (vbuf == NULL)
+			goto err;
+
 		spin_unlock_irqrestore(&vvd->commandq.qlock, flags);
 
 		msg = (struct virtio_video_msg *)vbuf->buf;

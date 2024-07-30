@@ -548,12 +548,12 @@ int msm_v4l2_querybuf(struct file *file, void *fh,
 int msm_v4l2_qbuf(struct file *file, void *fh, struct v4l2_buffer *buf)
 {
 	struct virtio_video_stream *stream = file2stream(file);
-	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
+	struct virtio_video_device *vvd = NULL;
 	struct video_device *vdev = video_devdata(file);
 	int ret = 0;
 	struct vb2_queue *queue = NULL;
 
-	if (!stream || !vvd || !buf || !is_valid_v4l2_buffer(buf, stream)) {
+	if (!stream || !buf || !is_valid_v4l2_buffer(buf, stream)) {
 		vpr_e(strm2tag(stream),"%s: invalid params %pK %pK\n",
 		      __func__, stream, buf);
 		ret = -EINVAL;
@@ -563,6 +563,14 @@ int msm_v4l2_qbuf(struct file *file, void *fh, struct v4l2_buffer *buf)
 	if (is_session_error(stream)) {
 		vpr_e(strm2tag(stream),"%s: in session error state\n",
 		      __func__);
+		goto exit;
+	}
+
+	vvd = to_virtio_vd(stream->video_dev);
+
+	if (!vvd) {
+		vpr_e(strm2tag(stream),"%s: failed to find vvd\n", __func__);
+		ret = -EINVAL;
 		goto exit;
 	}
 

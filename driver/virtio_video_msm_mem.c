@@ -196,12 +196,12 @@ static inline void msm_buf_free_cache_entry(struct virtio_video_stream* stream,
 {
 	struct buf_export_cache* cache = &stream->buf_cache;
 
+	vpr_l(strm2tag(stream), "%s: export_id %d, cache released, cache count %d",
+	      __func__, entry->export_id, cache->used_count);
+
 	list_del(&entry->list);
 	kmem_cache_free(cache->exports, entry);
 	cache->used_count--;
-
-	vpr_l(strm2tag(stream), "%s: export_id %d, cache released, cache count %d",
-	      __func__, entry->export_id, cache->used_count);
 
 	return;
 }

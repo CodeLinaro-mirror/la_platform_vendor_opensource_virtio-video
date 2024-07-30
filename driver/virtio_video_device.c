@@ -440,8 +440,14 @@ int virtio_video_enum_framemintervals(struct file *file, void *fh,
 	for (f_idx = 0; f_idx <= fmt->desc.num_frames; f_idx++) {
 		frm = &fmt->frames[f_idx];
 		frame = &frm->frame;
+#ifdef VIRTIO_VIDEO_MSM
+		if (frame != NULL &&
+		    in_stepped_interval(frame->width, f->width) &&
+		    in_stepped_interval(frame->height, f->height))
+#else
 		if (in_stepped_interval(frame->width, f->width) &&
 		    in_stepped_interval(frame->height, f->height))
+#endif
 			break;
 	}
 
