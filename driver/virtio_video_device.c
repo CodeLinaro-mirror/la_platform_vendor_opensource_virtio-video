@@ -24,7 +24,7 @@
 #include <media/videobuf2-dma-sg.h>
 
 #include "virtio_video.h"
-#ifdef CONFIG_MSM_VIRTIO_HAB
+#if IS_ENABLED(CONFIG_MSM_HAB)
 #include "virtio_video_msm_hab.h"
 #endif
 #include "virtio_video_msm_v4l2.h"
@@ -154,6 +154,97 @@ int virtio_video_pending_buf_list_del(struct virtio_video_device *vvd,
 
 	return ret;
 }
+
+#ifdef MSM_VIDC_HW_VIRT
+int virtio_video_pending_event_list_empty(struct virtio_video_device *vvd)
+{
+	int ret = 0;
+#ifndef VIRTIO_VIDEO_MSM
+	if (vvd->is_m2m_dev) {
+		vpr_e(vvd2tag(vvd), "Unexpected call for m2m device!\n");
+		return -EPERM;
+	}
+#endif
+	spin_lock(&vvd->pending_event_list_lock);
+	if (list_empty(&vvd->pending_event_list))
+		ret = 1;
+	spin_unlock(&vvd->pending_event_list_lock);
+
+	return ret;
+}
+
+int virtio_video_pending_event_list_pop(struct virtio_video_device *vvd,
+				        struct virtio_video_queuing_event **virtio_event)
+{
+	struct virtio_video_queuing_event *ret_event = NULL;
+#ifndef VIRTIO_VIDEO_MSM
+	if (vvd->is_m2m_dev) {
+		vpr_e(vvd2tag(vvd), "Unexpected call for m2m device!\n");
+		return -EPERM;
+	}
+#endif
+	spin_lock(&vvd->pending_event_list_lock);
+	if (list_empty(&vvd->pending_event_list)) {
+		spin_unlock(&vvd->pending_event_list_lock);
+		return -EAGAIN;
+	}
+
+	ret_event = list_first_entry(&vvd->pending_event_list,
+			                     struct virtio_video_queuing_event, list);
+	spin_unlock(&vvd->pending_event_list_lock);
+
+	*virtio_event = ret_event;
+
+	return 0;
+}
+
+int virtio_video_pending_event_list_add(struct virtio_video_device *vvd,
+				        struct virtio_video_queuing_event *virtio_event)
+{
+#ifndef VIRTIO_VIDEO_MSM
+	if (vvd->is_m2m_dev) {
+		vpr_e(vvd2tag(vvd), "Unexpected call for m2m device!\n");
+		return -EPERM;
+	}
+#endif
+	spin_lock(&vvd->pending_event_list_lock);
+	list_add_tail(&virtio_event->list, &vvd->pending_event_list);
+	spin_unlock(&vvd->pending_event_list_lock);
+
+	return 0;
+}
+
+int virtio_video_pending_event_list_del(struct virtio_video_device *vvd,
+				        struct virtio_video_queuing_event *virtio_event)
+{
+	struct virtio_video_queuing_event *ve = NULL;
+	struct virtio_video_queuing_event *ve_tmp = NULL;
+	int ret = -EINVAL;
+
+#ifndef VIRTIO_VIDEO_MSM
+	if (vvd->is_m2m_dev) {
+		vpr_e(vvd2tag(vvd), "Unexpected call for m2m device!\n");
+		return -EPERM;
+	}
+#endif
+	spin_lock(&vvd->pending_event_list_lock);
+	if (list_empty(&vvd->pending_event_list)) {
+		spin_unlock(&vvd->pending_event_list_lock);
+		return -EAGAIN;
+	}
+
+	list_for_each_entry_safe(ve, ve_tmp, &vvd->pending_event_list, list) {
+		if (ve->device_id == virtio_event->device_id) {
+			list_del(&ve->list);
+			ret = 0;
+			break;
+		}
+	}
+	spin_unlock(&vvd->pending_event_list_lock);
+
+	return ret;
+}
+#endif
 
 int virtio_video_queue_setup(struct vb2_queue *vq, unsigned int *num_buffers,
 			     unsigned int *num_planes, unsigned int sizes[],
@@ -1235,6 +1326,7 @@ static const struct v4l2_m2m_ops virtio_video_device_m2m_ops = {
 	.job_abort	= virtio_video_device_job_abort,
 };
 
+#ifndef MSM_VIDC_HW_VIRT
 static int virtio_video_device_register(struct virtio_video_device *vvd)
 {
 	int ret;
@@ -1262,6 +1354,7 @@ static void virtio_video_device_unregister(struct virtio_video_device *vvd)
 {
 	video_unregister_device(&vvd->video_dev);
 }
+#endif
 
 #ifdef VIRTIO_VIDEO_MSM
 
@@ -1535,19 +1628,22 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 		goto parse_ctrl_err;
 	}
 #endif
+#ifndef MSM_VIDC_HW_VIRT
 	ret = virtio_video_device_register(vvd);
 	if (ret) {
 		vpr_e(vvd2tag(vvd), "failed to init virtio video device\n");
 		goto register_err;
 	}
-
+#endif
 	goto out_cleanup;
 
+#ifndef MSM_VIDC_HW_VIRT
 register_err:
 #ifdef VIRTIO_VIDEO_MSM
 	virtio_video_clean_controls(vvd);
 #else
 	virtio_video_clean_control(vvd);
+#endif
 #endif
 #ifndef MSM_HAB_NO_SUPPORT
 parse_ctrl_err:
@@ -1572,7 +1668,9 @@ void virtio_video_device_deinit(struct virtio_video_device *vvd)
 {
 	vvd->commandq.ready = false;
 	vvd->eventq.ready = false;
+#ifndef MSM_VIDC_HW_VIRT
 	virtio_video_device_unregister(vvd);
+#endif
 	if (vvd->is_m2m_dev)
 		v4l2_m2m_release(vvd->m2m_dev);
 #ifdef VIRTIO_VIDEO_MSM

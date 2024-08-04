@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  *
  * Copyright (C) 2020 OpenSynergy GmbH.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _UAPI_LINUX_VIRTIO_VIDEO_H
@@ -998,6 +998,13 @@ struct virtio_video_v4l2_buffer {
 	__u32                           padding;
 };
 
+#define VIRTIO_VIDEO_CLEANUP_LIMIT 5
+
+struct virtio_video_erased_buffers {
+	__u32    count;
+	__u32    export_ids[VIRTIO_VIDEO_CLEANUP_LIMIT];
+};
+
 struct virtio_video_cmd_hdr {
 	__le32    type; /* One of enum virtio_video_cmd_type */
 	__le32    stream_id;
@@ -1031,7 +1038,7 @@ enum virtio_video_v4l2_ctrl_type {
 #define VIRTIO_VIDEO_V4L2_CTRL_MAX_DIMS  (4)
 #define VIRTIO_BIT(nr)                   ((1) << (nr))
 
-enum msm_vidc_inst_capability_flags {
+enum virtio_video_msm_inst_capability_flags {
 	CAP_FLAG_NONE                    = 0,
 	CAP_FLAG_DYNAMIC_ALLOWED         = VIRTIO_BIT(0),
 	CAP_FLAG_MENU                    = VIRTIO_BIT(1),
@@ -1043,7 +1050,7 @@ enum msm_vidc_inst_capability_flags {
 	CAP_FLAG_META                    = VIRTIO_BIT(7),
 };
 /* various Metadata - encoder & decoder */
-enum msm_vidc_metadata_bits {
+enum virtio_video_msm_metadata_bits {
 	MSM_VIDC_META_DISABLE          = 0x0,
 	MSM_VIDC_META_ENABLE           = 0x1,
 	MSM_VIDC_META_TX_INPUT         = 0x2,
@@ -1196,6 +1203,22 @@ enum virtio_video_cmd_type {
 	VIRTIO_VIDEO_RESP_ERR_INVALID_RESOURCE_ID,
 	VIRTIO_VIDEO_RESP_ERR_INVALID_PARAMETER,
 	VIRTIO_VIDEO_RESP_ERR_UNSUPPORTED_CONTROL,
+#ifdef MSM_VIDC_HW_VIRT
+	/* Hardware Virtualization Command */
+	VIRTIO_VIDEO_CMD_GVM_BASE = 0x00010000,
+	VIRTIO_VIDEO_CMD_OPEN_GVM,
+	VIRTIO_VIDEO_CMD_CLOSE_GVM,
+	VIRTIO_VIDEO_CMD_OPEN_GVM_SESSION,
+	VIRTIO_VIDEO_CMD_PAUSE_GVM_SESSION,
+	VIRTIO_VIDEO_CMD_RESUME_GVM_SESSION,
+	/* Hardware Virtualization response */
+	VIRTIO_VIDEO_RESP_GVM_BASE = 0x00020000,
+	VIRTIO_VIDEO_RESP_OPEN_GVM,
+	VIRTIO_VIDEO_RESP_CLOSE_GVM,
+	VIRTIO_VIDEO_RESP_OPEN_GVM_SESSION,
+	VIRTIO_VIDEO_RESP_PAUSE_GVM_SESSION,
+	VIRTIO_VIDEO_RESP_RESUME_GVM_SESSION,
+#endif
 };
 
 enum virtio_video_sub_cmd_type
@@ -1531,6 +1554,54 @@ struct virtio_video_set_control_resp {
 	struct virtio_video_cmd_hdr hdr;
 };
 
+#ifdef MSM_VIDC_HW_VIRT
+struct virtio_video_open_gvm {
+	struct virtio_video_cmd_hdr hdr;
+	__le32 vm_id;
+	__le32 device_id_mask;
+};
+
+struct virtio_video_open_gvm_resp {
+	struct virtio_video_cmd_hdr hdr;
+	__le32 device_core_mask;
+};
+
+struct virtio_video_close_gvm {
+	struct virtio_video_cmd_hdr hdr;
+};
+
+struct virtio_video_open_gvm_session {
+	struct virtio_video_cmd_hdr hdr;
+	__le32 vm_id;
+};
+
+struct virtio_video_open_gvm_session_resp {
+	struct virtio_video_cmd_hdr hdr;
+	__le32 device_id;
+	__le32 session_id;
+	__le64 session_handle;
+};
+
+struct virtio_video_gvm_device {
+	struct virtio_video_cmd_hdr hdr;
+	__le32 device_id;
+};
+
+struct virtio_video_gvm_session {
+	struct virtio_video_cmd_hdr hdr;
+	__le32 device_id;
+	__le32 session_id;
+	__le64 session_handle;
+};
+
+#define VIDC_DEVICE_0               0x00000001
+#define VIDC_DEVICE_1               0x00000002
+#define VIDC_CORE_0                 0x00000001
+#define VIDC_CORE_1                 0x00000002
+#define GVM_SSR_DEVICE_DRIVER       0x80000000
+
+#endif
+
 /*
  * Events
  */
@@ -1541,6 +1612,9 @@ enum virtio_video_event_type {
 	VIRTIO_VIDEO_EVENT_EBD,
 	/* For decoder only */
 	VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED = 0x0200,
+#ifdef MSM_VIDC_HW_VIRT
+	VIRTIO_VIDEO_EVENT_GVM_SSR = 0x0300,
+#endif
 };
 
 struct virtio_video_event {
