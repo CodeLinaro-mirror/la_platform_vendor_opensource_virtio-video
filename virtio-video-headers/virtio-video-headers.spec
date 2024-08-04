@@ -20,11 +20,11 @@ This contains virtio video headers used by the virtio backend
 KERNEL_SRC="/usr/src/kernels"
 CURDIR=${PWD}
 cd ${KERNEL_SRC}/%{kversion}/
-scripts/headers_install.sh ${CURDIR}/linux/virtio_video.h ${CURDIR}/linux/virtio_video.h
+scripts/headers_install.sh ${CURDIR}/virtio_video.h ${CURDIR}/virtio_video.h
 
 %install
-mkdir -p "$RPM_BUILD_ROOT/usr/include/uapi/virtio-video/"
-cp linux/virtio_video.h $RPM_BUILD_ROOT/usr/include/uapi/virtio-video/
+mkdir -p "$RPM_BUILD_ROOT/usr/include"
+cp virtio_video.h $RPM_BUILD_ROOT/usr/include/
 
 %files
-%{_includedir}/uapi/virtio-video/virtio_video.h
+%{_includedir}/virtio_video.h
