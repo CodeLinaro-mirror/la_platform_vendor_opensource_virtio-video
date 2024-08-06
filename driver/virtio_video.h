@@ -296,6 +296,7 @@ struct virtio_video_device {
 	struct virtio_video_device_ops *ops;
 
 #ifdef VIRTIO_VIDEO_MSM
+	uint32_t version;
 	const struct vb2_mem_ops *vb2_mem_ops;
 	struct list_head ctrl_config_list;
 	char tag[TAG_MAX_LEN];

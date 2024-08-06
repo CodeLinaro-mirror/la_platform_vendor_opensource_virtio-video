@@ -203,6 +203,10 @@ static int virtio_video_probe(struct virtio_device* vdev)
 		goto err_config;
 	}
 
+#ifdef VIRTIO_VIDEO_MSM
+	virtio_cread(vdev, struct virtio_video_config, version, &vvd->version);
+#endif
+
 	ret = virtio_video_alloc_events(vvd);
 	if (ret)
 		goto err_events;
@@ -292,13 +296,22 @@ static void msm_vdev_get(struct virtio_device *vdev, unsigned offset,
 	const char *dev_n = dev_name(&vdev->dev);
 	struct virtio_video_device *vvd = vdev->priv;
 
-	vpr_h(vvd2tag(vvd), "%s: %s offset=%x\n", dev_n, __func__, offset);
-
 	cfg = msm_hab_get_config(vdev);
-	if (offset == offsetof(struct virtio_video_config, max_caps_length))
+	if (offset == offsetof(struct virtio_video_config, max_caps_length)) {
 		*(uint32_t *)buf = cfg.max_caps_length;
-	else if (offset == offsetof(struct virtio_video_config, max_resp_length))
+		vpr_l(vvd2tag(vvd), "%s: %s offset=%x max_caps_length=%d\n",
+		      dev_n, __func__, offset, *(uint32_t *)buf);
+	}
+	else if (offset == offsetof(struct virtio_video_config, max_resp_length)) {
 		*(uint32_t *)buf = cfg.max_resp_length;
+		vpr_l(vvd2tag(vvd), "%s: %s offset=%x max_resp_length=%d\n",
+		      dev_n, __func__, offset, *(uint32_t *)buf);
+	}
+	else if (offset == offsetof(struct virtio_video_config, version)) {
+		*(uint32_t *)buf = cfg.version;
+		vpr_l(vvd2tag(vvd), "%s: %s offset=%x version=%d \n",
+		      dev_n, __func__, offset, *(uint32_t *)buf);
+	}
 	else
 		vpr_e(vvd2tag(vvd), "%s: %s unsupported\n", dev_n, __func__);
 }

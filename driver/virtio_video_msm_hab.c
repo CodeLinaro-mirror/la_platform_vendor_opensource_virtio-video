@@ -548,19 +548,8 @@ int msm_hab_set_features(struct virtio_device *vdev)
 
 struct virtio_video_config msm_hab_get_config(struct virtio_device *vdev)
 {
-	struct virtio_video_config configs = {0};
-	struct virtio_video_device *vvd = vdev->priv;
-
-	if (vdev->id.device == VIRTIO_ID_VIDEO_DECODER)
-		configs = dec_data.configs;
-	else
-		configs = enc_data.configs;
-
-	vpr_h(vvd2tag(vvd), "get config for video%d, version %d, max_caps_length %d, max_resp_length %d",
-		vdev->id.device, configs.version, configs.max_caps_length,
-		configs.max_resp_length);
-
-	return configs;
+	return (vdev->id.device == VIRTIO_ID_VIDEO_DECODER) ?
+		dec_data.configs : enc_data.configs;
 }
 
 bool msm_hab_virtqueue_kick(struct virtqueue *vq)

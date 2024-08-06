@@ -8,7 +8,11 @@
 
 #include <linux/types.h>
 
+/* version format: YY MM DD 00 (00 reserved) */
+#define VIRTIO_VIDEO_MSM_PROTOCOL_VERSION                   (24073100)
+
 #define MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE                   (1024)
+
 #define VIRTIO_VIDEO_BUF_FLAG_CODECCONFIG                   0x01000000
 #define VIRTIO_VIDEO_BUF_FLAG_END_OF_SUBFRAME               0x02000000
 #define VIRTIO_VIDEO_BUF_FLAG_DATA_CORRUPT                  0x04000000
