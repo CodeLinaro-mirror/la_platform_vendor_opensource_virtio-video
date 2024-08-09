@@ -340,7 +340,7 @@ unexport:
 		for (plane = 0; plane < VIDEO_MAX_PLANES; plane++) {
 			if (export_id[plane])
 				msm_buf_put_export_id(stream, export_id[plane],
-				                      to_virtio_queue_type(vb2->type));
+				                      to_virtio_queue_type(vb2->type), true);
 		}
 	}
 
@@ -395,6 +395,7 @@ int vb2q_init(struct virtio_video_stream *stream,
 	queue->drv_priv = stream;
 	queue->allow_zero_bytesused = 1;
 	queue->copy_timestamp = 1;
+	queue->buf_struct_size = sizeof(struct virtio_video_buffer);
 
 	ret = vb2_queue_init(queue);
 	if (ret)

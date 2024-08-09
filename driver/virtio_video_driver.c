@@ -2,7 +2,7 @@
 /* Driver for virtio video device.
  *
  * Copyright 2020 OpenSynergy GmbH.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,10 +28,12 @@
 #include "virtio_video.h"
 #include "virtio_video_msm_debug.h"
 
-#ifdef CONFIG_MSM_VIRTIO_HAB
+#if IS_ENABLED(CONFIG_MSM_HAB)
 #include <linux/habmm.h>
 #include "virtio_video_msm_hab.h"
+#if IS_ENABLED(CONFIG_MSM_VIRTIO_HAB)
 extern struct virtio_device * virthab_get_vdev(int32_t mmid);
+#endif
 #endif
 
 #define NUM_VIDEO_DEVICE 3
@@ -69,7 +71,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	struct virtio_video_device *vvd;
 	struct virtqueue *vqs[2];
 	struct device *dev = &vdev->dev;
-#ifndef CONFIG_MSM_VIRTIO_HAB
+#ifndef VIRTIO_VIDEO_MSM
 	struct device *pdev = dev->parent;
 #endif
 	static const char * const names[] = { "commandq", "eventq" };
@@ -120,7 +122,10 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	idr_init(&vvd->resource_idr);
 	spin_lock_init(&vvd->stream_idr_lock);
 	idr_init(&vvd->stream_idr);
-
+#ifdef MSM_VIDC_HW_VIRT
+	spin_lock_init(&vvd->pending_event_list_lock);
+	spin_lock_init(&vvd->wq_lock);
+#endif
 	init_waitqueue_head(&vvd->wq);
 
 	if (virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_NON_CONTIG))
@@ -131,7 +136,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 #else
 	vvd->has_iommu = !virtio_has_iommu_quirk(vdev);
 #endif
-#ifndef CONFIG_MSM_VIRTIO_HAB
+#ifndef VIRTIO_VIDEO_MSM
 	if (!dev->dma_ops)
 		set_dma_ops(dev, pdev->dma_ops);
 
@@ -147,7 +152,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 #endif
 
 	v4l2_device_set_name(&vvd->v4l2_dev, DRIVER_NAME, &v4l2_instance);
-#ifndef CONFIG_MSM_VIRTIO_HAB
+#if !IS_ENABLED(CONFIG_MSM_HAB)
 	/* when using HAB, the dev name has been set in register_virtio_device */
 	dev_set_name(dev, "%s.%i", DRIVER_NAME, vdev->index);
 #endif
@@ -163,6 +168,9 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	INIT_WORK(&vvd->eventq.work, virtio_video_process_events);
 
 	INIT_LIST_HEAD(&vvd->pending_vbuf_list);
+#ifdef MSM_VIDC_HW_VIRT
+	INIT_LIST_HEAD(&vvd->pending_event_list);
+#endif
 
 	ret = virtio_find_vqs(vdev, 2, vqs, callbacks, names, NULL);
 	if (ret) {
@@ -263,7 +271,7 @@ static struct virtio_driver virtio_video_driver = {
 	.remove = virtio_video_remove,
 };
 
-#ifndef CONFIG_MSM_VIRTIO_HAB
+#ifndef VIRTIO_VIDEO_MSM
 module_virtio_driver(virtio_video_driver);
 
 MODULE_DEVICE_TABLE(virtio, id_table);
@@ -370,9 +378,26 @@ static const struct virtio_config_ops msm_vdev_config_ops = {
 static struct virtio_device* venc = NULL;
 static struct virtio_device* vdec = NULL;
 
+#ifdef MSM_VIDC_HW_VIRT
+struct virtio_video_device* msm_virtio_video_hw_virtualization_get_vvd(void)
+{
+	struct virtio_video_device *vvd = NULL;
+	if (NULL == vdec) {
+		vpr_e(VPR_TAG, "failed to get vdev for hardware virtualization\n");
+	}
+	else {
+		vvd = (struct virtio_video_device *)vdec->priv;
+	}
+
+	return vvd;
+}
+#endif
+
 static int __init msm_virtio_video_init(void)
 {
 	int ret = 0;
+
+#if IS_ENABLED(CONFIG_MSM_VIRTIO_HAB)
 	struct virtio_device *vdev = NULL;
 
 	vdev = virthab_get_vdev(MM_VID);
@@ -381,6 +406,7 @@ static int __init msm_virtio_video_init(void)
 		ret = -ENODEV;
 		goto err;
 	}
+#endif
 
 	ret = register_virtio_driver(&virtio_video_driver);
 	if (ret) {
@@ -393,7 +419,9 @@ static int __init msm_virtio_video_init(void)
 		vdec->config = &msm_vdev_config_ops;
 		vdec->id.device = VIRTIO_ID_VIDEO_DECODER;
 		vdec->id.vendor = VIRTIO_DEV_ANY_ID;
+#if IS_ENABLED(CONFIG_MSM_VIRTIO_HAB)
 		vdec->dev.parent = &vdev->dev;
+#endif
 		vdec->dev.release = msm_vdev_release;
 		vpr_h(VPR_TAG, "%s: registering virtio device for video decoder\n", __func__);
 		ret = register_virtio_device(vdec);
@@ -412,7 +440,9 @@ static int __init msm_virtio_video_init(void)
 		venc->config = &msm_vdev_config_ops;
 		venc->id.device = VIRTIO_ID_VIDEO_ENCODER;
 		venc->id.vendor = VIRTIO_DEV_ANY_ID;
+#if IS_ENABLED(CONFIG_MSM_VIRTIO_HAB)
 		venc->dev.parent = &vdev->dev;
+#endif
 		venc->dev.release = msm_vdev_release;
 		vpr_h(VPR_TAG, "%s: registering virtio device for video encoder\n", __func__);
 		ret = register_virtio_device(venc);

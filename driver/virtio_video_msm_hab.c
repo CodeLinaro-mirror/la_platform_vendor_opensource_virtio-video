@@ -60,6 +60,44 @@ bool msm_hab_virtqueue_is_broken(struct virtqueue *vq)
 	return READ_ONCE(hvq->broken);
 };
 
+static inline void free_hvq_unused_vq_buf_list(struct hab_virtqueue *hvq)
+{
+	struct hab_vq_buffer *vq_buf = NULL, *tmp = NULL;
+
+	list_for_each_entry_safe(vq_buf, tmp,
+	                         &hvq->unused_vq_buf_list.list, list) {
+		list_del(&vq_buf->list);
+		hvq->unused_vq_buf_list.count--;
+		kfree(vq_buf);
+	}
+}
+
+static int init_hvq_unused_vq_buf_list(struct virtio_video_device *vvd,
+                                       struct hab_virtqueue *hvq)
+{
+	struct hab_vq_buffer *vq_buf = NULL;
+	int ret = 0;
+	int i = 0;
+
+	INIT_LIST_HEAD(&hvq->unused_vq_buf_list.list);
+	hvq->unused_vq_buf_list.count = 0;
+
+	for (i = 0; i < hvq->vq.num_free; i++) {
+		if (!(vq_buf = kzalloc(sizeof(*vq_buf), GFP_KERNEL))) {
+			vpr_e(vvd2tag(vvd), "%s %s out of memory\n",
+			      __func__, hvq->vq.name);
+			free_hvq_unused_vq_buf_list(hvq);
+			ret = -ENOMEM;
+			break;
+		}
+
+		list_add_tail(&vq_buf->list, &hvq->unused_vq_buf_list.list);
+		hvq->unused_vq_buf_list.count++;
+	}
+
+	return ret;
+}
+
 static int attach_buf_to_vq_buf(struct hab_virtqueue *hvq,
                                 struct hab_list *ls, void *data)
 {
@@ -199,9 +237,9 @@ static int process_msm_hab_cmd_resp(struct hab_virtqueue* hvq, void* data)
 	int found = 0;
 	struct virtio_video_vbuffer *vbuf = NULL, *vbuf_tmp = NULL;
 	struct virtqueue *vq = &hvq->vq;
-	struct virtio_video_device* vvd = hvq->vq.vdev->priv;
+	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
 	struct virtio_video_cmd_hdr *hdr = (struct virtio_video_cmd_hdr *)data;
-	struct virtio_video_cmd_hdr* vbuf_hdr = NULL;
+	struct virtio_video_cmd_hdr *vbuf_hdr = NULL;
 	void *resp = NULL;
 	int ret = 0;
 	int resp_rc = 0;
@@ -280,7 +318,7 @@ static int process_msm_hab_evt_resp(struct hab_virtqueue *hvq, void *data)
 
 static void *get_one_evt_buf(struct hab_virtqueue *hvq, const int max_retry)
 {
-	struct virtio_video_device* vvd = hvq->vq.vdev->priv;
+	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
 	void *msg = NULL;
 	int retry = 0;
 
@@ -448,8 +486,8 @@ static int get_inital_data(struct hab_virtqueue hvq[], struct virtio_video_initi
 
 int msm_hab_vdev_init(struct virtio_device *vdev)
 {
-	struct hab_virtqueue* hvq = NULL;
-	struct virtio_video_initial_data* data = NULL;
+	struct hab_virtqueue *hvq = NULL;
+	struct virtio_video_initial_data *data = NULL;
 	int ret = 0;
 
 	if (vdev->id.device == VIRTIO_ID_VIDEO_DECODER) {
@@ -487,9 +525,9 @@ uint64_t msm_hab_get_features(struct virtio_device *vdev)
 
 int msm_hab_set_features(struct virtio_device *vdev)
 {
-	struct hab_virtqueue* hvq = NULL;
+	struct hab_virtqueue *hvq = NULL;
 	uint32_t size_bytes = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE;
-	struct virtio_video_initial_data* data = NULL;
+	struct virtio_video_initial_data *data = NULL;
 	struct virtio_video_device *vvd = vdev->priv;
 	int ret = 0;
 
@@ -527,7 +565,7 @@ struct virtio_video_config msm_hab_get_config(struct virtio_device *vdev)
 
 bool msm_hab_virtqueue_kick(struct virtqueue *vq)
 {
-	struct hab_virtqueue * hvq = to_hab_vq(vq);
+	struct hab_virtqueue *hvq = to_hab_vq(vq);
 	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
 	struct virtio_video_stream *stream = NULL;
 	uint32_t habmm_handle = hvq->habmm_handle;
@@ -584,7 +622,7 @@ void msm_hab_sg_init_one(struct scatterlist *sg, const void *buf,
 
 void* msm_hab_virtqueue_get_buf(struct virtqueue* vq, unsigned int* len)
 {
-	struct hab_virtqueue * hvq = to_hab_vq(vq);
+	struct hab_virtqueue *hvq = to_hab_vq(vq);
 	struct virtio_video_device *vvd = vq->vdev->priv;
 	void *buf = NULL;
 
@@ -597,7 +635,6 @@ void* msm_hab_virtqueue_get_buf(struct virtqueue* vq, unsigned int* len)
 
 void* msm_hab_virtqueue_detach_unused_buf(struct virtqueue* vq)
 {
-	struct hab_vq_buffer *vq_buf = NULL, *tmp = NULL;
 	struct hab_virtqueue *hvq = to_hab_vq(vq);
 	void *buf = NULL;
 
@@ -608,12 +645,7 @@ void* msm_hab_virtqueue_detach_unused_buf(struct virtqueue* vq)
 
 	if (!buf) {
 		hvq_event_lock();
-		list_for_each_entry_safe(vq_buf, tmp,
-		                         &hvq->unused_vq_buf_list.list, list) {
-			list_del(&vq_buf->list);
-			hvq->unused_vq_buf_list.count--;
-			kfree(vq_buf);
-		}
+		free_hvq_unused_vq_buf_list(hvq);
 		hvq_event_unlock();
 	}
 
@@ -643,11 +675,9 @@ int msm_hab_virtqueue_add_sgs(struct virtqueue *vq, struct scatterlist *sgs[],
 	hvq_event_unlock();
 
 	if (!vq_buf) {
-		if (!(vq_buf = kmalloc(sizeof(*vq_buf), GFP_KERNEL))) {
-			vpr_e(vvd2tag(vvd), "%s: %s %s out of memory\n",
-			      name, __func__, hvq->vq.name);
-			goto err;
-		}
+		vpr_e(vvd2tag(vvd), "%s: %s %s out of memory\n",
+		      name, __func__, hvq->vq.name);
+		goto err;
 	}
 
 	vq_buf->buf = data;
@@ -705,10 +735,10 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		hvq->vq.num_free = DEFAULT_VQ_NUM;
 		INIT_LIST_HEAD(&hvq->vbuf_list.list);
 		INIT_LIST_HEAD(&hvq->resp_list.list);
-		INIT_LIST_HEAD(&hvq->unused_vq_buf_list.list);
+		if (init_hvq_unused_vq_buf_list(vvd, hvq))
+			goto err;
 		hvq->vbuf_list.count = 0;
 		hvq->resp_list.count = 0;
-		hvq->unused_vq_buf_list.count = 0;
 
 		if (!strcmp(names[i], "commandq"))
 			hvq->type = MSM_VIRTQ_CMD_TYPE;
