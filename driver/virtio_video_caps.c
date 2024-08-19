@@ -94,6 +94,13 @@ static size_t virtio_video_parse_virtio_frame(struct virtio_video_device *vvd,
 				   sizeof(struct virtio_video_format_range),
 				   GFP_KERNEL);
 
+#ifdef VIRTIO_VIDEO_MSM
+	if (frm->frame_rates == NULL) {
+		vpr_e(vvd2tag(vvd), "failed to allocate frame rate\n");
+		return 0;
+	}
+#endif
+
 	offset = sizeof(struct virtio_video_format_frame);
 	for (idx = 0; idx < frame->num_rates; idx++) {
 		rate = &frm->frame_rates[idx];
@@ -132,6 +139,13 @@ static size_t virtio_video_parse_virtio_fmt(struct virtio_video_device *vvd,
 	fmt->frames = kcalloc(fmt_desc->num_frames,
 			      sizeof(struct video_format_frame),
 			      GFP_KERNEL);
+
+#ifdef VIRTIO_VIDEO_MSM
+	if (fmt->frames == NULL) {
+		vpr_e(vvd2tag(vvd), "failed to allocate frame\n");
+		return 0;
+	}
+#endif
 
 	offset = sizeof(struct virtio_video_format_desc);
 	for (idx = 0; idx < fmt_desc->num_frames; idx++) {
@@ -278,6 +292,14 @@ static int virtio_video_parse_control_levels(struct virtio_video_device *vvd,
 	virtio_format = virtio_video_v4l2_format_to_virtio(fmt->format);
 
 	resp_buf = kzalloc(resp_size, GFP_KERNEL);
+
+#ifdef VIRTIO_VIDEO_MSM
+	if (!resp_buf) {
+		ret = -ENOMEM;
+		return ret;
+	}
+#endif
+
 	if (IS_ERR(resp_buf)) {
 		ret = PTR_ERR(resp_buf);
 		goto lvl_err;
@@ -348,6 +370,14 @@ static int virtio_video_parse_control_profiles(struct virtio_video_device *vvd,
 	resp_size = vvd->max_resp_len;
 	virtio_format = virtio_video_v4l2_format_to_virtio(fmt->format);
 	resp_buf = kzalloc(resp_size, GFP_KERNEL);
+
+#ifdef VIRTIO_VIDEO_MSM
+	if (!resp_buf) {
+		ret = -ENOMEM;
+		return ret;
+	}
+#endif
+
 	if (IS_ERR(resp_buf)) {
 		ret = PTR_ERR(resp_buf);
 		goto prf_err;
