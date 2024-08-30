@@ -1276,6 +1276,7 @@ static void virtio_video_device_unregister(struct virtio_video_device *vvd)
 }
 #endif
 
+#ifndef MSM_VIDC_HW_VIRT
 #ifdef VIRTIO_VIDEO_MSM
 
 #define MAX_QMENU_ELEMENT_COUNT     64
@@ -1427,6 +1428,7 @@ virtio_video_query_capability(struct virtio_video_device *vvd,
 
 	return ret;
 }
+#endif
 
 int virtio_video_device_init(struct virtio_video_device *vvd)
 {
@@ -1447,6 +1449,11 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 	if (!output_resp_buf)
 		return -ENOMEM;
 
+#ifdef MSM_VIDC_HW_VIRT
+	ret = 0;
+	m2m_dev = NULL;
+	vd = NULL;
+#else
 	ret = virtio_video_query_capability(vvd, output_resp_buf,
 					    VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
 	if (ret) {
@@ -1454,6 +1461,7 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 		goto err_output_cap;
 	}
 
+#endif
 	if (vvd->is_m2m_dev) {
 		input_resp_buf = kzalloc(vvd->max_caps_len, GFP_KERNEL);
 		if (!input_resp_buf) {
@@ -1461,6 +1469,7 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 			goto err_input_buf;
 		}
 
+#ifndef MSM_VIDC_HW_VIRT
 #ifndef MSM_HAB_NO_SUPPORT
 		ret = virtio_video_query_capability(vvd, input_resp_buf,
 						VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
@@ -1469,6 +1478,7 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 			goto err_input_cap;
 		}
 
+#endif
 #endif
 		m2m_dev = v4l2_m2m_init(&virtio_video_device_m2m_ops);
 		if (IS_ERR(m2m_dev)) {
@@ -1534,6 +1544,7 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 		virtio_video_dec_init(vvd);
 		break;
 	}
+#ifndef MSM_VIDC_HW_VIRT
 #ifndef MSM_HAB_NO_SUPPORT
 	ret = virtio_video_parse_virtio_capabilities(vvd, input_resp_buf,
 						     output_resp_buf);
@@ -1547,6 +1558,7 @@ int virtio_video_device_init(struct virtio_video_device *vvd)
 		vpr_e(vvd2tag(vvd), "failed to query controls\n");
 		goto parse_ctrl_err;
 	}
+#endif
 #endif
 #ifndef MSM_VIDC_HW_VIRT
 	ret = virtio_video_device_register(vvd);
@@ -1565,6 +1577,7 @@ register_err:
 	virtio_video_clean_control(vvd);
 #endif
 #endif
+#ifndef MSM_VIDC_HW_VIRT
 #ifndef MSM_HAB_NO_SUPPORT
 parse_ctrl_err:
 	virtio_video_clean_capability(vvd);
@@ -1573,12 +1586,15 @@ parse_cap_err:
 		v4l2_m2m_release(vvd->m2m_dev);
 err_input_cap:
 #endif
+#endif
 err_m2m_dev:
 out_cleanup:
 	if (vvd->is_m2m_dev)
 		kfree(input_resp_buf);
 err_input_buf:
+#ifndef MSM_VIDC_HW_VIRT
 err_output_cap:
+#endif
 	kfree(output_resp_buf);
 
 	return ret;
@@ -1594,7 +1610,9 @@ void virtio_video_device_deinit(struct virtio_video_device *vvd)
 	if (vvd->is_m2m_dev)
 		v4l2_m2m_release(vvd->m2m_dev);
 #ifdef VIRTIO_VIDEO_MSM
+#ifndef MSM_VIDC_HW_VIRT
 	virtio_video_clean_controls(vvd);
+#endif
 #else
 	virtio_video_clean_control(vvd);
 #endif
