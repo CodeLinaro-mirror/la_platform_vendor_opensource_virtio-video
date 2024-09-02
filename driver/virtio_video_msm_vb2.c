@@ -79,9 +79,16 @@ int msm_vidc_queue_setup(struct vb2_queue *queue,
 	}
 
 	stream = queue->drv_priv;
-	if (!stream || !stream->video_dev) {
-		vpr_e(vvd2tag(vvd), "%s: invalid params: stream %pk, video_dev %pK\n",
-		      __func__, stream, stream->video_dev);
+	if (!stream) {
+		vpr_e(vvd2tag(vvd), "%s: invalid params: stream %pk\n",
+		      __func__, stream);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	if (!stream->video_dev) {
+		vpr_e(vvd2tag(vvd), "%s: invalid params: video_dev %pK\n",
+		      __func__, stream->video_dev);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -134,9 +141,16 @@ int msm_vidc_start_streaming(struct vb2_queue *queue, unsigned int count)
 	struct virtio_video_stream *stream = NULL;
 	struct virtio_video_device* vvd = NULL;
 
-	if (!queue || !queue->drv_priv) {
-		vpr_e(vvd2tag(vvd), "%s: invalid input, queue %pK, stream %pK\n", __func__,
-		      queue, queue->drv_priv);
+	if (!queue) {
+		vpr_e(vvd2tag(vvd), "%s: invalid input, queue %pK\n",
+		      __func__, queue);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	if (!queue->drv_priv) {
+		vpr_e(vvd2tag(vvd), "%s: invalid input, stream %pK\n",
+		      __func__, queue->drv_priv);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -181,10 +195,18 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 	struct virtio_video_device* vvd = NULL;
 	enum virtio_video_queue_type virtio_queue_type = 0;
 
-	if (!queue || !queue->drv_priv) {
-		vpr_e(vvd2tag(vvd), "%s: invalid input, queue %pK, stream %pK\n", __func__,
-		      queue, queue->drv_priv);
-		return;
+	if (!queue) {
+		vpr_e(vvd2tag(vvd), "%s: invalid input, queue %pK\n",
+		      __func__, queue);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	if (!queue->drv_priv) {
+		vpr_e(vvd2tag(vvd), "%s: invalid input, stream %pK\n",
+		      __func__, queue->drv_priv);
+		ret = -EINVAL;
+		goto exit;
 	}
 
 	stream = queue->drv_priv;
@@ -378,9 +400,16 @@ int vb2q_init(struct virtio_video_stream *stream,
 	int ret = 0;
 	struct virtio_video_device* vvd = NULL;
 
-	if (!stream || !queue || !stream->video_dev) {
-		vpr_e(vvd2tag(vvd), "%s: invalid params: stream %pK, queue %pK, video_dev %pK\n",
-		      __func__, stream, queue, stream->video_dev);
+	if (!stream || !queue) {
+		vpr_e(vvd2tag(vvd), "%s: invalid params: stream %pK, queue %pK\n",
+		      __func__, stream, queue);
+		ret = -EINVAL;
+		return ret;
+	}
+
+	if (!stream->video_dev) {
+		vpr_e(vvd2tag(vvd), "%s: invalid params: video_dev %pK\n",
+		      __func__, stream->video_dev);
 		ret = -EINVAL;
 		return ret;
 	}

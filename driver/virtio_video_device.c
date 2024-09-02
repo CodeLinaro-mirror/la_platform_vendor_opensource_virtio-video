@@ -155,97 +155,6 @@ int virtio_video_pending_buf_list_del(struct virtio_video_device *vvd,
 	return ret;
 }
 
-#ifdef MSM_VIDC_HW_VIRT
-int virtio_video_pending_event_list_empty(struct virtio_video_device *vvd)
-{
-	int ret = 0;
-#ifndef VIRTIO_VIDEO_MSM
-	if (vvd->is_m2m_dev) {
-		vpr_e(vvd2tag(vvd), "Unexpected call for m2m device!\n");
-		return -EPERM;
-	}
-#endif
-	spin_lock(&vvd->pending_event_list_lock);
-	if (list_empty(&vvd->pending_event_list))
-		ret = 1;
-	spin_unlock(&vvd->pending_event_list_lock);
-
-	return ret;
-}
-
-int virtio_video_pending_event_list_pop(struct virtio_video_device *vvd,
-				        struct virtio_video_queuing_event **virtio_event)
-{
-	struct virtio_video_queuing_event *ret_event = NULL;
-#ifndef VIRTIO_VIDEO_MSM
-	if (vvd->is_m2m_dev) {
-		vpr_e(vvd2tag(vvd), "Unexpected call for m2m device!\n");
-		return -EPERM;
-	}
-#endif
-	spin_lock(&vvd->pending_event_list_lock);
-	if (list_empty(&vvd->pending_event_list)) {
-		spin_unlock(&vvd->pending_event_list_lock);
-		return -EAGAIN;
-	}
-
-	ret_event = list_first_entry(&vvd->pending_event_list,
-			                     struct virtio_video_queuing_event, list);
-	spin_unlock(&vvd->pending_event_list_lock);
-
-	*virtio_event = ret_event;
-
-	return 0;
-}
-
-int virtio_video_pending_event_list_add(struct virtio_video_device *vvd,
-				        struct virtio_video_queuing_event *virtio_event)
-{
-#ifndef VIRTIO_VIDEO_MSM
-	if (vvd->is_m2m_dev) {
-		vpr_e(vvd2tag(vvd), "Unexpected call for m2m device!\n");
-		return -EPERM;
-	}
-#endif
-	spin_lock(&vvd->pending_event_list_lock);
-	list_add_tail(&virtio_event->list, &vvd->pending_event_list);
-	spin_unlock(&vvd->pending_event_list_lock);
-
-	return 0;
-}
-
-int virtio_video_pending_event_list_del(struct virtio_video_device *vvd,
-				        struct virtio_video_queuing_event *virtio_event)
-{
-	struct virtio_video_queuing_event *ve = NULL;
-	struct virtio_video_queuing_event *ve_tmp = NULL;
-	int ret = -EINVAL;
-
-#ifndef VIRTIO_VIDEO_MSM
-	if (vvd->is_m2m_dev) {
-		vpr_e(vvd2tag(vvd), "Unexpected call for m2m device!\n");
-		return -EPERM;
-	}
-#endif
-	spin_lock(&vvd->pending_event_list_lock);
-	if (list_empty(&vvd->pending_event_list)) {
-		spin_unlock(&vvd->pending_event_list_lock);
-		return -EAGAIN;
-	}
-
-	list_for_each_entry_safe(ve, ve_tmp, &vvd->pending_event_list, list) {
-		if (ve->device_id == virtio_event->device_id) {
-			list_del(&ve->list);
-			ret = 0;
-			break;
-		}
-	}
-	spin_unlock(&vvd->pending_event_list_lock);
-
-	return ret;
-}
-#endif
-
 int virtio_video_queue_setup(struct vb2_queue *vq, unsigned int *num_buffers,
 			     unsigned int *num_planes, unsigned int sizes[],
 			     struct device *alloc_devs[])
@@ -531,8 +440,14 @@ int virtio_video_enum_framemintervals(struct file *file, void *fh,
 	for (f_idx = 0; f_idx <= fmt->desc.num_frames; f_idx++) {
 		frm = &fmt->frames[f_idx];
 		frame = &frm->frame;
+#ifdef VIRTIO_VIDEO_MSM
+		if (frame != NULL &&
+		    in_stepped_interval(frame->width, f->width) &&
+		    in_stepped_interval(frame->height, f->height))
+#else
 		if (in_stepped_interval(frame->width, f->width) &&
 		    in_stepped_interval(frame->height, f->height))
+#endif
 			break;
 	}
 
@@ -1000,6 +915,11 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 
 	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_PFRAME)
 		v4l2_vb->flags |= V4L2_BUF_FLAG_PFRAME;
+
+#ifdef VIRTIO_VIDEO_MSM
+	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_ERR)
+		v4l2_vb->flags |= V4L2_BUF_FLAG_ERROR;
+#endif
 
 	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_EOS) {
 #ifndef VIRTIO_VIDEO_MSM

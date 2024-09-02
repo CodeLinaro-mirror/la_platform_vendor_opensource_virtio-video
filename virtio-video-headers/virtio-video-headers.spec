@@ -21,10 +21,16 @@ KERNEL_SRC="/usr/src/kernels"
 CURDIR=${PWD}
 cd ${KERNEL_SRC}/%{kversion}/
 scripts/headers_install.sh ${CURDIR}/virtio_video.h ${CURDIR}/virtio_video.h
+scripts/headers_install.sh ${CURDIR}/virtio_video_msm_ext.h ${CURDIR}/virtio_video_msm_ext.h
+scripts/headers_install.sh ${CURDIR}/virtio_video_hw_virt.h ${CURDIR}/virtio_video_hw_virt.h
 
 %install
 mkdir -p "$RPM_BUILD_ROOT/usr/include"
 cp virtio_video.h $RPM_BUILD_ROOT/usr/include/
+cp virtio_video_msm_ext.h $RPM_BUILD_ROOT/usr/include/
+cp virtio_video_hw_virt.h $RPM_BUILD_ROOT/usr/include/
 
 %files
 %{_includedir}/virtio_video.h
+%{_includedir}/virtio_video_msm_ext.h
+%{_includedir}/virtio_video_hw_virt.h
