@@ -16,6 +16,7 @@
 #define VIRTIO_VIDEO_BUF_FLAG_CODECCONFIG                   0x01000000
 #define VIRTIO_VIDEO_BUF_FLAG_END_OF_SUBFRAME               0x02000000
 #define VIRTIO_VIDEO_BUF_FLAG_DATA_CORRUPT                  0x04000000
+#define VIRTIO_VIDEO_BUF_FLAG_ERROR                         0x08000000
 #define VIRTIO_VIDEO_BUF_FLAG_READONLY                      0x20000000
 #define VIRTIO_VIDEO_FMT_FLAG_COMPRESSED                    0x0001
 

@@ -904,7 +904,11 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 
 	virtio_vb->queued = false;
 
+#ifndef VIRTIO_VIDEO_MSM
 	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_ERR)
+#else
+	if (flags & VIRTIO_VIDEO_BUF_FLAG_ERROR)
+#endif
 		done_state = VB2_BUF_STATE_ERROR;
 
 	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_KEY_FRAME)
@@ -915,11 +919,6 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 
 	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_PFRAME)
 		v4l2_vb->flags |= V4L2_BUF_FLAG_PFRAME;
-
-#ifdef VIRTIO_VIDEO_MSM
-	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_ERR)
-		v4l2_vb->flags |= V4L2_BUF_FLAG_ERROR;
-#endif
 
 	if (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_EOS) {
 #ifndef VIRTIO_VIDEO_MSM
@@ -938,6 +937,9 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 	}
 
 	if ((flags & VIRTIO_VIDEO_DEQUEUE_FLAG_ERR) ||
+#ifdef VIRTIO_VIDEO_MSM
+	    (flags & VIRTIO_VIDEO_BUF_FLAG_ERROR)   ||
+#endif
 	    (flags & VIRTIO_VIDEO_DEQUEUE_FLAG_EOS)) {
 #ifndef VIRTIO_VIDEO_MSM
 		vb->planes[0].bytesused = 0;
