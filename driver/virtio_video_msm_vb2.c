@@ -263,10 +263,11 @@ wait_vb2:
 	if (ret)
 		vpr_e(strm2tag(stream), "%s: failed for waitting %s buffer done %d\n",
 		      __func__, v4l2_type_name(queue->type), ret);
+	else
+		vpr_h(strm2tag(stream), "%s: %s done\n", __func__,
+			v4l2_type_name(queue->type));
 
 exit:
-	vpr_h(strm2tag(stream), "%s: %s done\n", __func__,
-	      v4l2_type_name(queue->type));
 
 	return;
 }
