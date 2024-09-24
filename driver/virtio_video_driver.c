@@ -80,11 +80,12 @@ static int virtio_video_probe(struct virtio_device* vdev)
 		virtio_video_event_cb
 	};
 
+#ifndef MSM_VIDC_HW_VIRT
 	if (!virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES)) {
 		dev_err(dev, "device must support guest allocated buffers\n");
 		return -ENODEV;
 	}
-
+#endif
 	vvd = devm_kzalloc(dev, sizeof(*vvd), GFP_KERNEL);
 	if (!vvd)
 		return -ENOMEM;
@@ -187,6 +188,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 		goto err_vbufs;
 	}
 
+#ifndef MSM_VIDC_HW_VIRT
 	virtio_cread(vdev, struct virtio_video_config, max_caps_length,
 		     &vvd->max_caps_len);
 	if (!vvd->max_caps_len) {
@@ -203,6 +205,10 @@ static int virtio_video_probe(struct virtio_device* vdev)
 		goto err_config;
 	}
 
+#ifdef VIRTIO_VIDEO_MSM
+	virtio_cread(vdev, struct virtio_video_config, version, &vvd->version);
+#endif
+#endif
 	ret = virtio_video_alloc_events(vvd);
 	if (ret)
 		goto err_events;
@@ -222,7 +228,9 @@ static int virtio_video_probe(struct virtio_device* vdev)
 
 err_init:
 err_events:
+#ifndef MSM_VIDC_HW_VIRT
 err_config:
+#endif
 	virtio_video_free_vbufs(vvd);
 err_vbufs:
 	vdev->config->del_vqs(vdev);
@@ -292,13 +300,22 @@ static void msm_vdev_get(struct virtio_device *vdev, unsigned offset,
 	const char *dev_n = dev_name(&vdev->dev);
 	struct virtio_video_device *vvd = vdev->priv;
 
-	vpr_h(vvd2tag(vvd), "%s: %s offset=%x\n", dev_n, __func__, offset);
-
 	cfg = msm_hab_get_config(vdev);
-	if (offset == offsetof(struct virtio_video_config, max_caps_length))
+	if (offset == offsetof(struct virtio_video_config, max_caps_length)) {
 		*(uint32_t *)buf = cfg.max_caps_length;
-	else if (offset == offsetof(struct virtio_video_config, max_resp_length))
+		vpr_l(vvd2tag(vvd), "%s: %s offset=%x max_caps_length=%d\n",
+		      dev_n, __func__, offset, *(uint32_t *)buf);
+	}
+	else if (offset == offsetof(struct virtio_video_config, max_resp_length)) {
 		*(uint32_t *)buf = cfg.max_resp_length;
+		vpr_l(vvd2tag(vvd), "%s: %s offset=%x max_resp_length=%d\n",
+		      dev_n, __func__, offset, *(uint32_t *)buf);
+	}
+	else if (offset == offsetof(struct virtio_video_config, version)) {
+		*(uint32_t *)buf = cfg.version;
+		vpr_l(vvd2tag(vvd), "%s: %s offset=%x version=%d \n",
+		      dev_n, __func__, offset, *(uint32_t *)buf);
+	}
 	else
 		vpr_e(vvd2tag(vvd), "%s: %s unsupported\n", dev_n, __func__);
 }
@@ -357,10 +374,11 @@ static int msm_vdev_finalize_features(struct virtio_device *vdev)
 
 	vpr_h(vvd2tag(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
 
+#ifndef MSM_VIDC_HW_VIRT
 	ret = msm_hab_set_features(vdev);
 	if (ret)
 		vpr_e(vvd2tag(vvd), "%s: failed for video%d, ret %d", __func__, vdev->id.device, ret);
-
+#endif
 	return ret;
 }
 
@@ -379,13 +397,17 @@ static struct virtio_device* venc = NULL;
 static struct virtio_device* vdec = NULL;
 
 #ifdef MSM_VIDC_HW_VIRT
-struct virtio_video_device* msm_virtio_video_hw_virtualization_get_vvd(void)
+/* HW Virtualization uses only single HAB
+ * channel for both encoder and decoder.
+ */
+struct virtio_video_device* msm_virtio_video_hw_virt_get_vvd(void)
 {
 	struct virtio_video_device *vvd = NULL;
-	if (NULL == vdec) {
-		vpr_e(VPR_TAG, "failed to get vdev for hardware virtualization\n");
-	}
-	else {
+
+	if (!vdec) {
+		vpr_e(VPR_TAG,
+		      "failed to get vdev for hardware virtualization\n");
+	} else {
 		vvd = (struct virtio_video_device *)vdec->priv;
 	}
 

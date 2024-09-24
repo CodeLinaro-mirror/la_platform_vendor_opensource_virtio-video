@@ -8,8 +8,13 @@ VIDEO_COMPILE_BY = $(shell whoami | sed 's/\\/\\\\/')
 VIDEO_COMPILE_HOST = $(shell uname -n)
 VIDEO_COMPILE_TIP = $(shell git log --oneline --no-merges | head -n 1 | tr -d '\"')
 VIDEO_GEN_PATH = $(VIDEO_ROOT)/driver/video_generated.h
+VIDC_HW_VIRT_HEADER = $(VIDEO_ROOT)/include/vidc_hw_virt.h
+KERNEL_VIDC_PATH = $(KERNEL_SRC)/include
 
-all: modules
+all: copy_vidc_hw modules
+
+copy_vidc_hw:
+	@cp -av $(VIDC_HW_VIRT_HEADER) $(KERNEL_VIDC_PATH)
 
 $(VIDEO_GEN_PATH): $(shell find . -type f \( -iname \*.c -o -iname \*.h -o -iname \*.mk \))
 	echo '#define VIDEO_COMPILE_TIME "$(VIDEO_COMPILE_TIME)"' > $(VIDEO_GEN_PATH)
