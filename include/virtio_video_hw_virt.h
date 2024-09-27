@@ -29,8 +29,25 @@ enum virtio_video_hw_virt_event_type {
 	VIRTIO_VIDEO_EVENT_GVM_SSR = 0x0300,
 };
 
+struct virtio_video_msm_msg_hdr {
+	__le32 type;
+	__le32 stream_id;
+};
+
+struct virtio_video_msm_msg {
+	struct virtio_video_msm_msg_hdr hdr;
+	__le32 payload[MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE -
+		       sizeof(struct virtio_video_msm_msg_hdr)];
+};
+
+struct virtio_video_msm_cmd_msg {
+	struct virtio_video_msm_msg_hdr hdr;
+	__le32 sub_cmd;
+	uint8_t  payload[];
+};
+
 struct virtio_video_open_gvm {
-	struct virtio_video_cmd_hdr hdr;
+	struct virtio_video_msm_msg_hdr hdr;
 	__le32 vm_id;
 	__le32 device_id_mask;
 };
@@ -40,11 +57,11 @@ struct virtio_video_open_gvm_resp {
 };
 
 struct virtio_video_close_gvm {
-	struct virtio_video_cmd_hdr hdr;
+	struct virtio_video_msm_msg_hdr hdr;
 };
 
 struct virtio_video_open_gvm_session {
-	struct virtio_video_cmd_hdr hdr;
+	struct virtio_video_msm_msg_hdr hdr;
 	__le32 vm_id;
 };
 
@@ -55,12 +72,12 @@ struct virtio_video_open_gvm_session_resp {
 };
 
 struct virtio_video_gvm_device {
-	struct virtio_video_cmd_hdr hdr;
+	struct virtio_video_msm_msg_hdr hdr;
 	__le32 device_id;
 };
 
 struct virtio_video_gvm_session {
-	struct virtio_video_cmd_hdr hdr;
+	struct virtio_video_msm_msg_hdr hdr;
 	__le32 device_id;
 	__le32 session_id;
 	__le64 session_handle;
