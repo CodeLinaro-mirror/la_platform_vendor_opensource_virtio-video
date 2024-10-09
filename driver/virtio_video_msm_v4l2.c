@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include "virtio_video.h"
 #include "virtio_video_msm_v4l2.h"
@@ -491,6 +491,12 @@ int msm_v4l2_reqbufs(struct file *file, void *fh,
 	int port = 0;
 	int ret = 0;
 	int rc = 0;
+
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		return -EIO;
+	}
 
 	vpr_h(strm2tag(stream), "%s: count=%d, type=%s, memory=%d\n",
 	      __func__, buf->count, v4l2_type_name(buf->type), buf->memory);
