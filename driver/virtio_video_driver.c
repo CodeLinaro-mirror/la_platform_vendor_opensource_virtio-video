@@ -2,7 +2,7 @@
 /* Driver for virtio video device.
  *
  * Copyright 2020 OpenSynergy GmbH.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,10 +28,12 @@
 #include "virtio_video.h"
 #include "virtio_video_msm_debug.h"
 
-#ifdef CONFIG_MSM_VIRTIO_HAB
+#if IS_ENABLED(CONFIG_MSM_HAB)
 #include <linux/habmm.h>
 #include "virtio_video_msm_hab.h"
+#if IS_ENABLED(CONFIG_MSM_VIRTIO_HAB)
 extern struct virtio_device * virthab_get_vdev(int32_t mmid);
+#endif
 #endif
 
 #define NUM_VIDEO_DEVICE 3
@@ -69,7 +71,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	struct virtio_video_device *vvd;
 	struct virtqueue *vqs[2];
 	struct device *dev = &vdev->dev;
-#ifndef CONFIG_MSM_VIRTIO_HAB
+#ifndef VIRTIO_VIDEO_MSM
 	struct device *pdev = dev->parent;
 #endif
 	static const char * const names[] = { "commandq", "eventq" };
@@ -78,11 +80,12 @@ static int virtio_video_probe(struct virtio_device* vdev)
 		virtio_video_event_cb
 	};
 
+#ifndef MSM_VIDC_HW_VIRT
 	if (!virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES)) {
 		dev_err(dev, "device must support guest allocated buffers\n");
 		return -ENODEV;
 	}
-
+#endif
 	vvd = devm_kzalloc(dev, sizeof(*vvd), GFP_KERNEL);
 	if (!vvd)
 		return -ENOMEM;
@@ -120,7 +123,10 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	idr_init(&vvd->resource_idr);
 	spin_lock_init(&vvd->stream_idr_lock);
 	idr_init(&vvd->stream_idr);
-
+#ifdef MSM_VIDC_HW_VIRT
+	spin_lock_init(&vvd->pending_event_list_lock);
+	spin_lock_init(&vvd->wq_lock);
+#endif
 	init_waitqueue_head(&vvd->wq);
 
 	if (virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_NON_CONTIG))
@@ -131,7 +137,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 #else
 	vvd->has_iommu = !virtio_has_iommu_quirk(vdev);
 #endif
-#ifndef CONFIG_MSM_VIRTIO_HAB
+#ifndef VIRTIO_VIDEO_MSM
 	if (!dev->dma_ops)
 		set_dma_ops(dev, pdev->dma_ops);
 
@@ -147,7 +153,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 #endif
 
 	v4l2_device_set_name(&vvd->v4l2_dev, DRIVER_NAME, &v4l2_instance);
-#ifndef CONFIG_MSM_VIRTIO_HAB
+#if !IS_ENABLED(CONFIG_MSM_HAB)
 	/* when using HAB, the dev name has been set in register_virtio_device */
 	dev_set_name(dev, "%s.%i", DRIVER_NAME, vdev->index);
 #endif
@@ -163,6 +169,9 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	INIT_WORK(&vvd->eventq.work, virtio_video_process_events);
 
 	INIT_LIST_HEAD(&vvd->pending_vbuf_list);
+#ifdef MSM_VIDC_HW_VIRT
+	INIT_LIST_HEAD(&vvd->pending_event_list);
+#endif
 
 	ret = virtio_find_vqs(vdev, 2, vqs, callbacks, names, NULL);
 	if (ret) {
@@ -179,6 +188,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 		goto err_vbufs;
 	}
 
+#ifndef MSM_VIDC_HW_VIRT
 	virtio_cread(vdev, struct virtio_video_config, max_caps_length,
 		     &vvd->max_caps_len);
 	if (!vvd->max_caps_len) {
@@ -195,6 +205,10 @@ static int virtio_video_probe(struct virtio_device* vdev)
 		goto err_config;
 	}
 
+#ifdef VIRTIO_VIDEO_MSM
+	virtio_cread(vdev, struct virtio_video_config, version, &vvd->version);
+#endif
+#endif
 	ret = virtio_video_alloc_events(vvd);
 	if (ret)
 		goto err_events;
@@ -214,7 +228,9 @@ static int virtio_video_probe(struct virtio_device* vdev)
 
 err_init:
 err_events:
+#ifndef MSM_VIDC_HW_VIRT
 err_config:
+#endif
 	virtio_video_free_vbufs(vvd);
 err_vbufs:
 	vdev->config->del_vqs(vdev);
@@ -263,7 +279,7 @@ static struct virtio_driver virtio_video_driver = {
 	.remove = virtio_video_remove,
 };
 
-#ifndef CONFIG_MSM_VIRTIO_HAB
+#ifndef VIRTIO_VIDEO_MSM
 module_virtio_driver(virtio_video_driver);
 
 MODULE_DEVICE_TABLE(virtio, id_table);
@@ -284,13 +300,22 @@ static void msm_vdev_get(struct virtio_device *vdev, unsigned offset,
 	const char *dev_n = dev_name(&vdev->dev);
 	struct virtio_video_device *vvd = vdev->priv;
 
-	vpr_h(vvd2tag(vvd), "%s: %s offset=%x\n", dev_n, __func__, offset);
-
 	cfg = msm_hab_get_config(vdev);
-	if (offset == offsetof(struct virtio_video_config, max_caps_length))
+	if (offset == offsetof(struct virtio_video_config, max_caps_length)) {
 		*(uint32_t *)buf = cfg.max_caps_length;
-	else if (offset == offsetof(struct virtio_video_config, max_resp_length))
+		vpr_l(vvd2tag(vvd), "%s: %s offset=%x max_caps_length=%d\n",
+		      dev_n, __func__, offset, *(uint32_t *)buf);
+	}
+	else if (offset == offsetof(struct virtio_video_config, max_resp_length)) {
 		*(uint32_t *)buf = cfg.max_resp_length;
+		vpr_l(vvd2tag(vvd), "%s: %s offset=%x max_resp_length=%d\n",
+		      dev_n, __func__, offset, *(uint32_t *)buf);
+	}
+	else if (offset == offsetof(struct virtio_video_config, version)) {
+		*(uint32_t *)buf = cfg.version;
+		vpr_l(vvd2tag(vvd), "%s: %s offset=%x version=%d \n",
+		      dev_n, __func__, offset, *(uint32_t *)buf);
+	}
 	else
 		vpr_e(vvd2tag(vvd), "%s: %s unsupported\n", dev_n, __func__);
 }
@@ -349,10 +374,11 @@ static int msm_vdev_finalize_features(struct virtio_device *vdev)
 
 	vpr_h(vvd2tag(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
 
+#ifndef MSM_VIDC_HW_VIRT
 	ret = msm_hab_set_features(vdev);
 	if (ret)
 		vpr_e(vvd2tag(vvd), "%s: failed for video%d, ret %d", __func__, vdev->id.device, ret);
-
+#endif
 	return ret;
 }
 
@@ -370,9 +396,30 @@ static const struct virtio_config_ops msm_vdev_config_ops = {
 static struct virtio_device* venc = NULL;
 static struct virtio_device* vdec = NULL;
 
+#ifdef MSM_VIDC_HW_VIRT
+/* HW Virtualization uses only single HAB
+ * channel for both encoder and decoder.
+ */
+struct virtio_video_device* msm_virtio_video_hw_virt_get_vvd(void)
+{
+	struct virtio_video_device *vvd = NULL;
+
+	if (!vdec) {
+		vpr_e(VPR_TAG,
+		      "failed to get vdev for hardware virtualization\n");
+	} else {
+		vvd = (struct virtio_video_device *)vdec->priv;
+	}
+
+	return vvd;
+}
+#endif
+
 static int __init msm_virtio_video_init(void)
 {
 	int ret = 0;
+
+#if IS_ENABLED(CONFIG_MSM_VIRTIO_HAB)
 	struct virtio_device *vdev = NULL;
 
 	vdev = virthab_get_vdev(MM_VID);
@@ -381,6 +428,7 @@ static int __init msm_virtio_video_init(void)
 		ret = -ENODEV;
 		goto err;
 	}
+#endif
 
 	ret = register_virtio_driver(&virtio_video_driver);
 	if (ret) {
@@ -393,7 +441,9 @@ static int __init msm_virtio_video_init(void)
 		vdec->config = &msm_vdev_config_ops;
 		vdec->id.device = VIRTIO_ID_VIDEO_DECODER;
 		vdec->id.vendor = VIRTIO_DEV_ANY_ID;
+#if IS_ENABLED(CONFIG_MSM_VIRTIO_HAB)
 		vdec->dev.parent = &vdev->dev;
+#endif
 		vdec->dev.release = msm_vdev_release;
 		vpr_h(VPR_TAG, "%s: registering virtio device for video decoder\n", __func__);
 		ret = register_virtio_device(vdec);
@@ -412,7 +462,9 @@ static int __init msm_virtio_video_init(void)
 		venc->config = &msm_vdev_config_ops;
 		venc->id.device = VIRTIO_ID_VIDEO_ENCODER;
 		venc->id.vendor = VIRTIO_DEV_ANY_ID;
+#if IS_ENABLED(CONFIG_MSM_VIRTIO_HAB)
 		venc->dev.parent = &vdev->dev;
+#endif
 		venc->dev.release = msm_vdev_release;
 		vpr_h(VPR_TAG, "%s: registering virtio device for video encoder\n", __func__);
 		ret = register_virtio_device(venc);

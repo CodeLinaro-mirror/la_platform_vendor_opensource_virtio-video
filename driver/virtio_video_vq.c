@@ -22,11 +22,15 @@
  */
 
 #include "virtio_video.h"
-#ifdef CONFIG_MSM_VIRTIO_HAB
+#ifdef VIRTIO_VIDEO_MSM
 #include "virtio_video_msm_hab.h"
 #include "virtio_video_msm_debug.h"
-#endif
 #include "virtio_video_msm_mem.h"
+#endif
+#ifdef MSM_VIDC_HW_VIRT
+#include "include/virtio_video_hw_virt.h"
+#include "include/vidc_hw_virt.h"
+#endif
 
 #ifdef VIRTIO_VIDEO_MSM
 #define MAX_INLINE_CMD_SIZE   512
@@ -359,9 +363,13 @@ static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 	struct scatterlist sg;
 	struct virtqueue *vq = vvd->eventq.vq;
 
+#ifdef VIRTIO_VIDEO_MSM
+	memset(evt, 0, sizeof(struct virtio_video_msm_event));
+	sg_init_one(&sg, evt, sizeof(struct virtio_video_msm_event));
+#else
 	memset(evt, 0, sizeof(struct virtio_video_event));
 	sg_init_one(&sg, evt, sizeof(struct virtio_video_event));
-
+#endif
 	ret = virtqueue_add_inbuf(vq, &sg, 1, evt, GFP_KERNEL);
 	if (ret) {
 		vpr_e(vvd2tag(vvd), "failed to queue event buffer\n");
@@ -372,14 +380,16 @@ static int virtio_video_queue_event_buffer(struct virtio_video_device *vvd,
 	return 0;
 }
 
+#ifdef VIRTIO_VIDEO_MSM
 static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
-                                         struct virtio_video_event *evt)
+                                         struct virtio_video_msm_event *evt)
 {
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	uint32_t stream_id = evt->stream_id;
 	int event_type = le32_to_cpu(evt->event_type);
 	struct virtio_video_buffer *entry = NULL, *virtio_vb = NULL;
 	struct v4l2_buffer *v4l2_buf = NULL;
+	struct virtio_video_erased_buffers* buffers = NULL;
 	struct vb2_v4l2_buffer *v4l2_vb = NULL;
 	struct vb2_buffer *vb = NULL;
 	int plane = 0;
@@ -447,13 +457,25 @@ static void virtio_video_handle_buf_done(struct virtio_video_stream *stream,
 		virtio_video_buf_done(virtio_vb, v4l2_buf->flags,
 		                      v4l2_buffer_get_timestamp(v4l2_buf), NULL);
 	}
+
+	msm_buf_put_export_id(stream, export_id, to_virtio_queue_type(v4l2_buf->type), false);
+
+	if (V4L2_TYPE_IS_MULTIPLANAR(v4l2_buf->type)) {
+		buffers = (struct virtio_video_erased_buffers*)((char*)v4l2_buf->m.planes +
+			   sizeof(v4l2_buf->m.planes[0]));
+		msm_buf_cleanup_buffers(stream, buffers);
+	}
 }
+#endif
 
 static void virtio_video_handle_event(struct virtio_video_device *vvd,
                                       struct virtio_video_event *evt)
 {
 	struct virtio_video_stream *stream = NULL;
 	uint32_t stream_id = evt->stream_id;
+#ifdef MSM_VIDC_HW_VIRT
+	struct virtio_video_queuing_event *queuing_evt = NULL;
+#endif
 
 #ifndef VIRTIO_VIDEO_MSM
 	struct video_device *vd = &vvd->video_dev;
@@ -468,12 +490,14 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 	}
 
 	switch (le32_to_cpu(evt->event_type)) {
+#ifdef VIRTIO_VIDEO_MSM
 	case VIRTIO_VIDEO_EVENT_FBD:
 	case VIRTIO_VIDEO_EVENT_EBD:
-		virtio_video_handle_buf_done(stream, evt);
+		virtio_video_handle_buf_done(stream, (struct virtio_video_msm_event *)evt);
 		break;
+#endif
 	case VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED:
-		vpr_h(strm2tag(stream), "%s: stream_id=%u: resolution change event\n",
+		vpr_h(strm2tag(stream), "%s: stream_id=%u: reconfig/resolution change event\n",
 		      __func__, stream_id);
 #ifndef VIRTIO_VIDEO_MSM
 		virtio_video_cmd_get_params(vvd, stream,
@@ -494,6 +518,21 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 		virtio_video_handle_error(stream);
 		trace_virt_vid_evt_err(stream_id, 0, 0, 0, 0);
 		break;
+#ifdef MSM_VIDC_HW_VIRT
+	case VIRTIO_VIDEO_EVENT_GVM_SSR:
+		vpr_h(strm2tag(stream), "%s: stream_id=%u: gvm SSR event\n",
+		      __func__, stream_id);
+		queuing_evt = kzalloc(sizeof(*queuing_evt), GFP_KERNEL);
+		if (queuing_evt != NULL) {
+			memcpy(&queuing_evt->evt, evt,
+			       sizeof(queuing_evt->evt));
+			queuing_evt->device_id = *(uint32_t*)
+			     ((struct virtio_video_msm_hw_event *)evt)->payload;
+			virtio_video_pending_event_list_add(vvd, queuing_evt);
+			wake_up(&vvd->wq);
+		}
+		break;
+#endif
 	default:
 		vpr_h(strm2tag(stream), "stream_id=%u: unknown event\n",
 		      stream_id);
@@ -513,8 +552,11 @@ int virtio_video_alloc_events(struct virtio_video_device *vvd)
 	size_t i;
 	struct virtio_video_event *evts;
 	size_t num =  vvd->eventq.vq->num_free;
-
+#ifdef VIRTIO_VIDEO_MSM
+	evts = kzalloc(num * sizeof(struct virtio_video_msm_event), GFP_KERNEL);
+#else
 	evts = kzalloc(num * sizeof(struct virtio_video_event), GFP_KERNEL);
+#endif
 	if (!evts) {
 		vpr_e(vvd2tag(vvd), "failed to alloc event buffers!!!\n");
 		return -ENOMEM;
@@ -522,7 +564,12 @@ int virtio_video_alloc_events(struct virtio_video_device *vvd)
 	vvd->evts = evts;
 
 	for (i = 0; i < num; i++) {
+#ifdef VIRTIO_VIDEO_MSM
+		ret = virtio_video_queue_event_buffer(vvd, (struct virtio_video_event *)
+				&((struct virtio_video_msm_event *)evts)[i]);
+#else
 		ret = virtio_video_queue_event_buffer(vvd, &evts[i]);
+#endif
 		if (ret) {
 			vpr_e(vvd2tag(vvd), "failed to queue event buffer\n");
 			return ret;
@@ -684,7 +731,11 @@ int virtio_video_cmd_resource_queue(struct virtio_video_device *vvd,
 	req_p->timestamp =
 		cpu_to_le64(virtio_vb->v4l2_m2m_vb.vb.vb2_buf.timestamp);
 
+#ifdef VIRTIO_VIDEO_MSM
+	for (i = 0; i < num_data_size && i < VB2_MAX_PLANES; ++i)
+#else
 	for (i = 0; i < num_data_size; ++i)
+#endif
 		req_p->data_sizes[i] = cpu_to_le32(data_size[i]);
 
 	resp_p = (struct virtio_video_resource_queue_resp *)vbuf->resp_buf;
@@ -1079,4 +1130,3 @@ int virtio_video_cmd_set_control(struct virtio_video_device *vvd,
 
 	return virtio_video_queue_cmd_buffer(vvd, vbuf);
 }
-

@@ -24,7 +24,6 @@
 #include <linux/virtio.h>
 #include <linux/virtio_ids.h>
 #include <linux/virtio_config.h>
-#include <vidc/linux/virtio_video.h>
 #include <linux/list.h>
 #include <linux/completion.h>
 #include <media/v4l2-device.h>
@@ -32,6 +31,11 @@
 #include <media/v4l2-ctrls.h>
 #include <media/videobuf2-dma-sg.h>
 #include <media/videobuf2-dma-contig.h>
+#include "include/virtio_video.h"
+#include "include/virtio_video_msm_ext.h"
+#ifdef MSM_VIDC_HW_VIRT
+#include "include/vidc_hw_virt.h"
+#endif
 
 #define DRIVER_NAME "virtio-video"
 
@@ -39,6 +43,12 @@
 #define MIN_BUFS_MAX VIDEO_MAX_FRAME
 #define MIN_BUFS_STEP 1
 #define MIN_BUFS_DEF 1
+
+enum virtio_video_device_type {
+	VIRTIO_VIDEO_DEVICE_ENCODER = 0x0100,
+	VIRTIO_VIDEO_DEVICE_DECODER,
+	VIRTIO_VIDEO_DEVICE_CAMERA,
+};
 
 #ifdef VIRTIO_VIDEO_MSM
 #define INPUT_MPLANE V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE
@@ -62,6 +72,7 @@ struct buf_export_cache {
 	struct kmem_cache* exports;
 	struct list_head export_fifo;
 	int used_count;
+	struct mutex lock;
 };
 
 #define sg_init_one                 msm_hab_sg_init_one
@@ -257,6 +268,11 @@ struct virtio_video_device {
 
 	uint32_t vbufs_sent;
 	struct list_head pending_vbuf_list;
+#ifdef MSM_VIDC_HW_VIRT
+	struct list_head pending_event_list;
+	spinlock_t pending_event_list_lock;
+	spinlock_t wq_lock;
+#endif
 
 	/* device_busy - to block multiple opens for non-m2m (camera) */
 	bool device_busy;
@@ -280,9 +296,19 @@ struct virtio_video_device {
 	struct virtio_video_device_ops *ops;
 
 #ifdef VIRTIO_VIDEO_MSM
+	uint32_t version;
 	const struct vb2_mem_ops *vb2_mem_ops;
 	struct list_head ctrl_config_list;
 	char tag[TAG_MAX_LEN];
+#ifdef MSM_VIDC_HW_VIRT
+	uint64_t gvm_stream_id;
+	uint32_t device_id_mask;
+	uint32_t device_core_mask;
+	uint32_t vm_id;
+	uint32_t device_id;
+	uint32_t session_id;
+	uint64_t session_handle;
+#endif
 #endif
 };
 
@@ -569,7 +595,24 @@ int virtio_video_pending_buf_list_add(struct virtio_video_device* vvd,
 int virtio_video_pending_buf_list_del(struct virtio_video_device* vvd,
 				      struct virtio_video_buffer* virtio_vb);
 
+#ifdef MSM_VIDC_HW_VIRT
+int virtio_video_pending_event_list_empty(struct virtio_video_device *vvd);
+
+int virtio_video_pending_event_list_pop(struct virtio_video_device *vvd,
+				        struct virtio_video_queuing_event **virtio_event);
+
+int virtio_video_pending_event_list_add(struct virtio_video_device *vvd,
+				        struct virtio_video_queuing_event *virtio_event);
+
+int virtio_video_pending_event_list_del(struct virtio_video_device *vvd,
+				        struct virtio_video_queuing_event *virtio_event);
+#endif
+
 bool is_priv_ctrl(u32 id);
+
+#ifdef MSM_VIDC_HW_VIRT
+struct virtio_video_device* msm_virtio_video_hw_virt_get_vvd(void);
+#endif
 
 #endif
 
