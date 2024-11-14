@@ -266,11 +266,6 @@ static int process_msm_hab_cmd_resp(struct hab_virtqueue* hvq, void* data)
 	}
 
 	if (found) {
-		if (hdr->type == VIRTIO_VIDEO_CMD_QUERY_CAPABILITY &&
-		    vvd->version < VIRTIO_VIDEO_MSM_PROTOCOL_VERSION &&
-		    sizeof(struct virtio_video_query_capability) == 16)
-			vbuf->size -= 4;
-
 		resp = (uint8_t*)data + vbuf->size + vbuf->data_size;
 		resp_rc = ((struct virtio_video_resp *)resp)->result;
 
@@ -475,6 +470,7 @@ static int get_hab_handle(struct virtio_device *vdev, struct hab_virtqueue hvq[]
 	return ret;
 }
 
+#ifndef MSM_VIDC_HW_VIRT
 static int get_inital_data(struct hab_virtqueue hvq[], struct virtio_video_initial_data* data)
 {
 	int size_bytes = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE;
@@ -488,6 +484,7 @@ static int get_inital_data(struct hab_virtqueue hvq[], struct virtio_video_initi
 
 	return ret;
 }
+#endif
 
 int msm_hab_vdev_init(struct virtio_device *vdev)
 {
@@ -507,7 +504,9 @@ int msm_hab_vdev_init(struct virtio_device *vdev)
 	if (ret)
 		goto err;
 
+#ifndef MSM_VIDC_HW_VIRT
 	ret = get_inital_data(hvq, data);
+#endif
 
 err:
 	return ret;
@@ -724,8 +723,11 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		else
 			hvq = &hvq_enc[i];
 
-		if (!hvq->habmm_handle)
+		if (!hvq->habmm_handle) {
+			vpr_e(vvd2tag(vvd), "%s: %s habmm_handle is null\n",
+			      dev_name(&vdev->dev), __func__);
 			goto err;
+		}
 
 		hvq->vq.callback = callbacks[i];
 		hvq->vq.name = names[i];

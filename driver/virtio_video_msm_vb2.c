@@ -219,13 +219,6 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 		goto exit;
 	}
 
-	if (is_session_error(stream)) {
-		vpr_e(strm2tag(stream),"%s: %s in session error state\n",
-		      __func__, v4l2_type_name(queue->type));
-		ret = -EIO;
-		goto session_err;
-	}
-
 	if (queue->type == INPUT_META_PLANE || queue->type == OUTPUT_META_PLANE)
 		goto wait_vb2;
 
@@ -243,7 +236,6 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META);
 	}
 
-session_err:
 	if (ret) {
 		vpr_h(strm2tag(stream), "%s: streamoff %s failed %d, to release buffers\n",
 		      __func__, v4l2_type_name(queue->type), ret);
@@ -263,10 +255,11 @@ wait_vb2:
 	if (ret)
 		vpr_e(strm2tag(stream), "%s: failed for waitting %s buffer done %d\n",
 		      __func__, v4l2_type_name(queue->type), ret);
+	else
+		vpr_h(strm2tag(stream), "%s: %s done\n", __func__,
+			v4l2_type_name(queue->type));
 
 exit:
-	vpr_h(strm2tag(stream), "%s: %s done\n", __func__,
-	      v4l2_type_name(queue->type));
 
 	return;
 }
