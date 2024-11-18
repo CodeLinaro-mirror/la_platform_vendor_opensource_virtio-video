@@ -266,11 +266,6 @@ static int process_msm_hab_cmd_resp(struct hab_virtqueue* hvq, void* data)
 	}
 
 	if (found) {
-		if (hdr->type == VIRTIO_VIDEO_CMD_QUERY_CAPABILITY &&
-		    vvd->version < VIRTIO_VIDEO_MSM_PROTOCOL_VERSION &&
-		    sizeof(struct virtio_video_query_capability) == 16)
-			vbuf->size -= 4;
-
 		resp = (uint8_t*)data + vbuf->size + vbuf->data_size;
 		resp_rc = ((struct virtio_video_resp *)resp)->result;
 
