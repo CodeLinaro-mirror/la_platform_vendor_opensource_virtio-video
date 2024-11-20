@@ -40,7 +40,7 @@ struct virtio_video_msm_msg_hdr {
 
 struct virtio_video_msm_msg {
 	struct virtio_video_msm_msg_hdr hdr;
-	__le32 payload[MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE -
+	__u8   payload[MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE -
 		       sizeof(struct virtio_video_msm_msg_hdr)];
 };
 
