@@ -157,17 +157,13 @@ int32_t virtio_video_msm_cmd_open_gvm_session(uint32_t* device_id,
 		vpr_e(VPR_TAG, "%s: invalid vvd", __func__);
 		return -EXDEV;
 	}
-	if (vvd->session_handle != 0) {
-		vpr_e(VPR_TAG, "%s: session already opened", __func__);
-		return -EEXIST;
-	}
 
 	req_p = virtio_video_alloc_req_resp(vvd,
-					virtio_video_msm_open_gvm_session_cb,
-					&vbuf,
-					sizeof(*req_p),
-					resp_size,
-					NULL);
+	                                virtio_video_msm_open_gvm_session_cb,
+	                                &vbuf,
+	                                sizeof(*req_p),
+	                                resp_size,
+	                                NULL);
 	if (IS_ERR(req_p))
 		return -ENOMEM;
 
@@ -220,7 +216,6 @@ int32_t virtio_video_msm_cmd_pause_gvm_session(uint32_t device_id,
 	req_p->hdr.stream_id = cpu_to_le32(vvd->gvm_stream_id);
 	req_p->device_id = cpu_to_le32(device_id);
 	req_p->session_id = cpu_to_le32(session_id);
-	req_p->session_handle = cpu_to_le64(vvd->session_handle);
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 	if (ret == -ETIMEDOUT) {
 		vpr_e(vvd2tag(vvd),
@@ -261,7 +256,6 @@ int32_t virtio_video_msm_cmd_resume_gvm_session(uint32_t device_id,
 	req_p->hdr.stream_id = cpu_to_le32(vvd->gvm_stream_id);
 	req_p->device_id = cpu_to_le32(device_id);
 	req_p->session_id = cpu_to_le32(session_id);
-	req_p->session_handle = cpu_to_le64(vvd->session_handle);
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 	if (ret == -ETIMEDOUT) {
 		vpr_e(vvd2tag(vvd),
