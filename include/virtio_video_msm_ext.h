@@ -6,7 +6,11 @@
 #ifndef _VIRTIO_VIDEO_MSM_EXT_H
 #define _VIRTIO_VIDEO_MSM_EXT_H
 
+#if defined(__linux__)
 #include <linux/types.h>
+#else
+#include "virtio_video_msm_types.h"
+#endif
 
 /* version format: YY MM DD 00 (00 reserved) */
 #define VIRTIO_VIDEO_MSM_PROTOCOL_VERSION                   (24073100)

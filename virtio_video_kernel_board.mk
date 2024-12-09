@@ -11,12 +11,13 @@ ifeq ($(TARGET_USES_GY), true)
 endif
 
 # Check QMAA flags
-ifeq ($(TARGET_USES_QMAA), true)
-    ifneq ($(TARGET_USES_QMAA_OVERRIDE_VIDEO), true)
-    TARGET_VIRTIO_VIDEO_ENABLE := false
-    $(warning "virtio-video disabled due to QMAA")
-    endif
-endif
+# Temporary disable checking until target side enable override
+#ifeq ($(TARGET_USES_QMAA), true)
+#    ifneq ($(TARGET_USES_QMAA_OVERRIDE_VIDEO), true)
+#    TARGET_VIRTIO_VIDEO_ENABLE := false
+#    $(warning "virtio-video disabled due to QMAA")
+#    endif
+#endif
 
 # Build video kernel driver
 ifeq ($(TARGET_VIRTIO_VIDEO_ENABLE),true)
