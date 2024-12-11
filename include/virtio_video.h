@@ -9,8 +9,12 @@
 #ifndef _UAPI_LINUX_VIRTIO_VIDEO_H
 #define _UAPI_LINUX_VIRTIO_VIDEO_H
 
+#if defined(__linux__)
 #include <linux/types.h>
 #include <linux/virtio_config.h>
+#else
+#include "virtio_video_msm_types.h"
+#endif
 
 /*
  * Feature bits
