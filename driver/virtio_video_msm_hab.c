@@ -726,6 +726,7 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		if (!hvq->habmm_handle) {
 			vpr_e(vvd2tag(vvd), "%s: %s habmm_handle is null\n",
 			      dev_name(&vdev->dev), __func__);
+			ret = -ENODEV;
 			goto err;
 		}
 
@@ -735,7 +736,7 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		hvq->vq.num_free = DEFAULT_VQ_NUM;
 		INIT_LIST_HEAD(&hvq->vbuf_list.list);
 		INIT_LIST_HEAD(&hvq->resp_list.list);
-		if (init_hvq_unused_vq_buf_list(vvd, hvq))
+		if ((ret = init_hvq_unused_vq_buf_list(vvd, hvq)))
 			goto err;
 		hvq->vbuf_list.count = 0;
 		hvq->resp_list.count = 0;
