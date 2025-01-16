@@ -17,6 +17,9 @@
 #define spin_unlock_irqrestore(a, b)   {spin_unlock(a); b = 0;}
 #endif
 
+
+#define CONNECT_DELAY 1000
+
 struct hab_list {
 	struct list_head list;
 	int32_t count;
