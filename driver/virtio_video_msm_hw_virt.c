@@ -367,7 +367,7 @@ int virtio_video_queue_event_wait(struct virtio_video_msm_hw_event *evt)
 	}
 
 	if (list_empty(&vvd->pending_event_list))
-		wait_event(vvd->wq, !list_empty(&vvd->pending_event_list));
+		wait_event_interruptible(vvd->wq, !list_empty(&vvd->pending_event_list));
 
 	ret = virtio_video_pending_event_list_pop(vvd, &queuing_event);
 	if (ret) {
