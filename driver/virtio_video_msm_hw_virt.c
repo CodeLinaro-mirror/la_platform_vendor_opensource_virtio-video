@@ -76,7 +76,7 @@ int32_t virtio_video_msm_cmd_open_gvm(uint32_t vm_id,
 	                                    sizeof(*req_p),
 	                                    resp_size,
 	                                    NULL);
-	if (IS_ERR(req_p))
+	if (IS_ERR(req_p) || !vbuf)
 		return -ENOMEM;
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_OPEN_GVM);
@@ -114,7 +114,7 @@ int32_t virtio_video_msm_cmd_close_gvm(void)
 	                                    sizeof(*req_p),
 	                                    0,
 	                                    NULL);
-	if (IS_ERR(req_p))
+	if (IS_ERR(req_p) || !vbuf)
 		return -ENOMEM;
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_CLOSE_GVM);
@@ -164,7 +164,7 @@ int32_t virtio_video_msm_cmd_open_gvm_session(uint32_t* device_id,
 	                                sizeof(*req_p),
 	                                resp_size,
 	                                NULL);
-	if (IS_ERR(req_p))
+	if (IS_ERR(req_p) || !vbuf)
 		return -ENOMEM;
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_OPEN_GVM_SESSION);
@@ -209,7 +209,7 @@ int32_t virtio_video_msm_cmd_pause_gvm_session(uint32_t device_id,
 	                                    sizeof(*req_p),
 	                                    0,
 	                                    NULL);
-	if (IS_ERR(req_p))
+	if (IS_ERR(req_p) || !vbuf)
 		return -ENOMEM;
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_PAUSE_GVM_SESSION);
@@ -249,7 +249,7 @@ int32_t virtio_video_msm_cmd_resume_gvm_session(uint32_t device_id,
 	                                    sizeof(*req_p),
 	                                    0,
 	                                    NULL);
-	if (IS_ERR(req_p))
+	if (IS_ERR(req_p) || !vbuf)
 		return -ENOMEM;
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_RESUME_GVM_SESSION);

@@ -285,6 +285,9 @@ int virtio_video_queue_cmd_buffer(struct virtio_video_device *vvd,
 	int outcnt = 0, incnt = 0;
 	int ret;
 
+	if (!vbuf)
+		return -EINVAL;
+
 	if (!vvd->commandq.ready)
 		return -ENODEV;
 
@@ -336,6 +339,9 @@ int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 	int ret;
 	unsigned long rem;
 	unsigned long flags;
+
+	if (!vbuf)
+		return -EINVAL;
 
 	vbuf->is_sync = true;
 	init_completion(&vbuf->reclaimed);
