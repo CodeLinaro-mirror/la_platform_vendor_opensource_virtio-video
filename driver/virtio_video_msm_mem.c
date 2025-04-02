@@ -150,8 +150,8 @@ int msm_buf_get_export_id(struct virtio_video_stream* stream,
 	}
 
 	if (unlikely(ret) || unlikely(!export_id)) {
-		vpr_e(tag, "%s: export failed. queue_type %#3d fd %3d sz %d", __func__,
-		      queue_type, fd, size);
+		vpr_e(tag, "%s: export failed, ret %#3d, export_id %#3u. queue_type %#3d fd %3d sz %d", __func__,
+		      ret, export_id, queue_type, fd, size);
 		export_id = 0;
 		goto exit;
 	}

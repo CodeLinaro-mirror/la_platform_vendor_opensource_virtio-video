@@ -171,6 +171,7 @@ static int virtio_video_msm_hab_open(struct virtio_device *vdev, struct hab_virt
 	}
 
 	vpr_h(vvd2tag(vvd), "%s: mmid=%d done, socket 0x%x\n", __func__, mmid, hvq->habmm_handle);
+	WRITE_ONCE(hvq->broken, false);
 
 	return 0;
 
@@ -334,11 +335,32 @@ static void *get_one_evt_buf(struct hab_virtqueue *hvq, const int max_retry)
 	return msg;
 }
 
+static int virtio_video_send_err_evt(struct hab_virtqueue *hvq, int stream_id)
+{
+	int ret = 0;
+	const char *vq_name = hvq->vq.name;
+	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
+	struct virtio_video_msm_event *evt = NULL;
+
+	evt = get_one_evt_buf(hvq, 100 * MAX_RETRY_FOR_GET_EVT_BUF);
+	if (evt) {
+		vpr_h(vvd2tag(vvd), "%s %s: to send error event, resp_list=%d\n",
+		      vq_name, __func__, hvq->resp_list.count);
+		evt->event_type = VIRTIO_VIDEO_EVENT_ERROR;
+		evt->stream_id = stream_id;
+		ret = process_msm_hab_evt_resp(hvq, evt);
+	} else {
+		vpr_e(vvd2tag(vvd), "%s %s: unable get event buf\n", vq_name, __func__);
+		ret = -ENOENT;
+	}
+
+	return ret;
+}
+
 static int virtio_video_hab_resp_handler(void *p)
 {
 	struct hab_virtqueue *hvq = p;
 	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
-	struct virtio_video_msm_event *evt = NULL;
 	struct virtio_video_stream *stream = NULL;
 	const char *vq_name = hvq->vq.name;
 	uint8_t buf[MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE] = {0};
@@ -381,15 +403,15 @@ static int virtio_video_hab_resp_handler(void *p)
 				continue;
 			}
 			else if (ret == -ENODEV) {
-				vpr_h(vvd2tag(vvd), "%s %s: socket 0x%x closed\n",
+				vpr_e(vvd2tag(vvd), "%s %s: socket 0x%x closed, recv failed\n",
 				      vq_name, __func__, hvq->habmm_handle);
-				goto exit;
 			}
 			else {
 				vpr_e(vvd2tag(vvd), "%s %s: socket recv failed: rc=%d\n",
 				      vq_name, __func__, ret);
-				goto err;
 			}
+			WRITE_ONCE(hvq->broken, true);
+			goto exit;
 		}
 
 		if (hvq->type == MSM_VIRTQ_CMD_TYPE) {
@@ -408,33 +430,46 @@ static int virtio_video_hab_resp_handler(void *p)
 			vpr_h(vvd2tag(vvd), "%s %s: process done, resp_list=%d\n",
 			      vq_name, __func__, hvq->resp_list.count);
 		}
-		if (ret)
-			goto err;
-	}
-
-exit:
-	return 0;
 
 err:
-	WRITE_ONCE(hvq->broken, true);
+		if (ret && hvq->type == MSM_VIRTQ_EVT_TYPE) {
+			stream_id = ((struct virtio_video_msm_event *)msg)->stream_id;
+			virtio_video_send_err_evt(hvq, stream_id);
+		}
+	}
+
+	return ret;
+
+exit:
 	vpr_e(vvd2tag(vvd), "%s %s: exited. error %d\n", vq_name, __func__, ret);
+
 	//for commandq, commands will wait until timeout; no specific handling here
 	//for eventq, sending out error event
-	if (hvq->type == MSM_VIRTQ_EVT_TYPE)
+	if (hvq->type == MSM_VIRTQ_EVT_TYPE) {
 		if (msg)
 			attach_buf_to_vq_buf(hvq, &hvq->vbuf_list, msg);
 
-		idr_for_each_entry(&vvd->stream_idr, stream, stream_id) {
-		evt = get_one_evt_buf(hvq, 100 * MAX_RETRY_FOR_GET_EVT_BUF);
-		if (evt) {
-			vpr_h(vvd2tag(vvd), "%s %s: to send error event, resp_list=%d\n",
-			      vq_name, __func__, hvq->resp_list.count);
-			evt->event_type = VIRTIO_VIDEO_EVENT_ERROR;
-			evt->stream_id = stream_id;
-			process_msm_hab_evt_resp(hvq, evt);
+		idr_for_each_entry(&vvd->stream_idr, stream, stream_id)
+			virtio_video_send_err_evt(hvq, stream_id);
+	}
+
+	if (vvd->vq_running) {
+		ret = habmm_socket_close(hvq->habmm_handle);
+		if (ret)
+			vpr_e(vvd2tag(vvd), "%s, habmm cmd socket close failed %d\n",
+			      __func__, ret);
+		else
+			hvq->habmm_handle = 0;
+
+		if (vvd->type == VIRTIO_VIDEO_DEVICE_DECODER &&
+		    hvq->type == MSM_VIRTQ_CMD_TYPE) {
+			schedule_delayed_work(&vvd->connect_work,
+					      msecs_to_jiffies(CONNECT_DELAY));
+			vpr_h(vvd2tag(vvd), "%s %s: scheduled reconnect\n",
+			      vq_name, __func__);
 		}
 	}
-	msm_hab_del_vqs(hvq->vq.vdev);
+
 	return ret;
 }
 
@@ -726,6 +761,7 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		if (!hvq->habmm_handle) {
 			vpr_e(vvd2tag(vvd), "%s: %s habmm_handle is null\n",
 			      dev_name(&vdev->dev), __func__);
+			ret = -ENODEV;
 			goto err;
 		}
 
@@ -735,7 +771,7 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		hvq->vq.num_free = DEFAULT_VQ_NUM;
 		INIT_LIST_HEAD(&hvq->vbuf_list.list);
 		INIT_LIST_HEAD(&hvq->resp_list.list);
-		if (init_hvq_unused_vq_buf_list(vvd, hvq))
+		if ((ret = init_hvq_unused_vq_buf_list(vvd, hvq)))
 			goto err;
 		hvq->vbuf_list.count = 0;
 		hvq->resp_list.count = 0;
@@ -768,6 +804,7 @@ void msm_hab_del_vqs(struct virtio_device *vdev)
 
 	vpr_h(vvd2tag(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
 
+	vvd->vq_running = false;
 	list_for_each_entry_safe(vq, n, &vdev->vqs, list) {
 		hvq = to_hab_vq(vq);
 		virtio_video_msm_hab_close(hvq);

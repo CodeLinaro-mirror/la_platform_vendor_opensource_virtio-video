@@ -767,8 +767,16 @@ int msm_v4l2_unsubscribe_event(struct v4l2_fh *fh,
 	stream = container_of(fh, struct virtio_video_stream, fh);
 	vvd = to_virtio_vd(stream->video_dev);
 
+	if (is_session_error(stream)) {
+		vpr_e(strm2tag(stream),"%s: in session error state\n",
+		      __func__);
+		ret = -EIO;
+		goto exit;
+	}
+
 	ret = virtio_video_cmd_unsubscribe_event(vvd, stream, sub);
 
+exit:
 	if (ret)
 		vpr_h(strm2tag(stream), "%s: failed, ignore", __func__);
 	else
