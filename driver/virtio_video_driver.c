@@ -31,12 +31,12 @@
 #if IS_ENABLED(CONFIG_MSM_HAB)
 #include <linux/habmm.h>
 #include "virtio_video_msm_hab.h"
+#define NUM_VDEV 2
+static void msm_virtio_video_reconnect(struct work_struct *work);
 #if IS_ENABLED(CONFIG_MSM_VIRTIO_HAB)
 extern struct virtio_device * virthab_get_vdev(int32_t mmid);
 #endif
 #endif
-
-#define NUM_VIDEO_DEVICE 3
 
 unsigned int debug = VPR_ERR;
 module_param(debug, uint, 0644);
@@ -167,6 +167,9 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	init_waitqueue_head(&vvd->commandq.reclaim_queue);
 
 	INIT_WORK(&vvd->eventq.work, virtio_video_process_events);
+#if IS_ENABLED(CONFIG_MSM_HAB)
+	INIT_DELAYED_WORK(&vvd->connect_work, msm_virtio_video_reconnect);
+#endif
 
 	INIT_LIST_HEAD(&vvd->pending_vbuf_list);
 #ifdef MSM_VIDC_HW_VIRT
@@ -181,6 +184,9 @@ static int virtio_video_probe(struct virtio_device* vdev)
 
 	vvd->commandq.vq = vqs[0];
 	vvd->eventq.vq = vqs[1];
+#if IS_ENABLED(CONFIG_MSM_HAB)
+	vvd->vq_running = true;
+#endif
 
 	ret = virtio_video_alloc_vbufs(vvd);
 	if (ret) {
@@ -395,6 +401,65 @@ static const struct virtio_config_ops msm_vdev_config_ops = {
 
 static struct virtio_device* venc = NULL;
 static struct virtio_device* vdec = NULL;
+
+#if IS_ENABLED(CONFIG_MSM_HAB)
+static void msm_virtio_video_reconnect(struct work_struct *work)
+{
+	bool broken = false;
+	int ret = 0;
+	int i = 0;
+	struct virtio_video_device *vvd = NULL;
+	static struct virtio_device* vdevs[2] = {NULL};
+
+	if (!venc || !venc->priv || !vdec || !vdec->priv) {
+		vpr_e(vvd2tag(vvd), "%s: called before device init\n", __func__);
+		goto err;
+	}
+
+	vdevs[0] = vdec;
+	vdevs[1] = venc;
+	broken = true;
+	for (i = 0; i < NUM_VDEV; i++) {
+		vvd = vdevs[i]->priv;
+		if (!msm_hab_virtqueue_is_broken(vvd->commandq.vq) ||
+		    !msm_hab_virtqueue_is_broken(vvd->eventq.vq)) {
+			broken = false;
+			break;
+		}
+	}
+
+	if (broken) {
+		for (i = 0; i < NUM_VDEV; i++) {
+			vvd = vdevs[i]->priv;
+			ret = msm_hab_vdev_init(vdevs[i]);
+			if (ret) {
+				vpr_e(vvd2tag(vvd), "%s: %s failed to re-init\n",
+				      dev_name(&vdevs[i]->dev), __func__);
+				break;
+			}
+#ifndef MSM_VIDC_HW_VIRT
+			ret = msm_hab_set_features(vdevs[i]);
+			if (ret){
+				vpr_e(vvd2tag(vvd), "%s: %s failed to set features\n",
+					dev_name(&vdevs[i]->dev), __func__);
+				break;
+			}
+#endif
+			msm_hab_start(vdevs[i]);
+		}
+	}
+
+	/*If there are running vqs or reconnect fails, reschedule a work*/
+	if (!broken || ret) {
+		vvd = vdec->priv;
+		schedule_delayed_work(&vvd->connect_work, msecs_to_jiffies(CONNECT_DELAY));
+		vpr_h(vvd2tag(vvd), "%s: rescheduled work\n", __func__);
+	}
+
+err:
+	return;
+}
+#endif
 
 #ifdef MSM_VIDC_HW_VIRT
 /* HW Virtualization uses only single HAB
