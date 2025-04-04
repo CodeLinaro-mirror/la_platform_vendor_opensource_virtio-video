@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/errno.h>
 #include "virtio_video.h"
@@ -12,11 +12,9 @@
 
 static int msm_create_hw_virt_stream(struct virtio_video_device *vvd)
 {
-	int ret = 0;
 	uint32_t stream_id = 0;
 	struct virtio_video_stream *stream = NULL;
 	char name[TASK_COMM_LEN]= {0};
-	enum virtio_video_format format = VIRTIO_VIDEO_FORMAT_H264;
 
 	stream = kzalloc(sizeof(*stream), GFP_KERNEL);
 	if (!stream)
@@ -31,14 +29,8 @@ static int msm_create_hw_virt_stream(struct virtio_video_device *vvd)
 	stream->stream_id = stream_id;
 	vvd->gvm_stream_id = stream_id;
 	virtio_video_state_reset(stream);
-	ret = virtio_video_cmd_stream_create(vvd, stream_id, format, name);
-	if (ret) {
-		vpr_e(strm2tag(stream), "failed to create hw_virt stream\n");
-		virtio_video_stream_id_put(vvd, stream_id);
-		kfree(stream);
-	}
 
-	return ret;
+	return 0;
 }
 
 static void
