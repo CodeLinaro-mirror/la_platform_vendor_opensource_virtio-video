@@ -24,7 +24,7 @@ static int virtio_video_v4l2_to_hab(struct virtio_video_device* vvd,
 	req_p = virtio_video_alloc_req_resp(vvd, NULL, &vbuf, req_size,
 					    resp_size, payload);
 
-	if (IS_ERR(req_p)) {
+	if (IS_ERR(req_p) || !vbuf) {
 		ret = -ENOMEM;
 		goto err;
 	}

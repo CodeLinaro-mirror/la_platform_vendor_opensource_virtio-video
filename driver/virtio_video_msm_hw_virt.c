@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/errno.h>
 #include "virtio_video.h"
@@ -12,11 +12,9 @@
 
 static int msm_create_hw_virt_stream(struct virtio_video_device *vvd)
 {
-	int ret = 0;
 	uint32_t stream_id = 0;
 	struct virtio_video_stream *stream = NULL;
 	char name[TASK_COMM_LEN]= {0};
-	enum virtio_video_format format = VIRTIO_VIDEO_FORMAT_H264;
 
 	stream = kzalloc(sizeof(*stream), GFP_KERNEL);
 	if (!stream)
@@ -31,14 +29,8 @@ static int msm_create_hw_virt_stream(struct virtio_video_device *vvd)
 	stream->stream_id = stream_id;
 	vvd->gvm_stream_id = stream_id;
 	virtio_video_state_reset(stream);
-	ret = virtio_video_cmd_stream_create(vvd, stream_id, format, name);
-	if (ret) {
-		vpr_e(strm2tag(stream), "failed to create hw_virt stream\n");
-		virtio_video_stream_id_put(vvd, stream_id);
-		kfree(stream);
-	}
 
-	return ret;
+	return 0;
 }
 
 static void
@@ -76,7 +68,7 @@ int32_t virtio_video_msm_cmd_open_gvm(uint32_t vm_id,
 	                                    sizeof(*req_p),
 	                                    resp_size,
 	                                    NULL);
-	if (IS_ERR(req_p))
+	if (IS_ERR(req_p) || !vbuf)
 		return -ENOMEM;
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_OPEN_GVM);
@@ -114,7 +106,7 @@ int32_t virtio_video_msm_cmd_close_gvm(void)
 	                                    sizeof(*req_p),
 	                                    0,
 	                                    NULL);
-	if (IS_ERR(req_p))
+	if (IS_ERR(req_p) || !vbuf)
 		return -ENOMEM;
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_CLOSE_GVM);
@@ -164,7 +156,7 @@ int32_t virtio_video_msm_cmd_open_gvm_session(uint32_t* device_id,
 	                                sizeof(*req_p),
 	                                resp_size,
 	                                NULL);
-	if (IS_ERR(req_p))
+	if (IS_ERR(req_p) || !vbuf)
 		return -ENOMEM;
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_OPEN_GVM_SESSION);
@@ -209,7 +201,7 @@ int32_t virtio_video_msm_cmd_pause_gvm_session(uint32_t device_id,
 	                                    sizeof(*req_p),
 	                                    0,
 	                                    NULL);
-	if (IS_ERR(req_p))
+	if (IS_ERR(req_p) || !vbuf)
 		return -ENOMEM;
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_PAUSE_GVM_SESSION);
@@ -249,7 +241,7 @@ int32_t virtio_video_msm_cmd_resume_gvm_session(uint32_t device_id,
 	                                    sizeof(*req_p),
 	                                    0,
 	                                    NULL);
-	if (IS_ERR(req_p))
+	if (IS_ERR(req_p) || !vbuf)
 		return -ENOMEM;
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_RESUME_GVM_SESSION);
