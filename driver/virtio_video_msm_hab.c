@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kthread.h>
@@ -383,7 +383,7 @@ static int virtio_video_hab_resp_handler(void *p)
 				vpr_e(vvd2tag(vvd), "%s %s: unable get event buf\n",
 				      vq_name, __func__);
 				ret = -ENOENT;
-				goto err;
+				goto exit;
 			}
 			size_bytes = sizeof(struct virtio_video_msm_event);
 		} else {
@@ -392,6 +392,9 @@ static int virtio_video_hab_resp_handler(void *p)
 			msg = buf;
 			size_bytes = sizeof(buf);
 		}
+
+		if (unlikely(!msg))
+			goto exit;
 
 		memset(msg, 0, size_bytes);
 		ret = habmm_socket_recv(hvq->habmm_handle,
@@ -429,12 +432,6 @@ static int virtio_video_hab_resp_handler(void *p)
 			trace_hab_resp_evt_done(hvq->resp_list.count);
 			vpr_h(vvd2tag(vvd), "%s %s: process done, resp_list=%d\n",
 			      vq_name, __func__, hvq->resp_list.count);
-		}
-
-err:
-		if (ret && hvq->type == MSM_VIRTQ_EVT_TYPE) {
-			stream_id = ((struct virtio_video_msm_event *)msg)->stream_id;
-			virtio_video_send_err_evt(hvq, stream_id);
 		}
 	}
 
