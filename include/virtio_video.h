@@ -3,7 +3,7 @@
  * Virtio Video Device
  *
  * Copyright (C) 2020-2023 OpenSynergy GmbH.
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _UAPI_LINUX_VIRTIO_VIDEO_H
@@ -13,7 +13,7 @@
 #include <linux/types.h>
 #include <linux/virtio_config.h>
 #else
-#include "virtio_video_msm_types.h"
+#include "hyp_types.h"
 #endif
 
 /*

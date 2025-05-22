@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _VIRTIO_VIDEO_MSM_EXT_H
@@ -9,7 +9,7 @@
 #if defined(__linux__)
 #include <linux/types.h>
 #else
-#include "virtio_video_msm_types.h"
+#include "hyp_types.h"
 #endif
 
 /* version format: YY MM DD 00 (00 reserved) */
