@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include "virtio_video.h"
@@ -345,7 +345,7 @@ void msm_vidc_buf_queue(struct vb2_buffer *vb2)
 				ret = -1;
 				goto unexport;
 			}
-			vpr_l(strm2tag(stream), "%s, export buf_fd %d to export_id[%d] %d vb2 %#p\n",
+			vpr_l(strm2tag(stream), "%s, export buf_fd %llu to export_id[%d] %d vb2 %p\n",
 			      __func__, buf_fd, plane, export_id[plane], vb2);
 		}
 

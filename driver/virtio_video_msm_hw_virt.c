@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/errno.h>
 #include "virtio_video.h"
@@ -59,7 +59,7 @@ int32_t virtio_video_msm_cmd_open_gvm(uint32_t vm_id,
 
 	ret = msm_create_hw_virt_stream(vvd);
 	if (ret) {
-		vpr_e(VPR_TAG, "%S: failed creating hw_virt stream", __func__);
+		vpr_e(VPR_TAG, "%s: failed creating hw_virt stream", __func__);
 		return ret;
 	}
 	req_p = virtio_video_alloc_req_resp(vvd,

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/kthread.h>
@@ -465,7 +465,7 @@ static int start_resp_handler(struct hab_virtqueue *hvq)
 	int ret = 0;
 	struct virtio_video_device *vvd = NULL;
 	hvq->resp_thread = kthread_create(virtio_video_hab_resp_handler,
-	                                  hvq, "vvid_rsp_%x", hvq);
+	                                  hvq, "vvid_rsp_%p", hvq);
 
 	if (IS_ERR(hvq->resp_thread)) {
 		vpr_e(vvd2tag(vvd), "%s: failed\n", __func__);
@@ -544,7 +544,7 @@ uint64_t msm_hab_get_features(struct virtio_device *vdev)
 	else
 		features = enc_data.features;
 
-	vpr_h(vvd2tag(vvd), "%s: video%d, features %#x", __func__, vdev->id.device, features);
+	vpr_h(vvd2tag(vvd), "%s: video%d, features %#llx", __func__, vdev->id.device, features);
 
 	return features;
 }
@@ -727,10 +727,16 @@ int msm_hab_virtqueue_add_inbuf(struct virtqueue *vq, struct scatterlist sg[],
 	return msm_hab_virtqueue_add_sgs(vq, NULL, 0, num, data, gfp);
 }
 
+#if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
 int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
                      struct virtqueue *vqs[], vq_callback_t *callbacks[],
                      const char * const names[], const bool *ctx,
                      struct irq_affinity *desc)
+#else
+int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
+                     struct virtqueue *vqs[], struct virtqueue_info vqs_info[],
+                     struct irq_affinity *desc)
+#endif
 {
 	int ret = 0;
 	struct hab_virtqueue *hvq = NULL;
@@ -752,8 +758,13 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 			goto err;
 		}
 
+#if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
 		hvq->vq.callback = callbacks[i];
 		hvq->vq.name = names[i];
+#else
+		hvq->vq.callback = vqs_info[i].callback;
+		hvq->vq.name = vqs_info[i].name;
+#endif
 		hvq->vq.vdev = vdev;
 		hvq->vq.num_free = DEFAULT_VQ_NUM;
 		INIT_LIST_HEAD(&hvq->vbuf_list.list);
@@ -763,7 +774,11 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		hvq->vbuf_list.count = 0;
 		hvq->resp_list.count = 0;
 
+#if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
 		if (!strcmp(names[i], "commandq"))
+#else
+		if (!strcmp(vqs_info[i].name, "commandq"))
+#endif
 			hvq->type = MSM_VIRTQ_CMD_TYPE;
 		else {
 			hvq->type = MSM_VIRTQ_EVT_TYPE;

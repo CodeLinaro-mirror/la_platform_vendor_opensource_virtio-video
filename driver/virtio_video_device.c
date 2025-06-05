@@ -2,7 +2,7 @@
 /* Driver for virtio video device.
  *
  * Copyright 2020 OpenSynergy GmbH.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1355,8 +1355,8 @@ static int virtio_video_parse_controls(struct virtio_video_device *vvd,
 		offset += config->size;
 
 		vpr_h(vvd2tag(vvd), "%s: add ctrl to ctrl list, id=%#x, "
-		      "type=%#x, flags=%#x, max=%#x, min=%#x, step=%#x, "
-		      "def=%#x, name=%s, is_private=%d\n",
+		      "type=%#x, flags=%#x, max=%#llx, min=%#llx, step=%#llx, "
+		      "def=%#llx, name=%s, is_private=%d\n",
 		      __func__, ctrl->config->id, ctrl->config->type,
 		      ctrl->config->flags, ctrl->config->max,
 		      ctrl->config->min, ctrl->config->step,
