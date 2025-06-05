@@ -7,14 +7,15 @@ LINUXINCLUDE    += -I${KERNEL_ROOT}/include \
 KBUILD_CPPFLAGS += -DVIRTIO_VIDEO_MSM
 KBUILD_CPPFLAGS += -DMSM_HAB_NO_SUPPORT
 
-#Temporary support of detecting NordAU compilation, will replace when
-#the single CONFIG_ARCH_NORDAU flag is supported.
-ifeq ($(CONFIG_ARCH_LEMANS), y)
 ifeq ($(BOARD_PLATFORM), gen5)
+$(warning "Video HW_VIRT enabled")
 KBUILD_CPPFLAGS += -DMSM_VIDC_HW_VIRT
-KBUILD_CPPFLAGS += -DDISABLE_INIT_CONFIG
 msm_virtio_video-objs += driver/virtio_video_msm_hw_virt.o
 endif
+
+ifeq ($(CONFIG_ARCH_LEMANS), y) #Nordy HGY
+$(warning "Video INIT_CONFIG disabled")
+KBUILD_CPPFLAGS += -DDISABLE_INIT_CONFIG
 endif
 
 ccflags-y := -I"$(src)/include/uapi"
