@@ -59,6 +59,60 @@ void msm_vb2_unmap_dmabuf(void *buf_priv)
 {
 }
 
+int queue_check_input_params(struct vb2_queue *queue,
+			     unsigned int *num_buffers,
+			     unsigned int *num_planes,
+			     unsigned int sizes[],
+			     struct virtio_video_device* vvd,
+			     struct virtio_video_stream **stream)
+{
+	if (!queue || !num_buffers || !num_planes || !sizes) {
+		vpr_e(vvd2tag(vvd), "%s: invalid params: queue %pK, num_buffers %pK"
+		      ", num_planes %pK sizes %pK\n",
+		      __func__, queue, num_buffers, num_planes, sizes);
+		return -EINVAL;
+	}
+
+	*stream = queue->drv_priv;
+	if (!*stream) {
+		vpr_e(vvd2tag(vvd), "%s: invalid params: stream %pk\n",
+		      __func__, *stream);
+		return -EINVAL;
+	}
+
+	if (!(*stream)->video_dev) {
+		vpr_e(vvd2tag(vvd), "%s: invalid params: video_dev %pK\n",
+		      __func__, (*stream)->video_dev);
+		return -EINVAL;
+	}
+
+	if (is_session_error(*stream)) {
+		vpr_e(strm2tag(*stream),"%s: in session error state\n", __func__);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+void queue_set_size(struct virtio_video_stream *stream,
+		    unsigned int *num_planes, unsigned int sizes[],
+		    int port, struct v4l2_format* format)
+{
+	int plane = 0;
+	if((port == INPUT_PORT || port == OUTPUT_PORT)) {
+		*num_planes = format->fmt.pix_mp.num_planes;
+		for (plane = 0; plane < *num_planes; plane++) {
+			sizes[plane] = format->fmt.pix_mp.plane_fmt[plane].sizeimage;
+			vpr_h(strm2tag(stream), "%s: plane %d: size is %d.\n",
+			      __func__, plane, sizes[plane]);
+		}
+	}
+	else if (port == INPUT_META_PORT || port == OUTPUT_META_PORT) {
+		*num_planes = 1;
+		sizes[0] = format->fmt.meta.buffersize;
+	}
+}
+
 int msm_vidc_queue_setup(struct vb2_queue *queue,
 			 unsigned int *num_buffers, unsigned int *num_planes,
 			 unsigned int sizes[], struct device *alloc_devs[])
@@ -67,37 +121,13 @@ int msm_vidc_queue_setup(struct vb2_queue *queue,
 	struct virtio_video_stream *stream = NULL;
 	struct virtio_video_device* vvd = NULL;
 	int port = 0;
-	int plane = 0;
 	struct v4l2_format format = {0};
 
-	if (!queue || !num_buffers || !num_planes || !sizes) {
-		vpr_e(vvd2tag(vvd), "%s: invalid params: queue %pK, num_buffers %pK"
-		      ", num_planes %pK sizes %pK\n",
-		      __func__, queue, num_buffers, num_planes, sizes);
-		ret = -EINVAL;
-		goto exit;
-	}
+	ret = queue_check_input_params(queue, num_buffers, num_planes, sizes,
+				       vvd, &stream);
 
-	stream = queue->drv_priv;
-	if (!stream) {
-		vpr_e(vvd2tag(vvd), "%s: invalid params: stream %pk\n",
-		      __func__, stream);
-		ret = -EINVAL;
-		goto exit;
-	}
-
-	if (!stream->video_dev) {
-		vpr_e(vvd2tag(vvd), "%s: invalid params: video_dev %pK\n",
-		      __func__, stream->video_dev);
-		ret = -EINVAL;
-		goto exit;
-	}
-
-	if (is_session_error(stream)) {
-		vpr_e(strm2tag(stream),"%s: in session error state\n", __func__);
-		ret = -EIO;
-		goto exit;
-	}
+	if (ret)
+		return ret;
 
 	vvd = to_virtio_vd(stream->video_dev);
 	port = v4l2_type_to_driver_port(stream, queue->type, __func__);
@@ -105,33 +135,21 @@ int msm_vidc_queue_setup(struct vb2_queue *queue,
 		vpr_e(strm2tag(stream), "%s: port not found for v4l2 type %d\n",
 		      __func__, queue->type);
 		ret = -EINVAL;
-		goto exit;
+		return ret;
 	}
 
 	format.type = queue->type;
 	ret = virtio_video_cmd_g_fmt(vvd, stream, &format);
 	if (ret) {
 		vpr_e(strm2tag(stream), "%s: g_fmt failed.\n", __func__);
-		goto exit;
+		return ret;
 	}
 
-	if((port == INPUT_PORT || port == OUTPUT_PORT)) {
-		*num_planes = format.fmt.pix_mp.num_planes;
-		for (plane = 0; plane < *num_planes; plane++) {
-			sizes[plane] = format.fmt.pix_mp.plane_fmt[plane].sizeimage;
-			vpr_h(strm2tag(stream), "%s: plane %d: size is %d.\n",
-			      __func__, plane, sizes[plane]);
-		}
-	}
-	else if (port == INPUT_META_PORT || port == OUTPUT_META_PORT) {
-		*num_planes = 1;
-		sizes[0] = format.fmt.meta.buffersize;
-	}
+	queue_set_size(stream, num_planes, sizes, port, &format);
 	vpr_h(strm2tag(stream), "%s: type %s, num_buffers %d, "
 	      "*num_planes %d, sizes[0] %d\n", __func__, v4l2_type_name(queue->type),
 	      *num_buffers, *num_planes, sizes[0]);
 
-exit:
 	return ret;
 }
 
@@ -188,6 +206,35 @@ exit:
 	return ret;
 }
 
+void buf_put_export_queue(struct vb2_queue *queue)
+{
+	struct virtio_video_stream *stream = queue->drv_priv;
+
+	if (queue->type == OUTPUT_MPLANE) {
+		vpr_h(strm2tag(stream), "%s: OUTPUT unexport\n", __func__);
+		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
+		vpr_h(strm2tag(stream), "%s: OUTMTA unexport\n", __func__);
+		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT_META);
+	} else if (queue->type == INPUT_MPLANE) {
+		vpr_h(strm2tag(stream), "%s:  INPUT unexport\n", __func__);
+		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
+		vpr_h(strm2tag(stream), "%s:  INMTA unexport\n", __func__);
+		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META);
+	}
+}
+
+void queue_release_buffers(struct vb2_queue *queue)
+{
+	struct virtio_video_stream *stream = queue->drv_priv;
+
+	if (queue->type == INPUT_MPLANE)
+		virtio_video_queue_release_buffers(stream,
+			               VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META);
+	else if (queue->type == OUTPUT_MPLANE)
+		virtio_video_queue_release_buffers(stream,
+			               VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT_META);
+}
+
 void msm_vidc_stop_streaming(struct vb2_queue *queue)
 {
 	int ret = 0;
@@ -230,31 +277,14 @@ void msm_vidc_stop_streaming(struct vb2_queue *queue)
 		goto wait_vb2;
 
 	ret = virtio_video_cmd_streamoff(vvd, stream, queue->type);
-
-	if (queue->type == OUTPUT_MPLANE) {
-		vpr_h(strm2tag(stream), "%s: OUTPUT unexport\n", __func__);
-		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
-		vpr_h(strm2tag(stream), "%s: OUTMTA unexport\n", __func__);
-		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT_META);
-	} else if (queue->type == INPUT_MPLANE) {
-		vpr_h(strm2tag(stream), "%s:  INPUT unexport\n", __func__);
-		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
-		vpr_h(strm2tag(stream), "%s:  INMTA unexport\n", __func__);
-		msm_buf_put_export_queue_type(stream, VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META);
-	}
+	buf_put_export_queue(queue);
 
 session_err:
 	if (ret) {
 		vpr_h(strm2tag(stream), "%s: streamoff %s failed %d, to release buffers\n",
 		      __func__, v4l2_type_name(queue->type), ret);
 
-		if (queue->type == INPUT_MPLANE)
-			virtio_video_queue_release_buffers(stream,
-			               VIRTIO_VIDEO_QUEUE_TYPE_INPUT_META);
-		else if (queue->type == OUTPUT_MPLANE)
-			virtio_video_queue_release_buffers(stream,
-			               VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT_META);
-
+		queue_release_buffers(queue);
 		virtio_video_queue_release_buffers(stream, virtio_queue_type);
 	}
 

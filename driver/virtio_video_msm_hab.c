@@ -339,18 +339,63 @@ static void *get_one_evt_buf(struct hab_virtqueue *hvq, const int max_retry)
 	return msg;
 }
 
+static int resp_recv_done(struct hab_virtqueue *hvq, void *msg)
+{
+	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
+	const char *vq_name = hvq->vq.name;
+	int ret = 0;
+
+	if (hvq->type == MSM_VIRTQ_CMD_TYPE) {
+		vpr_l(vvd2tag(vvd), "%s %s: recv done\n", vq_name, __func__);
+		ret = process_msm_hab_cmd_resp(hvq, msg);
+		trace_hab_resp_cmd_done(hvq->resp_list.count);
+		vpr_h(vvd2tag(vvd), "%s %s: process done\n", vq_name, __func__);
+	} else {
+		vpr_l(vvd2tag(vvd), "%s %s: recv done, resp_list=%d\n",
+		      vq_name, __func__, hvq->resp_list.count);
+		ret = process_msm_hab_evt_resp(hvq, msg);
+		trace_hab_resp_evt_done(hvq->resp_list.count);
+		vpr_h(vvd2tag(vvd), "%s %s: process done, resp_list=%d\n",
+		      vq_name, __func__, hvq->resp_list.count);
+	}
+
+	return ret;
+}
+
+static void send_err_evt(struct hab_virtqueue *hvq, void *msg)
+{
+	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
+	struct virtio_video_msm_event *evt = NULL;
+	struct virtio_video_stream *stream = NULL;
+	const char *vq_name = hvq->vq.name;
+	int stream_id = 0;
+
+	if (hvq->type == MSM_VIRTQ_EVT_TYPE){
+		if (msg)
+			attach_buf_to_vq_buf(hvq, &hvq->vbuf_list, msg);
+
+		idr_for_each_entry(&vvd->stream_idr, stream, stream_id) {
+			evt = get_one_evt_buf(hvq, 100 * MAX_RETRY_FOR_GET_EVT_BUF);
+			if (evt) {
+				vpr_h(vvd2tag(vvd), "%s %s: to send error event, resp_list=%d\n",
+				vq_name, __func__, hvq->resp_list.count);
+				evt->event_type = VIRTIO_VIDEO_EVENT_ERROR;
+				evt->stream_id = stream_id;
+				process_msm_hab_evt_resp(hvq, evt);
+			}
+		}
+	}
+}
+
 static int virtio_video_hab_resp_handler(void *p)
 {
 	struct hab_virtqueue *hvq = p;
 	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
-	struct virtio_video_msm_event *evt = NULL;
-	struct virtio_video_stream *stream = NULL;
 	const char *vq_name = hvq->vq.name;
 	uint8_t buf[MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE] = {0};
 	int size_bytes = 0;
 	void *msg = NULL;
 	int ret = 0;
-	int stream_id = 0;
 
 	vpr_h(vvd2tag(vvd), "%s %s: start\n", vq_name, __func__);
 
@@ -397,22 +442,7 @@ static int virtio_video_hab_resp_handler(void *p)
 			}
 		}
 
-		if (hvq->type == MSM_VIRTQ_CMD_TYPE) {
-			vpr_l(vvd2tag(vvd), "%s %s: recv done\n", vq_name, __func__);
-			ret = process_msm_hab_cmd_resp(hvq, msg);
-			trace_hab_resp_cmd_done(hvq->resp_list.count);
-			vpr_h(vvd2tag(vvd), "%s %s: process done\n", vq_name, __func__);
-		}
-		else {
-			vpr_l(vvd2tag(vvd), "%s %s: recv done, resp_list=%d\n",
-			      vq_name, __func__, hvq->resp_list.count);
-
-			ret = process_msm_hab_evt_resp(hvq, msg);
-
-			trace_hab_resp_evt_done(hvq->resp_list.count);
-			vpr_h(vvd2tag(vvd), "%s %s: process done, resp_list=%d\n",
-			      vq_name, __func__, hvq->resp_list.count);
-		}
+		ret = resp_recv_done(hvq, msg);
 		if (ret)
 			goto err;
 	}
@@ -425,20 +455,7 @@ err:
 	vpr_e(vvd2tag(vvd), "%s %s: exited. error %d\n", vq_name, __func__, ret);
 	//for commandq, commands will wait until timeout; no specific handling here
 	//for eventq, sending out error event
-	if (hvq->type == MSM_VIRTQ_EVT_TYPE)
-		if (msg)
-			attach_buf_to_vq_buf(hvq, &hvq->vbuf_list, msg);
-
-		idr_for_each_entry(&vvd->stream_idr, stream, stream_id) {
-		evt = get_one_evt_buf(hvq, 100 * MAX_RETRY_FOR_GET_EVT_BUF);
-		if (evt) {
-			vpr_h(vvd2tag(vvd), "%s %s: to send error event, resp_list=%d\n",
-			      vq_name, __func__, hvq->resp_list.count);
-			evt->event_type = VIRTIO_VIDEO_EVENT_ERROR;
-			evt->stream_id = stream_id;
-			process_msm_hab_evt_resp(hvq, evt);
-		}
-	}
+	send_err_evt(hvq, msg);
 	msm_hab_del_vqs(hvq->vq.vdev);
 	return ret;
 }
