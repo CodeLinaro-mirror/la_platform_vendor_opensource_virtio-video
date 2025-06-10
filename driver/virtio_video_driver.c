@@ -86,7 +86,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	};
 #endif
 
-#ifndef MSM_VIDC_HW_VIRT
+#ifndef DISABLE_INIT_CONFIG
 	if (!virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES)) {
 		dev_err(dev, "device must support guest allocated buffers\n");
 		return -ENODEV;
@@ -198,7 +198,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 		goto err_vbufs;
 	}
 
-#ifndef MSM_VIDC_HW_VIRT
+#ifndef DISABLE_INIT_CONFIG
 	virtio_cread(vdev, struct virtio_video_config, max_caps_length,
 		     &vvd->max_caps_len);
 	if (!vvd->max_caps_len) {
@@ -238,7 +238,7 @@ static int virtio_video_probe(struct virtio_device* vdev)
 
 err_init:
 err_events:
-#ifndef MSM_VIDC_HW_VIRT
+#ifndef DISABLE_INIT_CONFIG
 err_config:
 #endif
 	virtio_video_free_vbufs(vvd);
@@ -384,10 +384,11 @@ static int msm_vdev_finalize_features(struct virtio_device *vdev)
 
 	vpr_h(vvd2tag(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
 
-#ifndef MSM_VIDC_HW_VIRT
+#ifndef DISABLE_INIT_CONFIG
 	ret = msm_hab_set_features(vdev);
 	if (ret)
-		vpr_e(vvd2tag(vvd), "%s: failed for video%d, ret %d", __func__, vdev->id.device, ret);
+		vpr_e(vvd2tag(vvd), "%s: failed for video%d, ret %d",
+		      __func__, vdev->id.device, ret);
 #endif
 	return ret;
 }

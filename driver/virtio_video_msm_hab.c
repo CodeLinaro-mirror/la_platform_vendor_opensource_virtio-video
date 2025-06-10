@@ -1,5 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
+/* SPDX-License-Identifier: GPL-2.0-only
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
@@ -492,7 +491,7 @@ static int get_hab_handle(struct virtio_device *vdev, struct hab_virtqueue hvq[]
 	return ret;
 }
 
-#ifndef MSM_VIDC_HW_VIRT
+#ifndef DISABLE_INIT_CONFIG
 static int get_inital_data(struct hab_virtqueue hvq[], struct virtio_video_initial_data* data)
 {
 	int size_bytes = MAX_VIRTIO_VIDEO_CMD_PAYLOAD_SIZE;
@@ -503,6 +502,8 @@ static int get_inital_data(struct hab_virtqueue hvq[], struct virtio_video_initi
 				HAB_TIMEOUT, HABMM_SOCKET_RECV_FLAGS_TIMEOUT);
 	if (ret)
 		vpr_e(vvd2tag(vvd), "failed to receive data, ret %d", ret);
+
+	vpr_l(vvd2tag(vvd), "%s done\n", __func__);
 
 	return ret;
 }
@@ -526,7 +527,7 @@ int msm_hab_vdev_init(struct virtio_device *vdev)
 	if (ret)
 		goto err;
 
-#ifndef MSM_VIDC_HW_VIRT
+#ifndef DISABLE_INIT_CONFIG
 	ret = get_inital_data(hvq, data);
 #endif
 

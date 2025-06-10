@@ -12,6 +12,7 @@ KBUILD_CPPFLAGS += -DMSM_HAB_NO_SUPPORT
 ifeq ($(CONFIG_ARCH_LEMANS), y)
 ifeq ($(BOARD_PLATFORM), gen5)
 KBUILD_CPPFLAGS += -DMSM_VIDC_HW_VIRT
+KBUILD_CPPFLAGS += -DDISABLE_INIT_CONFIG
 msm_virtio_video-objs += driver/virtio_video_msm_hw_virt.o
 endif
 endif
