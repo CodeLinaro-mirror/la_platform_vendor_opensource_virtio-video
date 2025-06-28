@@ -141,17 +141,18 @@ int msm_buf_get_export_id(struct virtio_video_stream* stream,
 
 	//alloc an entry if no existing one
 	for (i = 0; i < MAX_EXPORT_RETRY && ret != -ENOMEM; i++) {
-		ret = habmm_export(habmmhandle, (void*)fd, size, &export_id, exp_flag);
+		// the alignment is required by hab interface, and ensured by dma buffer's allocator.
+		ret = habmm_export(habmmhandle, (void*)fd, ALIGN(size, 4096), &export_id, exp_flag);
 		if (!ret) {
-			vpr_h(tag, "%s: export ok, queue_type %2d fd %3d export_id %3d sz %d",
-			      __func__, queue_type, fd, export_id, size);
+			vpr_h(tag, "%s: export ok, queue_type %2d fd %3d export_id %3d sz %d align size %d",
+			      __func__, queue_type, fd, export_id, size, ALIGN(size, 4096));
 			break;
 		}
 	}
 
 	if (unlikely(ret) || unlikely(!export_id)) {
-		vpr_e(tag, "%s: export failed. queue_type %#3d fd %3d sz %d", __func__,
-		      queue_type, fd, size);
+		vpr_e(tag, "%s: export failed, ret %#3d, export_id %#3u. queue_type %#3d fd %3d sz %d align size %d",
+			      __func__, ret, export_id, queue_type, fd, size, ALIGN(size, 4096));
 		export_id = 0;
 		goto exit;
 	}

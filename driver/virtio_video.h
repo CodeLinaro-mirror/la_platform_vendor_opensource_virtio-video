@@ -300,6 +300,10 @@ struct virtio_video_device {
 	const struct vb2_mem_ops *vb2_mem_ops;
 	struct list_head ctrl_config_list;
 	char tag[TAG_MAX_LEN];
+#if IS_ENABLED(CONFIG_MSM_HAB)
+	bool vq_running;
+	struct delayed_work connect_work;
+#endif
 #ifdef MSM_VIDC_HW_VIRT
 	uint64_t gvm_stream_id;
 	uint32_t device_id_mask;

@@ -3,6 +3,8 @@ VIDEO_SELECT := CONFIG_MSM_VIDC_V4L2=m
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
+ifeq ($(TARGET_VIRTIO_VIDEO_ENABLE), true)
+
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
 
@@ -44,3 +46,5 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ###########################################################
 endif # DLKM check
+
+endif # TARGET_VIRTIO_VIDEO_ENABLE check
