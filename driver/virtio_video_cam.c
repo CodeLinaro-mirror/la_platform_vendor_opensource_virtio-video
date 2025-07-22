@@ -2,6 +2,7 @@
 /* Capture for virtio video device.
  *
  * Copyright 2021 OpenSynergy GmbH.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -126,7 +127,9 @@ int virtio_video_cam_init_queues(void *priv, struct vb2_queue *src_vq,
 	dst_vq->buf_struct_size = sizeof(struct virtio_video_buffer);
 	dst_vq->ops = &virtio_video_cam_qops;
 	dst_vq->mem_ops = virtio_video_mem_ops(vvd);
+#if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
 	dst_vq->min_buffers_needed = stream->out_info.min_buffers;
+#endif
 	dst_vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 	dst_vq->lock = &stream->vq_mutex;
 	dst_vq->gfp_flags = virtio_video_gfp_flags(vvd);
