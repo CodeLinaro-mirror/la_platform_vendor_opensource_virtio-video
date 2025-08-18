@@ -2,7 +2,7 @@
 /* Encoder for virtio video device.
  *
  * Copyright 2020 OpenSynergy GmbH.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -177,7 +177,7 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 		config = entry->config;
 
 		vpr_h(strm2tag(stream), "%s: add ctrl, id=%#x, type=%#x, flags=%#x, "
-		      "max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n",
+		      "max=%#llx, min=%#llx, step=%#llx, def=%#llx, name=%s, is_private=%d\n",
 		      __func__, config->id, config->type, config->flags, config->max, config->min, config->step,
 		      config->def, (char*)config + config->name_offset, config->is_private);
 
@@ -206,7 +206,7 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 		} else {
 			vpr_h(strm2tag(stream), "%s: add std ctrl", __func__);
 
-			if (config->type == V4L2_CTRL_TYPE_MENU) {
+			if (config->type == (int)V4L2_CTRL_TYPE_MENU) {
 				ctrl = v4l2_ctrl_new_std_menu(&stream->ctrl_handler,
 					&virtio_video_enc_ctrl_ops, config->id, config->max,
 					~(config->step), config->def);
@@ -225,7 +225,7 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 
 		if (stream->ctrl_handler.error) {
 			vpr_e(strm2tag(stream), "%s: failed to add ctrl, id=%#x, type=%#x, flags=%#x, "
-			      "max=%#x, min=%#x, step=%#x, def=%#x, name=%s, is_private=%d\n",
+			      "max=%#llx, min=%#llx, step=%#llx, def=%#llx, name=%s, is_private=%d\n",
 			      __func__, config->id, config->type, config->flags,
 			      config->max, config->min, config->step, config->def,
 			      (char*)config + config->name_offset, config->is_private);
@@ -312,7 +312,9 @@ int virtio_video_enc_init_queues(void *priv, struct vb2_queue *src_vq,
 	src_vq->ops = &virtio_video_msm_vb2_ops;
 	src_vq->mem_ops = vvd->vb2_mem_ops;
 #endif
+#if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
 	src_vq->min_buffers_needed = stream->in_info.min_buffers;
+#endif
 	src_vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_COPY;
 	src_vq->lock = &stream->vq_mutex;
 	src_vq->gfp_flags = virtio_video_gfp_flags(vvd);
@@ -336,7 +338,9 @@ int virtio_video_enc_init_queues(void *priv, struct vb2_queue *src_vq,
 	dst_vq->ops = &virtio_video_msm_vb2_ops;
 	dst_vq->mem_ops = vvd->vb2_mem_ops;
 #endif
+#if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
 	dst_vq->min_buffers_needed = stream->out_info.min_buffers;
+#endif
 	dst_vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_COPY;
 	dst_vq->lock = &stream->vq_mutex;
 	dst_vq->gfp_flags = virtio_video_gfp_flags(vvd);

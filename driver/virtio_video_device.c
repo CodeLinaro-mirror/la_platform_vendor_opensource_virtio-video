@@ -2,7 +2,7 @@
 /* Driver for virtio video device.
  *
  * Copyright 2020 OpenSynergy GmbH.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
  */
 
 #include <linux/version.h>
+#include <linux/stringify.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-ioctl.h>
 #include <media/videobuf2-dma-sg.h>
@@ -1051,7 +1052,7 @@ static int virtio_video_device_open(struct file *file)
 	struct video_device *video_dev = video_devdata(file);
 	struct virtio_video_device *vvd = video_drvdata(file);
 
-	vpr_h(VPR_TAG, "commit tip: \"%s\"\n", VIDEO_COMPILE_TIP);
+	vpr_h(VPR_TAG, "commit tip: \"%s\"\n", __stringify(VIDEO_COMPILE_TIP));
 
 	ret = virtio_video_set_device_busy(vvd);
 	if (ret) {
@@ -1355,8 +1356,8 @@ static int virtio_video_parse_controls(struct virtio_video_device *vvd,
 		offset += config->size;
 
 		vpr_h(vvd2tag(vvd), "%s: add ctrl to ctrl list, id=%#x, "
-		      "type=%#x, flags=%#x, max=%#x, min=%#x, step=%#x, "
-		      "def=%#x, name=%s, is_private=%d\n",
+		      "type=%#x, flags=%#x, max=%#llx, min=%#llx, step=%#llx, "
+		      "def=%#llx, name=%s, is_private=%d\n",
 		      __func__, ctrl->config->id, ctrl->config->type,
 		      ctrl->config->flags, ctrl->config->max,
 		      ctrl->config->min, ctrl->config->step,
