@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/kthread.h>
@@ -39,7 +39,7 @@ get_entry_from_fd(struct buf_export_cache* cache,
 
 	dmabuf = dma_buf_get(fd);
 	if (IS_ERR_OR_NULL(dmabuf)) {
-		vpr_e(tag, "%s: dma_buf_get error fd=%d", __func__, fd);
+		vpr_e(tag, "%s: dma_buf_get error fd=%llu", __func__, fd);
 		goto exit;
 	}
 
@@ -51,7 +51,7 @@ get_entry_from_fd(struct buf_export_cache* cache,
 		    (entry->queue_type == queue_type) && (entry->size == size)) {
 			found = entry;
 			entry->in_use = true;
-			vpr_h(tag, "%s: fd %d export_id=%d inode %#x queue_type %2d, sz %d",
+			vpr_h(tag, "%s: fd %llu export_id=%d inode %#llx queue_type %2d, sz %d",
 			      __func__, fd, entry->export_id, inode,
 			      queue_type, size);
 			break;
@@ -77,14 +77,14 @@ alloc_one_export_entry(struct buf_export_cache* cache,
 	uint64_t inode = 0;
 
 	if (cache->used_count >= MAX_NUM_EXPORT_CACHE_ENTRY) {
-		vpr_e(tag, "%s: export cache full(%d>=%d), fd %d", __func__,
+		vpr_e(tag, "%s: export cache full(%d>=%d), fd %llu", __func__,
 		      cache->used_count, MAX_NUM_EXPORT_CACHE_ENTRY, fd);
 		goto exit;
 	}
 
 	dmabuf = dma_buf_get(fd);
 	if (IS_ERR_OR_NULL(dmabuf)) {
-		vpr_e(tag, "%s: dma_buf_get error fd %d", __func__, fd);
+		vpr_e(tag, "%s: dma_buf_get error fd %llu", __func__, fd);
 		goto exit;
 	}
 
@@ -105,7 +105,7 @@ alloc_one_export_entry(struct buf_export_cache* cache,
 		cache->used_count++;
 		mutex_unlock(&cache->lock);
 
-		vpr_h(tag, "%s: fd %3d export_id %3d inode %#x dmabuf %#x queue_type %#2d cache count %2d sz %d",
+		vpr_h(tag, "%s: fd %3llu export_id %3d inode %#llx dmabuf %pK queue_type %2d cache count %2d sz %d",
 		      __func__, fd, export_id, inode, dmabuf,
 		      queue_type, cache->used_count, size);
 	}
@@ -144,14 +144,14 @@ int msm_buf_get_export_id(struct virtio_video_stream* stream,
 		// the alignment is required by hab interface, and ensured by dma buffer's allocator.
 		ret = habmm_export(habmmhandle, (void*)fd, ALIGN(size, 4096), &export_id, exp_flag);
 		if (!ret) {
-			vpr_h(tag, "%s: export ok, queue_type %2d fd %3d export_id %3d sz %d align size %d",
+			vpr_h(tag, "%s: export ok, queue_type %2d fd %3llu export_id %3d sz %d align size %d",
 			      __func__, queue_type, fd, export_id, size, ALIGN(size, 4096));
 			break;
 		}
 	}
 
 	if (unlikely(ret) || unlikely(!export_id)) {
-		vpr_e(tag, "%s: export failed, ret %#3d, export_id %#3u. queue_type %#3d fd %3d sz %d align size %d",
+		vpr_e(tag, "%s: export failed, ret %d, export_id %d. queue_type %3d fd %3llu sz %d align size %d",
 			      __func__, ret, export_id, queue_type, fd, size, ALIGN(size, 4096));
 		export_id = 0;
 		goto exit;
@@ -167,7 +167,7 @@ int msm_buf_get_export_id(struct virtio_video_stream* stream,
 
 		export_id = 0;
 	} else {
-		vpr_h(tag, "%s: alloc entry. queue_type %2d fd %3d export_id %d sz %d",
+		vpr_h(tag, "%s: alloc entry. queue_type %2d fd %3llu export_id %d sz %d",
 		      __func__, queue_type, fd, export_id, size);
 	}
 
@@ -227,7 +227,7 @@ int msm_buf_put_export_id(struct virtio_video_stream* stream,
 	mutex_lock(&cache->lock);
 	list_for_each_entry_safe(entry, temp, &cache->export_fifo, list) {
 		if (entry->export_id == export_id) {
-			vpr_l(strm2tag(stream), "%s: cleanup %d queue_type %2d export_id %d inode %#x",
+			vpr_l(strm2tag(stream), "%s: cleanup %d queue_type %2d export_id %d inode %#llx",
 			      __func__, cleanup, queue_type, export_id, entry->inode);
 			if (cleanup)
 				msm_buf_free_cache_entry(stream, entry);

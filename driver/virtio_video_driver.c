@@ -2,7 +2,7 @@
 /* Driver for virtio video device.
  *
  * Copyright 2020 OpenSynergy GmbH.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -79,6 +79,12 @@ static int virtio_video_probe(struct virtio_device* vdev)
 		virtio_video_cmd_cb,
 		virtio_video_event_cb
 	};
+#if (KERNEL_VERSION(6, 12, 0) <= LINUX_VERSION_CODE)
+	struct virtqueue_info vqs_info[] = {
+		{ names[0], callbacks[0]},
+		{ names[1], callbacks[1]},
+	};
+#endif
 
 #ifndef MSM_VIDC_HW_VIRT
 	if (!virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES)) {
@@ -176,7 +182,11 @@ static int virtio_video_probe(struct virtio_device* vdev)
 	INIT_LIST_HEAD(&vvd->pending_event_list);
 #endif
 
+#if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
 	ret = virtio_find_vqs(vdev, 2, vqs, callbacks, names, NULL);
+#else
+	ret = virtio_find_vqs(vdev, 2, vqs, vqs_info, NULL);
+#endif
 	if (ret) {
 		vpr_e(vvd2tag(vvd), "failed to find virt queues\n");
 		goto err_vqs;
