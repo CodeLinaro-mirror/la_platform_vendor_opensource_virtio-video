@@ -11,6 +11,10 @@
 #include "virtio_video_msm_debug.h"
 #include <media/v4l2-common.h>
 #include "virtio_video.h"
+#ifdef MSM_VIDC_HW_VIRT
+#include "include/virtio_video_hw_virt.h"
+#include "include/vidc_hw_virt.h"
+#endif
 
 #define SESSION_ERROR -1
 #define DEFAULT_VQ_NUM 512
@@ -386,6 +390,112 @@ static void send_err_evt(struct hab_virtqueue *hvq, void *msg)
 	}
 }
 
+static void notify_ssr_event(struct virtio_video_device *vvd)
+{
+#ifdef MSM_VIDC_HW_VIRT
+	struct virtio_video_queuing_event *queuing_evt = NULL;
+
+	queuing_evt = kzalloc(sizeof(*queuing_evt), GFP_KERNEL);
+	if (!queuing_evt) {
+		vpr_e(vvd2tag(vvd), "%s: kzalloc failed\n", __func__);
+		return;
+	}
+	queuing_evt->evt.event_type = VIRTIO_VIDEO_EVENT_GVM_SSR;
+	queuing_evt->device_id = GVM_SSR_DEVICE_DRIVER;
+	memcpy(queuing_evt->evt.payload, &queuing_evt->device_id, sizeof(queuing_evt->device_id));
+	virtio_video_pending_event_list_add(vvd, queuing_evt);
+	wake_up(&vvd->wq);
+#endif
+}
+
+#define MAX_RETRY_COUNT 12
+#define RETRY_INTERVAL 5000
+static int notify_driver_and_reset(void *p)
+{
+	struct hab_virtqueue *hvq = p;
+	struct virtio_video_device *vvd = hvq->vq.vdev->priv;
+	int retry_count = 0, ret = 0;
+	struct virtqueue *vqs[2];
+	static const char * const names[] = { "commandq", "eventq" };
+	static vq_callback_t *callbacks[] = {
+		virtio_video_cmd_cb,
+		virtio_video_event_cb
+	};
+	struct virtqueue_info vqs_info[] = {
+		{ names[0], callbacks[0]},
+		{ names[1], callbacks[1]},
+	};
+
+	/* Only one reconnection at a time */
+	if (atomic_cmpxchg(&vvd->reconnecting, 0, 1) != 0) {
+		vpr_h(vvd2tag(vvd), "%s: reconnect already in progress, skipping\n",
+		      __func__);
+		return 0;
+	}
+
+	vpr_h(vvd2tag(vvd), "%s: attempting reset for device %d.\n",
+	      __func__, vvd->vdev->id.device);
+
+	WRITE_ONCE(hvq->broken, true);
+	vvd->commandq.ready = false;
+	vvd->eventq.ready = false;
+	msm_hab_del_vqs(hvq->vq.vdev);
+	virtio_video_free_vbufs(vvd);
+
+	/* Notify driver through SSR event */
+	notify_ssr_event(vvd);
+
+	while (retry_count < MAX_RETRY_COUNT) {
+		retry_count += 1;
+		msleep_interruptible(RETRY_INTERVAL);
+		vpr_h(vvd2tag(vvd), "%s: retry count %d\n",
+		      __func__, retry_count);
+		if (msm_hab_vdev_init(vvd->vdev)) {
+			continue;   /* retry the whole init sequence */
+		} else {
+#if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
+			ret = virtio_find_vqs(vvd->vdev, 2, vqs, callbacks, names, NULL);
+#else
+			ret = virtio_find_vqs(vvd->vdev, 2, vqs, vqs_info, NULL);
+#endif
+			if (ret) {
+				vpr_e(vvd2tag(vvd), "%s: virtio_find_vqs failed: %d, retry %d\n",
+				      __func__, ret, retry_count);
+				continue;   /* retry the whole init sequence */
+			}
+			vvd->commandq.vq = vqs[0];
+			vvd->eventq.vq = vqs[1];
+			ret = virtio_video_alloc_vbufs(vvd);
+			if (ret) {
+				vpr_e(vvd2tag(vvd), "%s: alloc_vbufs failed: %d\n",
+				      __func__, ret);
+				msm_hab_del_vqs(vvd->vdev);   /* clean up the VQs we just created */
+				continue;
+			}
+
+			ret = virtio_video_alloc_events(vvd);
+			if (ret) {
+				vpr_e(vvd2tag(vvd), "%s: alloc_events failed: %d\n",
+				      __func__, ret);
+				virtio_video_free_vbufs(vvd);
+				msm_hab_del_vqs(vvd->vdev);
+				continue;
+			}
+			vvd->commandq.ready = true;
+			vvd->eventq.ready = true;
+			msm_hab_start(vvd->vdev);
+			break;
+		}
+	}
+	if (retry_count >= MAX_RETRY_COUNT)
+		vpr_e(vvd2tag(vvd), "%s: reconnect failed after %d retries\n",
+		      __func__, MAX_RETRY_COUNT);
+
+	atomic_set(&vvd->reconnecting, 0);
+
+	return 0;
+}
+
 static int virtio_video_hab_resp_handler(void *p)
 {
 	struct hab_virtqueue *hvq = p;
@@ -447,6 +557,17 @@ static int virtio_video_hab_resp_handler(void *p)
 	}
 
 exit:
+	hvq->resp_thread = NULL;
+
+	if (hvq->type == MSM_VIRTQ_CMD_TYPE) {
+		struct task_struct *reset_task = kthread_run(notify_driver_and_reset,
+							     hvq, "vvid_notify_%p", hvq);
+		if (IS_ERR(reset_task))
+			vpr_e(vvd2tag(vvd),
+			      "%s: failed to start reset thread, err=%ld\n",
+		              __func__, PTR_ERR(reset_task));
+	}
+
 	return 0;
 
 err:
@@ -823,6 +944,7 @@ void msm_hab_start(struct virtio_device *vdev)
 	spin_lock(&vdev->vqs_list_lock);
 	list_for_each_entry_safe(entry, tmp, &vdev->vqs, list) {
 		hvq = to_hab_vq(entry);
+		WRITE_ONCE(hvq->broken, false);
 		wake_up_process(hvq->resp_thread);
 	}
 	spin_unlock(&vdev->vqs_list_lock);
