@@ -21,6 +21,5 @@ module_entry(
         "driver/virtio_video_enc.c",
         "driver/virtio_video_msm_hab.c",
         "driver/virtio_video_device.c",
-        "driver/virtio_video_msm_hw_virt.c",
         ],
 )

@@ -11,12 +11,12 @@
 
 #ifdef spin_lock_irqsave
 #undef spin_lock_irqsave
-#define spin_lock_irqsave(a, b)        {spin_lock(a); b = 0;}
 #endif
+#define spin_lock_irqsave(a, b)        {spin_lock(a); b = 0;}
 #ifdef spin_lock_irqrestore
 #undef spin_lock_irqrestore
-#define spin_unlock_irqrestore(a, b)   {spin_unlock(a); b = 0;}
 #endif
+#define spin_unlock_irqrestore(a, b)   {spin_unlock(a); b = 0;}
 
 
 #define CONNECT_DELAY 1000

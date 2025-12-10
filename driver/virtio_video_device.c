@@ -1345,7 +1345,7 @@ static int virtio_video_parse_controls(struct virtio_video_device *vvd,
 		}
 
 		/* parse qmenu - replace count/offsets with pointers. */
-		if (is_priv_ctrl(config->id) && new_config->type == V4L2_CTRL_TYPE_MENU)
+		if (is_priv_ctrl(config->id) && new_config->type == (int)V4L2_CTRL_TYPE_MENU)
 			virtio_video_parse_qmenu((char*)new_config +
 						 new_config->qmenu_offset,
 						 new_config->size -
