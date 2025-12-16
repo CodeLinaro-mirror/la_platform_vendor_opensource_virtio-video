@@ -1,12 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #if !defined(_VIRTIO_VIDEO_TRACE_) || defined(TRACE_HEADER_MULTI_READ)
 #define _VIRTIO_VIDEO_TRACE_
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH .
+#define TRACE_INCLUDE_PATH driver
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE virtio_video_msm_debug
 #undef TRACE_SYSTEM
@@ -20,7 +20,6 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include "virtio_video.h"
-#include "video_generated.h"
 
 DECLARE_EVENT_CLASS(virtio_video_inst,
 	TP_PROTO(int id),

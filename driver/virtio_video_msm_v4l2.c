@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include "virtio_video.h"
 #include "virtio_video_msm_v4l2.h"
@@ -193,8 +193,8 @@ int msm_v4l2_querycap(struct file *file, void *fh,
 		return -EIO;
 	}
 
-	strlcpy(cap->driver, MSM_VIRTIO_VIDEO_DRV_NAME, sizeof(cap->driver));
-	strlcpy(cap->bus_info, MSM_VIRTIO_VIDEO_BUS_NAME, sizeof(cap->bus_info));
+	strscpy(cap->driver, MSM_VIRTIO_VIDEO_DRV_NAME, sizeof(cap->driver));
+	strscpy(cap->bus_info, MSM_VIRTIO_VIDEO_BUS_NAME, sizeof(cap->bus_info));
 	cap->version = MSM_VIRTIO_VIDEO_VERSION << 16;
 
 	ret = virtio_video_cmd_querycap(vvd, stream, cap);
