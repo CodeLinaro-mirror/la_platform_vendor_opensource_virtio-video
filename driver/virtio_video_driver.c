@@ -248,6 +248,7 @@ err_vqs:
 	v4l2_device_unregister(&vvd->v4l2_dev);
 err_v4l2_reg:
 	devm_kfree(dev, vvd);
+	vdev->priv = NULL;
 
 	return ret;
 }
@@ -255,6 +256,11 @@ err_v4l2_reg:
 static void virtio_video_remove(struct virtio_device *vdev)
 {
 	struct virtio_video_device *vvd = vdev->priv;
+
+	if (!vvd) {
+		vpr_e(vvd2tag(vvd), "%s: null vvd\n", __func__);
+		return;
+	}
 
 	vpr_h(vvd2tag(vvd), "%s: %s\n", dev_name(&vdev->dev), __func__);
 
