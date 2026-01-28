@@ -133,7 +133,6 @@ virtio_video_msm_open_gvm_session_cb(struct virtio_video_device *vvd,
 
 	vvd->device_id = le32_to_cpu(resp->device_id);
 	vvd->session_id = le32_to_cpu(resp->session_id);
-	vvd->session_handle = le64_to_cpu(resp->session_handle);
 }
 
 int32_t virtio_video_msm_cmd_open_gvm_session(uint32_t* device_id,
@@ -165,8 +164,7 @@ int32_t virtio_video_msm_cmd_open_gvm_session(uint32_t* device_id,
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 	if (ret == -ETIMEDOUT) {
 		vpr_e(vvd2tag(vvd), "timed out waiting for open gvm session\n");
-	} else if (vvd->device_id == 0 || vvd->session_id == 0
-			|| vvd->session_handle == 0) {
+	} else if (vvd->device_id == 0 || vvd->session_id == 0) {
 		vpr_e(vvd2tag(vvd), "open GVM session BE returns NULL\n");
 		ret = -EINVAL;
 	} else {
@@ -189,10 +187,6 @@ int32_t virtio_video_msm_cmd_pause_gvm_session(uint32_t device_id,
 	if (vvd == NULL) {
 		vpr_e(VPR_TAG, "%s: invalid vvd", __func__);
 		return -EXDEV;
-	}
-	if (vvd->session_handle == 0) {
-		vpr_e(VPR_TAG, "%s: no available session", __func__);
-		return -EINVAL;
 	}
 
 	req_p = virtio_video_alloc_req_resp(vvd,
@@ -229,10 +223,6 @@ int32_t virtio_video_msm_cmd_resume_gvm_session(uint32_t device_id,
 	if (vvd == NULL) {
 		vpr_e(VPR_TAG, "%s: invalid vvd", __func__);
 		return -EXDEV;
-	}
-	if (vvd->session_handle == 0) {
-		vpr_e(VPR_TAG, "%s: no available session", __func__);
-		return -EINVAL;
 	}
 
 	req_p = virtio_video_alloc_req_resp(vvd,
