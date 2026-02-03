@@ -307,7 +307,6 @@ struct virtio_video_device {
 	uint32_t vm_id;
 	uint32_t device_id;
 	uint32_t session_id;
-	uint64_t session_handle;
 #endif
 #endif
 };
