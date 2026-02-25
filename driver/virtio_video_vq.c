@@ -196,7 +196,7 @@ virtio_video_get_vbuf(struct virtio_video_device *vvd, int size, int resp_size,
 	if (!vvd || !vvd->vbufs)
 		return ERR_PTR(-EINVAL);
 
-	if (size <= 0 || size > MAX_INLINE_CMD_SIZE || resp_size <= 0)
+	if (size <= 0 || size > MAX_INLINE_CMD_SIZE || resp_size < 0)
 		return ERR_PTR(-EINVAL);
 
 	/* When resp_buf is provided by caller, they are responsible for
