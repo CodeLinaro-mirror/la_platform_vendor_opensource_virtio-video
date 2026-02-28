@@ -177,31 +177,53 @@ void virtio_video_event_cb(struct virtqueue *vq)
 {
 	struct virtio_video_device *vvd = vq->vdev->priv;
 
+	if (!vvd)
+		return;
+
 	schedule_work(&vvd->eventq.work);
 }
 
+/* size must be > 0 and <= MAX_INLINE_CMD_SIZE.
+ * resp_size must be > 0 and <= the size of resp_buf given by caller.
+ * resp_buf can be null then inline buffer is used.
+ * resp_cb can be null or not null. */
 static struct virtio_video_vbuffer *
 virtio_video_get_vbuf(struct virtio_video_device *vvd, int size, int resp_size,
 		      void *resp_buf, virtio_video_resp_cb resp_cb)
 {
 	struct virtio_video_vbuffer *vbuf;
 
+	if (!vvd || !vvd->vbufs)
+		return ERR_PTR(-EINVAL);
+
+	if (size <= 0 || size > MAX_INLINE_CMD_SIZE || resp_size < 0)
+		return ERR_PTR(-EINVAL);
+
+	/* When resp_buf is provided by caller, they are responsible for
+	 * ensuring it's large enough for resp_size. When resp_buf is NULL,
+	 * we use inline buffer which has MAX_INLINE_RESP_SIZE limit. */
+	if (resp_size > MAX_INLINE_RESP_SIZE && !resp_buf)
+		return ERR_PTR(-EINVAL);
+
 	vbuf = kmem_cache_alloc(vvd->vbufs, GFP_KERNEL);
 	if (!vbuf)
 		return ERR_PTR(-ENOMEM);
 	memset(vbuf, 0, VBUFFER_SIZE);
 
-	BUG_ON(size > MAX_INLINE_CMD_SIZE);
 	vbuf->buf = (void *)vbuf + sizeof(*vbuf);
 	vbuf->size = size;
 
 	vbuf->resp_cb = resp_cb;
 	vbuf->resp_size = resp_size;
-	if (resp_size <= MAX_INLINE_RESP_SIZE && !resp_buf)
+	if (!resp_buf)
 		vbuf->resp_buf = (void *)vbuf->buf + size;
 	else
 		vbuf->resp_buf = resp_buf;
-	BUG_ON(!vbuf->resp_buf);
+
+	if (!vbuf->resp_buf) {
+		kmem_cache_free(vvd->vbufs, vbuf);
+		return ERR_PTR(-EINVAL);
+	}
 
 	return vbuf;
 }
