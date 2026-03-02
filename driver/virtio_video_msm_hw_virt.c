@@ -115,7 +115,6 @@ int32_t virtio_video_msm_cmd_close_gvm(void)
 	if (ret == -ETIMEDOUT)
 		vpr_e(vvd2tag(vvd), "timed out waiting for close gvm\n");
 
-	virtio_video_cmd_stream_destroy(vvd, vvd->gvm_stream_id);
 	virtio_video_stream_id_put(vvd, vvd->gvm_stream_id);
 	kfree(stream);
 	vvd->gvm_stream_id = 0;
