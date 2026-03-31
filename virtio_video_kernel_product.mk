@@ -2,7 +2,7 @@
 
 TARGET_VIRTIO_VIDEO_ENABLE := false
 ifeq ($(ENABLE_HYP),true)
-  ifeq ($(TARGET_BOARD_PLATFORM),gen5)
+  ifneq ($(filter gen5 auto_gen,$(TARGET_BOARD_PLATFORM)),)
     TARGET_VIRTIO_VIDEO_ENABLE := true
   else ifeq ($(TARGET_USES_GY), true)
     TARGET_VIRTIO_VIDEO_ENABLE := true
