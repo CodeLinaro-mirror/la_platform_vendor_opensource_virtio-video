@@ -47,7 +47,7 @@ get_entry_from_fd(struct buf_export_cache* cache,
 
 	mutex_lock(&cache->lock);
 	list_for_each_entry(entry, &cache->export_fifo, list) {
-		if ((entry->inode == inode) &&
+		if ((entry->inode == inode) && (!entry->in_use) &&
 		    (entry->queue_type == queue_type) && (entry->size == size)) {
 			found = entry;
 			entry->in_use = true;
