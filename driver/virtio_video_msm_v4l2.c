@@ -159,7 +159,9 @@ unsigned int msm_v4l2_poll(struct file *file, struct poll_table_struct *pt)
 
 	poll_wait(file, &stream->fh.wait, pt);
 	poll_wait(file, &stream->bufq[INPUT_PORT].vb2q->done_wq, pt);
+	poll_wait(file, &stream->bufq[INPUT_META_PORT].vb2q->done_wq, pt);
 	poll_wait(file, &stream->bufq[OUTPUT_PORT].vb2q->done_wq, pt);
+	poll_wait(file, &stream->bufq[OUTPUT_META_PORT].vb2q->done_wq, pt);
 
 	if (v4l2_event_pending(&stream->fh))
 		poll |= POLLPRI;
