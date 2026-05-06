@@ -597,13 +597,10 @@ int virtio_video_pending_buf_list_del(struct virtio_video_device* vvd,
 #ifdef MSM_VIDC_HW_VIRT
 int virtio_video_pending_event_list_empty(struct virtio_video_device *vvd);
 
-int virtio_video_pending_event_list_pop(struct virtio_video_device *vvd,
+int virtio_video_pending_event_list_pop_del(struct virtio_video_device *vvd,
 				        struct virtio_video_queuing_event **virtio_event);
 
 int virtio_video_pending_event_list_add(struct virtio_video_device *vvd,
-				        struct virtio_video_queuing_event *virtio_event);
-
-int virtio_video_pending_event_list_del(struct virtio_video_device *vvd,
 				        struct virtio_video_queuing_event *virtio_event);
 #endif
 

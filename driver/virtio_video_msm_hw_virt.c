@@ -115,7 +115,6 @@ int32_t virtio_video_msm_cmd_close_gvm(void)
 	if (ret == -ETIMEDOUT)
 		vpr_e(vvd2tag(vvd), "timed out waiting for close gvm\n");
 
-	virtio_video_cmd_stream_destroy(vvd, vvd->gvm_stream_id);
 	virtio_video_stream_id_put(vvd, vvd->gvm_stream_id);
 	kfree(stream);
 	vvd->gvm_stream_id = 0;
@@ -265,7 +264,7 @@ int virtio_video_pending_event_list_empty(struct virtio_video_device *vvd)
 	return ret;
 }
 
-int virtio_video_pending_event_list_pop(struct virtio_video_device *vvd,
+int virtio_video_pending_event_list_pop_del(struct virtio_video_device *vvd,
 			       struct virtio_video_queuing_event **virtio_event)
 {
 	struct virtio_video_queuing_event *ret_event = NULL;
@@ -283,6 +282,7 @@ int virtio_video_pending_event_list_pop(struct virtio_video_device *vvd,
 
 	ret_event = list_first_entry(&vvd->pending_event_list,
 				struct virtio_video_queuing_event, list);
+	list_del(&ret_event->list); // combine pop and del into a single atomic operation
 	spin_unlock(&vvd->pending_event_list_lock);
 
 	*virtio_event = ret_event;
@@ -306,37 +306,6 @@ int virtio_video_pending_event_list_add(struct virtio_video_device *vvd,
 	return 0;
 }
 
-int virtio_video_pending_event_list_del(struct virtio_video_device *vvd,
-				struct virtio_video_queuing_event *virtio_event)
-{
-	struct virtio_video_queuing_event *ve = NULL;
-	struct virtio_video_queuing_event *ve_tmp = NULL;
-	int ret = -EINVAL;
-
-#ifndef VIRTIO_VIDEO_MSM
-	if (vvd->is_m2m_dev) {
-		vpr_e(vvd2tag(vvd), "Unexpected call for m2m device!\n");
-		return -EPERM;
-	}
-#endif
-	spin_lock(&vvd->pending_event_list_lock);
-	if (list_empty(&vvd->pending_event_list)) {
-		spin_unlock(&vvd->pending_event_list_lock);
-		return -EAGAIN;
-	}
-
-	list_for_each_entry_safe(ve, ve_tmp, &vvd->pending_event_list, list) {
-		if (ve->device_id == virtio_event->device_id) {
-			list_del(&ve->list);
-			ret = 0;
-			break;
-		}
-	}
-	spin_unlock(&vvd->pending_event_list_lock);
-
-	return ret;
-}
-
 int virtio_video_queue_event_wait(struct virtio_video_msm_hw_event *evt)
 {
 	int ret = 0;
@@ -351,15 +320,14 @@ int virtio_video_queue_event_wait(struct virtio_video_msm_hw_event *evt)
 	if (list_empty(&vvd->pending_event_list))
 		wait_event_interruptible(vvd->wq, !list_empty(&vvd->pending_event_list));
 
-	ret = virtio_video_pending_event_list_pop(vvd, &queuing_event);
+	ret = virtio_video_pending_event_list_pop_del(vvd, &queuing_event);
 	if (ret) {
 		vpr_e(vvd2tag(vvd), "unable to fetch the event\n");
 	} else {
 		memcpy(evt, &queuing_event->evt, sizeof(*evt));
-		virtio_video_pending_event_list_del(vvd, queuing_event);
 		kfree(queuing_event);
 	}
 
-        return ret;
+	return ret;
 }
 EXPORT_SYMBOL(virtio_video_queue_event_wait);
