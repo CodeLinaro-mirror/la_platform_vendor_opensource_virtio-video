@@ -308,6 +308,7 @@ struct virtio_video_device {
 	uint32_t device_id;
 	uint32_t session_id;
 #endif
+	atomic_t reconnecting;
 #endif
 };
 
