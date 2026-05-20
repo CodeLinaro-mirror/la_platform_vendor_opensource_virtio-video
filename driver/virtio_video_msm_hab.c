@@ -274,6 +274,15 @@ static int process_msm_hab_cmd_resp(struct hab_virtqueue* hvq, void* data)
 			memcpy(vbuf->resp_buf, resp, vbuf->resp_size);
 		}
 
+		/* Stash the backend result on the vbuf so the sync waiter
+		 * (virtio_video_queue_cmd_buffer_sync) can translate it
+		 * into a kernel errno; otherwise the failure would be
+		 * silently swallowed and userspace (V4L2 / c2hal) would
+		 * see streamon/etc. as successful even when the backend
+		 * responded with VIRTIO_VIDEO_RESP_ERR_*.
+		 */
+		vbuf->resp_rc = resp_rc;
+
 		vpr_h(stream_id2tag(vvd, hdr->stream_id), "%s: recv: cmd_type=%s. resp=%s\n",
 		      __func__,
 		      cmd_to_string(hdr->type),

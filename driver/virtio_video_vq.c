@@ -333,7 +333,7 @@ retry:
 int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 				   struct virtio_video_vbuffer *vbuf)
 {
-	int ret;
+	int ret = 0;
 	unsigned long rem;
 	unsigned long flags;
 
@@ -347,6 +347,19 @@ int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 	rem = wait_for_completion_timeout(&vbuf->reclaimed, 5 * HZ);
 	if (rem == 0)
 		ret = -ETIMEDOUT;
+
+#ifdef VIRTIO_VIDEO_MSM
+	/*
+	 * Round-trip succeeded: translate the backend's response code
+	 * (set by process_msm_hab_cmd_resp on vbuf->resp_rc) into a
+	 * kernel errno so V4L2 / userspace receive the failure.
+	 * Without this, RESP_ERR_* responses (e.g. backend streamon
+	 * failed for OOM) would be silently treated as success in
+	 * the synchronous v4l2-to-hab path.
+	 */
+	if (!ret && vbuf->resp_rc == VIRTIO_VIDEO_RESP_ERR_OUT_OF_MEMORY)
+		ret = -ENOMEM;
+#endif
 
 	spin_lock_irqsave(&vvd->commandq.qlock, flags);
 	if (vbuf_is_pending(vvd, vbuf))
