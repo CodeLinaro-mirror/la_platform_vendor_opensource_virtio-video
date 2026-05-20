@@ -175,6 +175,13 @@ struct virtio_video_vbuffer {
 	bool is_sync;
 	struct completion reclaimed;
 
+	/* Backend response result code (e.g. VIRTIO_VIDEO_RESP_*).
+	 * Set by the response handler before completing reclaimed,
+	 * read by the sync waiter to translate into a kernel errno.
+	 * 0 means no response received yet (or success encoded as 0).
+	 */
+	int resp_rc;
+
 	struct list_head pending_list_entry;
 };
 
