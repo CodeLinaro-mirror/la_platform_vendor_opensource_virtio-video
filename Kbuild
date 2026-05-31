@@ -7,7 +7,7 @@ LINUXINCLUDE    += -I${KERNEL_ROOT}/include \
 KBUILD_CPPFLAGS += -DVIRTIO_VIDEO_MSM
 KBUILD_CPPFLAGS += -DMSM_HAB_NO_SUPPORT
 
-ifeq ($(BOARD_PLATFORM), gen5)
+ifneq ($(filter gen5 auto_gen,$(BOARD_PLATFORM)),)
 $(warning "Video HW_VIRT enabled")
 KBUILD_CPPFLAGS += -DMSM_VIDC_HW_VIRT
 msm_virtio_video-objs += driver/virtio_video_msm_hw_virt.o
