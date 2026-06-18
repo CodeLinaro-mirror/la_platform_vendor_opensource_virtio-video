@@ -86,7 +86,14 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
             "CONFIG_MSM_VIDC_{}".format(lunch_target.upper()),
         ]
     else:
-        dist_target_name = "{}_video_driver_modules_dist".format(kernel_build)
+        # build_module.sh constructs the Bazel query filter regex as:
+        #   filter_regex = "${btgt}_${VARIANT}_${SUBTARGET_REGEX}_dist$"
+        # where SUBTARGET_REGEX = MODNAME_MODULE = "msm_virtio_video" (set in
+        # the qti-techpack recipe via MODNAME_MODULE).
+        # So the dist target name must follow the pattern:
+        #   autogvm_<variant>_msm_virtio_video_dist
+        # e.g. autogvm_debug-defconfig_msm_virtio_video_dist
+        dist_target_name = "{}_msm_virtio_video_dist".format(kernel_build)
         print("dist_target_name: " + dist_target_name)
         config_options = [
             "CONFIG_MSM_VIDC_{}".format(target.upper()),

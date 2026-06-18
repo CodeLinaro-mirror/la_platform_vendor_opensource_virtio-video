@@ -64,3 +64,13 @@ alias(
         "//conditions:default": "//vendor/qcom/opensource/virtio-video/gen5:autogvm_gki_msm_virtio_video",
     }),
 )
+
+alias(
+    name = "autogvm_debug-defconfig_msm_virtio_video",
+    actual = "//vendor/qcom/opensource/virtio-video/gen5:autogvm_debug-defconfig_msm_virtio_video",
+)
+
+alias(
+    name = "autogvm_defconfig_msm_virtio_video",
+    actual = "//vendor/qcom/opensource/virtio-video/gen5:autogvm_defconfig_msm_virtio_video",
+)
