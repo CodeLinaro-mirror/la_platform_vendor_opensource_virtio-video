@@ -971,7 +971,8 @@ void msm_hab_start(struct virtio_device *vdev)
 	list_for_each_entry_safe(entry, tmp, &vdev->vqs, list) {
 		hvq = to_hab_vq(entry);
 		WRITE_ONCE(hvq->broken, false);
-		wake_up_process(hvq->resp_thread);
+		if (hvq->resp_thread)
+			wake_up_process(hvq->resp_thread);
 	}
 	spin_unlock(&vdev->vqs_list_lock);
 }
