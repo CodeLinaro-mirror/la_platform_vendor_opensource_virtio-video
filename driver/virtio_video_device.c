@@ -176,6 +176,12 @@ int virtio_video_queue_setup(struct vb2_queue *vq, unsigned int *num_buffers,
 
 	*num_planes = p_info->num_planes;
 
+	if (!*num_planes) {
+		vpr_e(strm2tag(stream), "%s: num_planes is 0 for %s queue\n",
+		__func__, V4L2_TYPE_IS_OUTPUT(vq->type) ? "output" : "capture");
+		return -EINVAL;
+	}
+
 	for (i = 0; i < p_info->num_planes; i++)
 		sizes[i] = p_info->plane_format[i].plane_size;
 

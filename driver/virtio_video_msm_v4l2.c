@@ -513,7 +513,7 @@ int msm_v4l2_reqbufs(struct file *file, void *fh,
 
 	ret = vb2_reqbufs(stream->bufq[port].vb2q, buf);
 	if (ret) {
-		vpr_e(strm2tag(stream), "%s: vb2_querybuf(%d) failed, %d\n",
+		vpr_e(strm2tag(stream), "%s: vb2_reqbufs(%d) failed, %d\n",
 		      __func__, buf->type, ret);
 		goto exit;
 	}
