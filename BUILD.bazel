@@ -1,16 +1,76 @@
-load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+
 package(
-    default_visibility = [
-        "//visibility:public"],
+    default_visibility = ["//visibility:public"],
 )
 
-ddk_headers(
+# ---------------------------------------------------------------------------
+# Build-gen selection flag.
+# Pass --//vendor/qcom/opensource/virtio-video:target_gen=gen4 for gen4 products
+# (TARGET_BOARD_PLATFORM=gen4 / TARGET_USES_GY=true).
+# Defaults to gen5.
+# ---------------------------------------------------------------------------
+string_flag(
+    name = "target_gen",
+    build_setting_default = "gen5",
+    values = ["gen4", "gen5"],
+)
+
+config_setting(
+    name = "is_gen4",
+    flag_values = {":target_gen": "gen4"},
+)
+
+config_setting(
+    name = "is_gen5",
+    flag_values = {":target_gen": "gen5"},
+)
+
+# ---------------------------------------------------------------------------
+# Headers — select gen4 or gen5 implementation.
+# ---------------------------------------------------------------------------
+alias(
     name = "virtio_video_driver_headers",
-    hdrs = glob(["**/*.h"]),
-    includes = [
-        ".",
-        "include",]
+    actual = select({
+        ":is_gen4": "//vendor/qcom/opensource/virtio-video/gen4:virtio_video_driver_headers",
+        "//conditions:default": "//vendor/qcom/opensource/virtio-video/gen5:virtio_video_driver_headers",
+    }),
 )
 
-load(":target.bzl", "define_target_modules")
-define_target_modules()
+# ---------------------------------------------------------------------------
+# Module targets for each (target, variant) pair defined in target_variants.bzl.
+# Both gen4 and gen5 expose the same variant names (consolidate/perf/gki).
+# ---------------------------------------------------------------------------
+alias(
+    name = "autogvm_consolidate_msm_virtio_video",
+    actual = select({
+        ":is_gen4": "//vendor/qcom/opensource/virtio-video/gen4:autogvm_consolidate_msm_virtio_video",
+        "//conditions:default": "//vendor/qcom/opensource/virtio-video/gen5:autogvm_consolidate_msm_virtio_video",
+    }),
+)
+
+alias(
+    name = "autogvm_perf_msm_virtio_video",
+    actual = select({
+        ":is_gen4": "//vendor/qcom/opensource/virtio-video/gen4:autogvm_perf_msm_virtio_video",
+        "//conditions:default": "//vendor/qcom/opensource/virtio-video/gen5:autogvm_perf_msm_virtio_video",
+    }),
+)
+
+alias(
+    name = "autogvm_gki_msm_virtio_video",
+    actual = select({
+        ":is_gen4": "//vendor/qcom/opensource/virtio-video/gen4:autogvm_gki_msm_virtio_video",
+        "//conditions:default": "//vendor/qcom/opensource/virtio-video/gen5:autogvm_gki_msm_virtio_video",
+    }),
+)
+
+alias(
+    name = "autogvm_debug-defconfig_msm_virtio_video",
+    actual = "//vendor/qcom/opensource/virtio-video/gen5:autogvm_debug-defconfig_msm_virtio_video",
+)
+
+alias(
+    name = "autogvm_defconfig_msm_virtio_video",
+    actual = "//vendor/qcom/opensource/virtio-video/gen5:autogvm_defconfig_msm_virtio_video",
+)

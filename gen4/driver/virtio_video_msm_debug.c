@@ -1,0 +1,281 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ */
+
+#define CREATE_TRACE_POINTS
+#include "virtio_video_msm_debug.h"
+#include "virtio_video.h"
+#ifdef MSM_VIDC_HW_VIRT
+#include "include/virtio_video_hw_virt.h"
+#endif
+
+void put_inst(struct virtio_video_stream *stream)
+{
+
+	if (!stream || !stream->video_dev) {
+		vpr_e(strm2tag(stream), "%s: invalid params\n", __func__);
+		return;
+	}
+}
+
+const char *v4l2_type_name(uint32_t port)
+{
+	switch (port) {
+	case INPUT_MPLANE:      return " INPUT";
+	case OUTPUT_MPLANE:     return "OUTPUT";
+	case INPUT_META_PLANE:  return " INMTA";
+	case OUTPUT_META_PLANE: return "OUTMTA";
+	}
+
+	return "NA";
+}
+
+void print_vb2_buffer(const char *str, struct virtio_video_stream *stream,
+		struct vb2_buffer *vb2)
+{
+	struct virtio_video_device* vvd  = to_virtio_vd(stream->video_dev);;
+
+	v4l2_info(&vvd->v4l2_dev,
+			"%s: %s: idx %2d fd %d off %d size %d filled %d\n",
+			str, v4l2_type_name(vb2->type),
+			vb2->index, vb2->planes[0].m.fd,
+			vb2->planes[0].data_offset, vb2->planes[0].length,
+			vb2->planes[0].bytesused);
+
+	return;
+}
+
+const char *cmd_to_string(uint32_t cmd_type)
+{
+	switch (cmd_type) {
+	/* Command */
+	case VIRTIO_VIDEO_CMD_QUERY_CAPABILITY:
+		return "QUERY_CAPABILITY";
+	case VIRTIO_VIDEO_CMD_STREAM_CREATE:
+		return "STREAM_CREATE";
+	case VIRTIO_VIDEO_CMD_STREAM_DESTROY:
+		return "STREAM_DESTROY";
+	case VIRTIO_VIDEO_CMD_STREAM_DRAIN:
+		return "STREAM_DRAIN";
+	case VIRTIO_VIDEO_CMD_RESOURCE_ATTACH:
+		return "RESOURCE_ATTACH";
+	case VIRTIO_VIDEO_CMD_RESOURCE_QUEUE:
+		return "RESOURCE_QUEUE";
+	case VIRTIO_VIDEO_CMD_QUEUE_DETACH_RESOURCES:
+		return "QUEUE_DETACH_RESOURCE";
+	case VIRTIO_VIDEO_CMD_QUEUE_CLEAR:
+		return "QUEUE_CLEAR";
+	case VIRTIO_VIDEO_CMD_GET_PARAMS:
+		return "GET_PARAMS";
+	case VIRTIO_VIDEO_CMD_SET_PARAMS:
+		return "SET_PARAMS";
+	case VIRTIO_VIDEO_CMD_QUERY_CONTROL:
+		return "QUERY_CONTROL";
+	case VIRTIO_VIDEO_CMD_GET_CONTROL:
+		return "GET_CONTROL";
+	case VIRTIO_VIDEO_CMD_SET_CONTROL:
+		return "SET_CONTROL";
+	case VIRTIO_VIDEO_CMD_STREAMON:
+		return "STREAMON";
+	case VIRTIO_VIDEO_CMD_STREAMOFF:
+		return "STREAMOFF";
+	case VIRTIO_VIDEO_CMD_STREAM_START:
+		return "STREAM_START";
+#ifdef MSM_VIDC_HW_VIRT
+	case VIRTIO_VIDEO_CMD_OPEN_GVM:
+		return "OPEN_GVM";
+	case VIRTIO_VIDEO_CMD_CLOSE_GVM:
+		return "CLOSE_GVM";
+	case VIRTIO_VIDEO_CMD_OPEN_GVM_SESSION:
+		return "OPEN_GVM_SESSION";
+	case VIRTIO_VIDEO_CMD_PAUSE_GVM_SESSION:
+		return "PAUSE_GVM_SESSION";
+	case VIRTIO_VIDEO_CMD_RESUME_GVM_SESSION:
+		return "RESUME_GVM_SESSION";
+#endif
+
+	/* Response */
+	case VIRTIO_VIDEO_RESP_OK_NODATA:
+		return "RESP_OK_NODATA";
+	case VIRTIO_VIDEO_RESP_OK_QUERY_CAPABILITY:
+		return "RESP_OK_QUERY_CAPABILITY";
+	case VIRTIO_VIDEO_RESP_OK_RESOURCE_QUEUE:
+		return "RESP_OK_RESOURCE_QUEUE";
+	case VIRTIO_VIDEO_RESP_OK_GET_PARAMS:
+		return "RESP_OK_GET_PARAMS";
+	case VIRTIO_VIDEO_RESP_OK_QUERY_CONTROL:
+		return "RESP_OK_QUERY_CONTROL";
+	case VIRTIO_VIDEO_RESP_OK_GET_CONTROL:
+		return "RESP_OK_GET_CONTROL";
+
+	case VIRTIO_VIDEO_RESP_ERR_INVALID_OPERATION:
+		return "RESP_ERR_INVALID_OPERATION";
+	case VIRTIO_VIDEO_RESP_ERR_OUT_OF_MEMORY:
+		return "RESP_ERR_OUT_OF_MEMORY";
+	case VIRTIO_VIDEO_RESP_ERR_INVALID_STREAM_ID:
+		return "RESP_ERR_INVALID_STREAM_ID";
+	case VIRTIO_VIDEO_RESP_ERR_INVALID_RESOURCE_ID:
+		return "RESP_ERR_INVALID_RESOURCE_ID";
+	case VIRTIO_VIDEO_RESP_ERR_INVALID_PARAMETER:
+		return "RESP_ERR_INVALID_PARAMETER";
+	case VIRTIO_VIDEO_RESP_ERR_UNSUPPORTED_CONTROL:
+		return "RESP_ERR_UNSUPPORTED_CONTROL";
+#ifdef MSM_VIDC_HW_VIRT
+	case VIRTIO_VIDEO_RESP_OPEN_GVM:
+		return "RESP_OPEN_GVM";
+	case VIRTIO_VIDEO_RESP_CLOSE_GVM:
+		return "RESP_CLOSE_GVM";
+	case VIRTIO_VIDEO_RESP_OPEN_GVM_SESSION:
+		return "RESP_OPEN_GVM_SESSION";
+	case VIRTIO_VIDEO_RESP_PAUSE_GVM_SESSION:
+		return "RESP_PAUSE_GVM_SESSION";
+	case VIRTIO_VIDEO_RESP_RESUME_GVM_SESSION:
+		return "RESP_RESUME_GVM_SESSION";
+#endif
+
+	/* sub_cmd*/
+	case ENUM_FMT:
+		return "ENUM_FMT";
+	case ENUM_FRAMESIZES:
+		return "ENUM_FRAMESIZES";
+	case ENUM_FRAMEINTERVALS:
+		return "ENUM_FRAMEINTERVALS";
+	case S_FMT:
+		return "S_FMT";
+	case G_FMT:
+		return "G_FMT";
+	case QUERYCAP:
+		return "QUERYCAP";
+	case SUBSCRIBE_EVENT:
+		return "SUBSCRIBE_EVENT";
+	case UNSUBSCRIBE_EVENT:
+		return "UNSUBSCRIBE_EVENT";
+	case QBUF:
+		return "QBUF";
+	case REQBUFS:
+		return "REQBUFS";
+	case G_CTRL:
+		return "G_CTRL";
+	case S_CTRL:
+		return "S_CTRL";
+	case G_PARAM:
+		return "G_PARAM";
+	case S_PARAM:
+		return "S_PARAM";
+	case G_SELECTION:
+		return "G_SELECTION";
+	case S_SELECTION:
+		return "S_SELECTION";
+	}
+
+	return "UNKNOWN";
+}
+
+const char *codec_cmd_name(uint32_t cmd)
+{
+	switch (cmd) {
+	case V4L2_DEC_CMD_START:
+		return "START";
+	case V4L2_DEC_CMD_STOP:
+		return "STOP";
+	case V4L2_DEC_CMD_PAUSE:
+		return "PAUSE";
+	case V4L2_DEC_CMD_RESUME:
+		return "RESUME";
+	}
+
+	return "UNKNOWN";
+}
+
+const char *event2str(uint32_t event)
+{
+	switch (event) {
+	case VIRTIO_VIDEO_EVENT_FBD:
+		return "FBD";
+	case VIRTIO_VIDEO_EVENT_EBD:
+		return "EBD";
+	case VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED:
+		return "RCH";
+	case VIRTIO_VIDEO_EVENT_ERROR:
+		return "ERR";
+#ifdef MSM_VIDC_HW_VIRT
+	case VIRTIO_VIDEO_EVENT_GVM_SSR:
+		return "GVM_SSR";
+#endif
+	}
+
+	return "N/A";
+}
+
+char *stream_id2tag(struct virtio_video_device *vvd, unsigned long id)
+{
+	struct virtio_video_stream *stream = idr_find(&vvd->stream_idr, id);
+
+	return strm2tag(stream);
+}
+
+static const char *get_codec_str(int type)
+{
+	switch (type) {
+	case VIRTIO_VIDEO_PIX_FMT_H264: return " avc";
+	case VIRTIO_VIDEO_PIX_FMT_HEVC: return "hevc";
+	case VIRTIO_VIDEO_PIX_FMT_VP9:  return " vp9";
+	case VIRTIO_VIDEO_PIX_FMT_MPEG2: return "mpeg2";
+	case VIRTIO_VIDEO_MSM_PIX_FMT_AV1:  return " av1";
+	case VIRTIO_VIDEO_MSM_PIX_FMT_HEIC: return "heic";
+	}
+
+	return NULL;
+}
+
+static const char *get_domain_str(int type)
+{
+	switch (type) {
+	case VIRTIO_VIDEO_DEVICE_ENCODER: return "E";
+	case VIRTIO_VIDEO_DEVICE_DECODER: return "D";
+	}
+
+	return ".";
+}
+
+void msm_update_device_tag(struct virtio_video_device *vvd)
+{
+	if (vvd) {
+		snprintf(vvd->tag, sizeof(vvd->tag), "%s : %s",
+			 vvd->v4l2_dev.name, VPR_DBG_STR);
+		vpr_h(VPR_TAG, "%s: result=%s", __func__, vvd->tag);
+	} else {
+		vpr_e(VPR_TAG, "%s: cannot update tag\n", __func__);
+	}
+
+	return;
+}
+
+void msm_update_stream_tag(struct virtio_video_stream *stream)
+{
+	const char *codec = NULL;
+	const char *domain = NULL;
+	struct virtio_video_device *vvd = NULL;
+	u32 client_id = 0;
+
+	if (!stream) {
+		vpr_e(VPR_TAG, "%s: cannot update tag\n", __func__);
+		return;
+	}
+
+	client_id = stream->client_id;
+	codec = get_codec_str(stream->codec);
+	domain = get_domain_str(stream->domain);
+	if ((client_id != INVALID_CLIENT_ID) && (codec != NULL)) {
+		vvd = to_virtio_vd(stream->video_dev);
+		snprintf(stream->tag, sizeof(stream->tag),
+		         "%s : %s%s_%d",
+		         stream->video_dev->v4l2_dev->name,
+		         codec, domain, client_id);
+		vpr_h(vvd2tag(vvd), "%s: codec: %s, domain: %s, result: %s\n",
+		      __func__, codec, domain, stream->tag);
+	}
+
+	return;
+}
