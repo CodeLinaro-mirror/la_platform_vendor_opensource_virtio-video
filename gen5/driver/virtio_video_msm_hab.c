@@ -40,6 +40,12 @@ static struct hab_virtqueue hvq_enc[HVQ_NUM];
 static struct virtio_video_initial_data dec_data;
 static struct virtio_video_initial_data enc_data;
 
+/* Encoder must not open its HAB socket until decoder has done so, because the
+ * BE assigns decoder/encoder roles by arrival order on MM_VID.  Initial value
+ * is 1 (ready) so the first probe does not block. */
+static atomic_t dec_hab_done = ATOMIC_INIT(1);
+static DECLARE_WAIT_QUEUE_HEAD(dec_hab_wq);
+
 static int start_resp_handler(struct hab_virtqueue *hvq);
 static void stop_cmd_resp_handler(struct hab_virtqueue* hvq);
 static void stop_event_handler(struct hab_virtqueue* hvq);
@@ -436,6 +442,11 @@ static int notify_driver_and_reset(void *p)
 	vpr_h(vvd2tag(vvd), "%s: attempting reset for device %d.\n",
 	      __func__, vvd->vdev->id.device);
 
+	/* Clear the ready flag before the retry sleep so encoder's
+	 * wait_event_timeout in msm_hab_vdev_init sees it cleared. */
+	if (vvd->vdev->id.device == VIRTIO_ID_VIDEO_DECODER)
+		atomic_set(&dec_hab_done, 0);
+
 	WRITE_ONCE(hvq->broken, true);
 	vvd->commandq.ready = false;
 	vvd->eventq.ready = false;
@@ -634,6 +645,7 @@ int msm_hab_vdev_init(struct virtio_device *vdev)
 {
 	struct hab_virtqueue *hvq = NULL;
 	struct virtio_video_initial_data *data = NULL;
+	struct virtio_video_device *vvd = NULL;
 	int ret = 0;
 
 	if (vdev->id.device == VIRTIO_ID_VIDEO_DECODER) {
@@ -644,9 +656,23 @@ int msm_hab_vdev_init(struct virtio_device *vdev)
 		data = &enc_data;
 	}
 
+	if (vdev->id.device == VIRTIO_ID_VIDEO_ENCODER) {
+		if (!wait_event_timeout(dec_hab_wq, atomic_read(&dec_hab_done),
+					msecs_to_jiffies(RETRY_INTERVAL * 2))) {
+			vpr_e(vvd2tag(vvd), "%s: timed out waiting for decoder HAB\n",
+			      __func__);
+			return -ETIMEDOUT;
+		}
+	}
+
 	ret = get_hab_handle(vdev, hvq);
 	if (ret)
 		goto err;
+
+	if (vdev->id.device == VIRTIO_ID_VIDEO_DECODER) {
+		atomic_set(&dec_hab_done, 1);
+		wake_up(&dec_hab_wq);
+	}
 
 #ifndef DISABLE_INIT_CONFIG
 	ret = get_inital_data(hvq, data);
