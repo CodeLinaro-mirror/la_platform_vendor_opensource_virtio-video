@@ -1,0 +1,16 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+package(
+    default_visibility = [
+        "//visibility:public"],
+)
+
+ddk_headers(
+    name = "virtio_video_driver_headers",
+    hdrs = glob(["**/*.h"]),
+    includes = [
+        ".",
+        "include",]
+)
+
+load(":target.bzl", "define_target_modules")
+define_target_modules()
