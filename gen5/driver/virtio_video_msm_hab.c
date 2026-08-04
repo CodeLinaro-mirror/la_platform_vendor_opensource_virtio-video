@@ -551,7 +551,7 @@ static int virtio_video_hab_resp_handler(void *p)
 				continue;
 			}
 			else if (ret == -ENODEV) {
-				vpr_h(vvd2tag(vvd), "%s %s: socket 0x%x closed\n",
+				vpr_e(vvd2tag(vvd), "%s %s: socket 0x%x closed\n",
 				      vq_name, __func__, hvq->habmm_handle);
 				goto exit;
 			}

@@ -242,7 +242,8 @@ int virtio_video_alloc_vbufs(struct virtio_video_device *vvd)
 
 void virtio_video_free_vbufs(struct virtio_video_device *vvd)
 {
-	struct virtio_video_vbuffer *vbuf;
+	struct virtio_video_vbuffer *vbuf = NULL, *tmp = NULL;
+	unsigned long flags = 0;
 
 	/* Release command buffers. Operation on vbufs here is lock safe,
            since before device was deinitialized and queues was stopped
@@ -251,6 +252,20 @@ void virtio_video_free_vbufs(struct virtio_video_device *vvd)
 		if (vbuf_is_pending(vvd, vbuf))
 			free_vbuf(vvd, vbuf);
 	}
+
+	/*
+	 * Drain buffers consumed by HAB but still on pending_vbuf_list.
+	 * Complete sync buffers before freeing them; commandq.ready prevents
+	 * the waiting caller from accessing the freed buffer.
+	 */
+	spin_lock_irqsave(&vvd->commandq.qlock, flags);
+	list_for_each_entry_safe(vbuf, tmp, &vvd->pending_vbuf_list,
+				 pending_list_entry) {
+		if (vbuf->is_sync)
+			complete(&vbuf->reclaimed);
+		free_vbuf(vvd, vbuf);
+	}
+	spin_unlock_irqrestore(&vvd->commandq.qlock, flags);
 
 	kmem_cache_destroy(vvd->vbufs);
 	vvd->vbufs = NULL;
@@ -377,7 +392,10 @@ int virtio_video_queue_cmd_buffer_sync(struct virtio_video_device *vvd,
 		ret = -ETIMEDOUT;
 
 	spin_lock_irqsave(&vvd->commandq.qlock, flags);
-	if (vbuf_is_pending(vvd, vbuf))
+	/*
+	 * Teardown may have freed vbuf while the caller was waiting.
+	 */
+	if (vvd->commandq.ready && vbuf_is_pending(vvd, vbuf))
 		free_vbuf(vvd, vbuf);
 	spin_unlock_irqrestore(&vvd->commandq.qlock, flags);
 

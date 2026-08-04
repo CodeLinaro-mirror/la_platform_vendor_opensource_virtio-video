@@ -69,6 +69,12 @@ int32_t virtio_video_msm_cmd_open_gvm(uint32_t vm_id,
 		vpr_e(VPR_TAG, "%s: failed creating hw_virt stream", __func__);
 		return ret;
 	}
+
+	if (!vvd->commandq.ready) {
+		vpr_e(vvd2tag(vvd), "%s: commandq not ready\n", __func__);
+		return -ENODEV;
+	}
+
 	req_p = virtio_video_alloc_req_resp(vvd,
 	                                    virtio_video_msm_open_gvm_cb,
 	                                    &vbuf,
@@ -110,6 +116,12 @@ int32_t virtio_video_msm_cmd_close_gvm(void)
 		vpr_e(VPR_TAG, "%s: invalid vvd", __func__);
 		return -EXDEV;
 	}
+
+	if (!vvd->commandq.ready) {
+		vpr_e(vvd2tag(vvd), "%s: commandq not ready\n", __func__);
+		return -ENODEV;
+	}
+
 	stream = idr_find(&vvd->stream_idr, vvd->gvm_stream_id);
 	req_p = virtio_video_alloc_req_resp(vvd,
 	                                    NULL,
@@ -159,6 +171,11 @@ int32_t virtio_video_msm_cmd_open_gvm_session(uint32_t* device_id,
 		return -EXDEV;
 	}
 
+	if (!vvd->commandq.ready) {
+		vpr_e(vvd2tag(vvd), "%s: commandq not ready\n", __func__);
+		return -ENODEV;
+	}
+
 	req_p = virtio_video_alloc_req_resp(vvd,
 	                                virtio_video_msm_open_gvm_session_cb,
 	                                &vbuf,
@@ -199,6 +216,11 @@ int32_t virtio_video_msm_cmd_pause_gvm_session(uint32_t device_id,
 		return -EXDEV;
 	}
 
+	if (!vvd->commandq.ready) {
+		vpr_e(vvd2tag(vvd), "%s: commandq not ready\n", __func__);
+		return -ENODEV;
+	}
+
 	req_p = virtio_video_alloc_req_resp(vvd,
 	                                    NULL,
 	                                    &vbuf,
@@ -233,6 +255,11 @@ int32_t virtio_video_msm_cmd_resume_gvm_session(uint32_t device_id,
 	if (vvd == NULL) {
 		vpr_e(VPR_TAG, "%s: invalid vvd", __func__);
 		return -EXDEV;
+	}
+
+	if (!vvd->commandq.ready) {
+		vpr_e(vvd2tag(vvd), "%s: commandq not ready\n", __func__);
+		return -ENODEV;
 	}
 
 	req_p = virtio_video_alloc_req_resp(vvd,
