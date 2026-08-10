@@ -121,7 +121,7 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
             deps = headers + all_module_deps + _get_kernel_build_module_deps(module, options, formatter),
             kernel_build = kernel_build_label,
             local_defines = options.keys(),
-            copts = ["-DVIRTIO_VIDEO_MSM", "-DMSM_HAB_NO_SUPPORT", "-DMSM_VIDC_HW_VIRT", "-DDISABLE_INIT_CONFIG"]
+            copts = ["-DVIRTIO_VIDEO_MSM", "-DMSM_HAB_NO_SUPPORT"]
         )
         all_module_rules.append(rule_name)
 
