@@ -39,7 +39,14 @@ virtio_video_msm_open_gvm_cb(struct virtio_video_device *vvd,
 {
 	struct virtio_video_open_gvm_resp *resp =
 		(struct virtio_video_open_gvm_resp *)vbuf->resp_buf;
-	vvd->device_core_mask = le32_to_cpu(resp->device_core_mask);
+
+	if (vbuf->resp_rc == VIRTIO_VIDEO_RESP_OK_NODATA) {
+		vvd->device_core_mask = le32_to_cpu(resp->device_core_mask);
+	} else {
+		vvd->device_core_mask = 0;
+		vpr_e(vvd2tag(vvd), "%s: BE returned error resp_rc 0x%x\n",
+		      __func__, vbuf->resp_rc);
+	}
 }
 
 int32_t virtio_video_msm_cmd_open_gvm(uint32_t vm_id,
@@ -78,6 +85,10 @@ int32_t virtio_video_msm_cmd_open_gvm(uint32_t vm_id,
 	ret = virtio_video_queue_cmd_buffer_sync(vvd, vbuf);
 	if (ret == -ETIMEDOUT) {
 		vpr_e(vvd2tag(vvd), "timed out waiting for open gvm\n");
+	} else if (!ret && !vvd->device_core_mask) {
+		vpr_e(vvd2tag(vvd), "invalid device_core_mask 0x%x\n",
+		      vvd->device_core_mask);
+		ret = -ENODEV;
 	} else {
 		*device_core_mask = vvd->device_core_mask;
 		vvd->vm_id = vm_id;
