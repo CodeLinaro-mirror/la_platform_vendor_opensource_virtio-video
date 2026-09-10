@@ -176,6 +176,7 @@ struct virtio_video_vbuffer {
 	struct completion reclaimed;
 
 	struct list_head pending_list_entry;
+	int resp_rc;
 };
 
 struct virtio_video_cmd_queue {

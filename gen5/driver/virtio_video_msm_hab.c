@@ -287,7 +287,7 @@ static int process_msm_hab_cmd_resp(struct hab_virtqueue* hvq, void* data)
 			resp += sizeof(struct virtio_video_resp);
 			memcpy(vbuf->resp_buf, resp, vbuf->resp_size);
 		}
-
+		vbuf->resp_rc = resp_rc;
 		vpr_h(stream_id2tag(vvd, hdr->stream_id), "%s: recv: cmd_type=%s. resp=%s\n",
 		      __func__,
 		      cmd_to_string(hdr->type),
