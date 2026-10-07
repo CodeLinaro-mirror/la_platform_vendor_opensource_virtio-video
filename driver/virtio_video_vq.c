@@ -524,6 +524,12 @@ static void virtio_video_handle_event(struct virtio_video_device *vvd,
 		}
 		trace_virt_vid_evt_rch(stream_id, 0, 0, 0, 0);
 		break;
+	case VIRTIO_VIDEO_EVENT_EOS:
+		vpr_h(strm2tag(stream), "%s: stream_id=%u: eos event\n", __func__,
+		      stream_id);
+		if (stream->enable_eos_event)
+			virtio_video_queue_eos_event(stream);
+		break;
 	case VIRTIO_VIDEO_EVENT_ERROR:
 		vpr_e(strm2tag(stream), "%s: stream_id=%u: error event\n", __func__,
 		      stream_id);
