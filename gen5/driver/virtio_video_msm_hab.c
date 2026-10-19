@@ -287,7 +287,7 @@ static int process_msm_hab_cmd_resp(struct hab_virtqueue* hvq, void* data)
 			resp += sizeof(struct virtio_video_resp);
 			memcpy(vbuf->resp_buf, resp, vbuf->resp_size);
 		}
-
+		vbuf->resp_rc = resp_rc;
 		vpr_h(stream_id2tag(vvd, hdr->stream_id), "%s: recv: cmd_type=%s. resp=%s\n",
 		      __func__,
 		      cmd_to_string(hdr->type),
@@ -656,6 +656,12 @@ int msm_hab_vdev_init(struct virtio_device *vdev)
 		data = &enc_data;
 	}
 
+#ifdef MSM_VIDC_HW_VIRT
+	/* All hw_virt GVM commands use the decoder channel; encoder opens no HAB sockets. */
+	if (vdev->id.device == VIRTIO_ID_VIDEO_ENCODER)
+		return 0;
+#endif
+
 	if (vdev->id.device == VIRTIO_ID_VIDEO_ENCODER) {
 		if (!wait_event_timeout(dec_hab_wq, atomic_read(&dec_hab_done),
 					msecs_to_jiffies(RETRY_INTERVAL * 2))) {
@@ -902,8 +908,15 @@ int msm_hab_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		if (!hvq->habmm_handle) {
 			vpr_e(vvd2tag(vvd), "%s: %s habmm_handle is null\n",
 			      dev_name(&vdev->dev), __func__);
+#ifndef MSM_VIDC_HW_VIRT
 			ret = -ENODEV;
 			goto err;
+#else
+			if (vdev->id.device != VIRTIO_ID_VIDEO_ENCODER) {
+				ret = -ENODEV;
+				goto err;
+			}
+#endif
 		}
 
 #if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
@@ -971,7 +984,8 @@ void msm_hab_start(struct virtio_device *vdev)
 	list_for_each_entry_safe(entry, tmp, &vdev->vqs, list) {
 		hvq = to_hab_vq(entry);
 		WRITE_ONCE(hvq->broken, false);
-		wake_up_process(hvq->resp_thread);
+		if (hvq->resp_thread)
+			wake_up_process(hvq->resp_thread);
 	}
 	spin_unlock(&vdev->vqs_list_lock);
 }
