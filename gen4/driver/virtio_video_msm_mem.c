@@ -15,7 +15,7 @@
 #include "virtio_video_msm_mem.h"
 
 #define MAX_EXPORT_RETRY 5
-#define MAX_NUM_EXPORT_CACHE_ENTRY 256
+#define MAX_NUM_EXPORT_CACHE_ENTRY 1024
 
 
 struct buf_export_entry {
@@ -47,7 +47,7 @@ get_entry_from_fd(struct buf_export_cache* cache,
 
 	mutex_lock(&cache->lock);
 	list_for_each_entry(entry, &cache->export_fifo, list) {
-		if ((entry->inode == inode) &&
+		if ((entry->inode == inode) && (!entry->in_use) &&
 		    (entry->queue_type == queue_type) && (entry->size == size)) {
 			found = entry;
 			entry->in_use = true;
